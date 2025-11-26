@@ -1,0 +1,13 @@
+[project]
+name = "ftcvanguard"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "argon2-cffi>=25.1.0",
+    "dotenv>=0.9.9",
+    "flask>=3.1.2",
+    "pyjwt[crypto]>=2.10.1",
+    "requests>=2.32.5",
+]
