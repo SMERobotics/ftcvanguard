@@ -31,7 +31,11 @@ def _root():
 
 @app.route("/assets/<path:path>", methods=["GET"])
 def _assets(path):
-    return send_from_directory("static", "assets", path)
+    return send_from_directory("static/assets", path)
+
+@app.route("/login", methods=["GET"])
+def _login():
+    return send_from_directory("static", "login.html")
 
 @app.route("/form", methods=["GET"])
 def _form():

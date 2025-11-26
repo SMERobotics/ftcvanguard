@@ -13,3 +13,5 @@ wheels/
 default.db
 default.db-shm
 default.db-wal
+
+node_modules/
