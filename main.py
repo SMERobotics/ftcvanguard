@@ -9,7 +9,7 @@ import requests
 import sqlite3
 
 FTC_API_URL = "https://ftc-api.firstinspires.org/v2.0"
-BLOCK_REGISTRATION = False
+BLOCK_REGISTRATION = True
 RSA_PUBLIC_KEY = ""
 RSA_PRIVATE_KEY = ""
 
@@ -107,11 +107,26 @@ def _api_v1_login():
         print(e)
         return {"status": "fuck", "error": "idk"}, 500
 
+@app.route("/api/v1/verify", methods=["GET"])
+def _api_v1_verify():
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return {"status": "fuck", "error": "no auth"}, 401
+    
+    token = auth_header.split(" ")[1]
+    try:
+        payload = jwt.decode(token, RSA_PUBLIC_KEY, algorithms=["RS256"])
+        return {"status": "success!"}, 200
+    except jwt.ExpiredSignatureError:
+        return {"status": "fuck", "error": "token expired"}, 401
+    except jwt.InvalidTokenError:
+        return {"status": "fuck", "error": "invalid token"}, 401
+
 @app.route("/api/v1/events", methods=["GET"])
 def _api_v1_events():
     auth_header = request.headers.get("Authorization")
     if not auth_header or not auth_header.startswith("Bearer "):
-        return {"status": "fuck", "error": "no token"}, 401
+        return {"status": "fuck", "error": "no auth"}, 401
     
     token = auth_header.split(" ")[1]
     try:
@@ -134,7 +149,7 @@ def _api_v1_events():
 def _api_v1_schedule():
     auth_header = request.headers.get("Authorization")
     if not auth_header or not auth_header.startswith("Bearer "):
-        return {"status": "fuck", "error": "no token"}, 401
+        return {"status": "fuck", "error": "no auth"}, 401
     
     token = auth_header.split(" ")[1]
     try:

@@ -1,3 +1,196 @@
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&display=swap');
+@import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&display=swap");
 
-/* CSS should be global bc sharing is caring <3 */
+body {
+    margin: 0;
+    padding: 0;
+    font-family: "JetBrains Mono", monospace;
+    background-color: #ffffff;
+    color: #000000;
+    height: 100vh;
+    display: grid;
+    grid-template-columns: 48px 1fr;
+    grid-template-rows: 36px 1fr 24px;
+    grid-template-areas:
+        "header header"
+        "sidebar main"
+        "footer footer";
+}
+
+#header {
+    grid-area: header;
+    background-color: #181818;
+    border-bottom: 1px solid #333333;
+}
+
+#sidebar {
+    grid-area: sidebar;
+    background-color: #181818;
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid #333333;
+}
+
+#main {
+    grid-area: main;
+    background-color: #1f1f1f;
+    overflow: auto;
+}
+
+#footer {
+    grid-area: footer;
+    background-color: #181818;
+    border-top: 1px solid #333333;
+    display: flex;
+    align-items: center;
+    padding: 0 12px;
+    font-size: 12px;
+    color: #868686;
+}
+
+.sidebar-button {
+    width: 100%;
+    height: 48px;
+    background: none;
+    border: none;
+    border-left: 2px solid transparent;
+    border-right: 2px solid transparent;
+    box-sizing: border-box;
+    cursor: pointer;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 8px 0;
+}
+
+.sidebar-button svg {
+    width: 24px;
+    height: 24px;
+    stroke: #868686;
+    fill: #868686;
+    transition: stroke 0.1s, fill 0.1s;
+}
+
+.sidebar-button:hover svg {
+    stroke: #d7d7d7;
+    fill: #d7d7d7;
+}
+
+.sidebar-active {
+    border-left: 2px solid #0078d4;
+}
+
+#button-settings {
+    margin-top: auto;
+}
+
+#button-settings svg {
+    transition: transform 0.2s ease-out;
+}
+
+#button-settings:hover svg {
+    transform: rotate(22.5deg);
+}
+
+#login {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: #1f1f1f;
+    z-index: 1000;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.login-container {
+    background-color: #181818;
+    padding: 40px;
+    border-radius: 12px;
+    border: 1px solid #333333;
+    width: 320px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+.login-container span {
+    margin: 0;
+    text-align: center;
+    color: #ffffff;
+    font-size: 28px;
+    font-weight: 600;
+    letter-spacing: -0.5px;
+}
+
+#login-form {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.form-group label {
+    color: #a0a0a0;
+    font-size: 13px;
+    font-weight: 500;
+}
+
+.form-group input {
+    background-color: #252526;
+    border: 1px solid #3e3e42;
+    border-radius: 6px;
+    padding: 12px;
+    color: #ffffff;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 14px;
+    outline: none;
+    transition: all 0.2s ease;
+}
+
+.form-group input:focus {
+    border-color: #0078d4;
+    background-color: #2d2d30;
+    box-shadow: 0 0 0 2px rgba(0, 120, 212, 0.2);
+}
+
+.form-group input::placeholder {
+    color: #505050;
+}
+
+#login-button {
+    background-color: #0078d4;
+    color: #ffffff;
+    border: none;
+    border-radius: 6px;
+    padding: 12px;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.2s, transform 0.1s;
+    width: 100%;
+    margin-top: 8px;
+}
+
+#login-button:hover {
+    background-color: #0063b1;
+}
+
+#login-button:active {
+    transform: scale(0.98);
+}
+
+#login-error {
+    color: #ff4d4d;
+    font-size: 12px;
+    margin: 0;
+    text-align: center;
+    display: none;
+}
