@@ -1,5 +1,10 @@
 @import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&display=swap");
 
+::selection {
+    background-color: #ffffff;
+    color: #000000;
+}
+
 body {
     margin: 0;
     padding: 0;
@@ -20,6 +25,48 @@ body {
     grid-area: header;
     background-color: #181818;
     border-bottom: 1px solid #333333;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.header-content {
+    display: flex;
+    align-items: center;
+}
+
+#meet-selector {
+    background-color: #252526;
+    color: #cccccc;
+    border: 1px solid #3e3e42;
+    border-radius: 5px;
+    padding: 2px;
+    text-align: center;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 12px;
+    font-weight: 400;
+    outline: none;
+    min-width: 32vw;
+    cursor: pointer;
+}
+
+#meet-selector:hover {
+    border-color: #505050;
+}
+
+#meet-selector:focus {
+    border-color: #0078d4;
+    background-color: #1f1f1f;
+}
+
+#meet-selector option {
+    font-size: 12px;
+    font-weight: 400;
+}
+
+#meet-selector option:checked {
+    background-color: #04395e;
+    color: #ffffff;
 }
 
 #sidebar {
@@ -33,7 +80,240 @@ body {
 #main {
     grid-area: main;
     background-color: #1f1f1f;
-    overflow: auto;
+    overflow: hidden;
+}
+
+#schedule-container {
+    display: flex;
+    height: 100%;
+    width: 100%;
+}
+
+#schedule-list {
+    width: 350px;
+    border-right: 1px solid #333333;
+    overflow-y: auto;
+    background-color: #252526;
+}
+
+#schedule-details {
+    flex: 1;
+    padding: 24px;
+    overflow-y: auto;
+    background-color: #1f1f1f;
+}
+
+.match-item {
+    padding: 12px 16px;
+    border-bottom: 1px solid #333333;
+    cursor: pointer;
+    transition: background-color 0.1s;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.match-item:hover {
+    background-color: #2a2d2e;
+}
+
+.match-item.active {
+    background-color: #37373d;
+    border-left: 3px solid #0078d4;
+}
+
+.match-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.match-title {
+    font-weight: 600;
+    font-size: 14px;
+    color: #cccccc;
+}
+
+.match-time {
+    font-size: 12px;
+    color: #868686;
+}
+
+.match-teams {
+    font-size: 13px;
+    color: #a0a0a0;
+    display: flex;
+    gap: 8px;
+}
+
+.team-red { color: #ff6b6b; }
+.team-blue { color: #4da6ff; }
+.team-vs { color: #ffffff; }
+
+.match-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 4px;
+    font-size: 11px;
+}
+
+.queue-status {
+    color: #868686;
+}
+
+.queue-status.queueing {
+    color: #4ec9b0;
+    font-weight: 600;
+}
+
+.empty-state {
+    color: #868686;
+    text-align: center;
+    margin-top: 40px;
+    font-size: 14px;
+}
+
+/* Details View Styles */
+.details-header {
+    margin-bottom: 24px;
+    border-bottom: 1px solid #333333;
+    padding-bottom: 16px;
+}
+
+.details-title {
+    font-size: 24px;
+    font-weight: 600;
+    color: #ffffff;
+    margin-bottom: 8px;
+}
+
+.details-time {
+    color: #868686;
+    font-size: 14px;
+}
+
+.alliance-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    margin-bottom: 32px;
+}
+
+.alliance-card {
+    background-color: #252526;
+    border-radius: 6px;
+    padding: 16px;
+    border: 1px solid #333333;
+}
+
+.alliance-card.red { border-top: 3px solid #ff6b6b; }
+.alliance-card.blue { border-top: 3px solid #4da6ff; }
+
+.alliance-title {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 12px;
+    color: #cccccc;
+}
+
+.team-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 0;
+    border-bottom: 1px solid #333333;
+    font-size: 13px;
+}
+
+.team-row:last-child { border-bottom: none; }
+
+.team-rank {
+    color: #868686;
+    font-size: 11px;
+}
+
+/* Stats Table Styles */
+.stats-container {
+    background-color: #252526;
+    border-radius: 6px;
+    padding: 16px;
+    border: 1px solid #333333;
+    margin-top: 24px;
+}
+
+.stats-title {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 12px;
+    color: #cccccc;
+}
+
+.stats-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+
+.stats-table th {
+    text-align: left;
+    color: #868686;
+    font-weight: 500;
+    padding: 8px;
+    border-bottom: 1px solid #333333;
+}
+
+.stats-table td {
+    padding: 8px;
+    color: #cccccc;
+    border-bottom: 1px solid #333333;
+}
+
+.stats-table tr:last-child td {
+    border-bottom: none;
+}
+
+.stats-row-red {
+    background-color: rgba(255, 107, 107, 0.1);
+}
+
+.stats-row-blue {
+    background-color: rgba(77, 166, 255, 0.1);
+}
+
+#rankings-container {
+    padding: 24px;
+    overflow-y: auto;
+    height: 100%;
+    box-sizing: border-box;
+}
+
+#rankings-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+
+#rankings-table th {
+    text-align: left;
+    color: #868686;
+    font-weight: 500;
+    padding: 8px;
+    border-bottom: 1px solid #333333;
+}
+
+#rankings-table td {
+    padding: 8px;
+    color: #cccccc;
+    border-bottom: 1px solid #333333;
+}
+
+#rankings-table tr:hover {
+    background-color: #2a2d2e;
+}
+
+.current-team-rank {
+    background-color: rgba(0, 120, 212, 0.2) !important;
+    font-weight: 600;
 }
 
 #footer {
@@ -45,6 +325,23 @@ body {
     padding: 0 12px;
     font-size: 12px;
     color: #868686;
+}
+
+#loading-bar-container {
+    margin-left: auto;
+    width: 20vw;
+    height: 8px;
+    background-color: #333333;
+    border-radius: 4px;
+    overflow: hidden;
+    display: none;
+}
+
+#loading-bar {
+    width: 0%;
+    height: 100%;
+    background: linear-gradient(90deg, #ff0000, #ff7f00, #ffff00, #00ff00, #0000ff, #4b0082, #8f00ff);
+    border-radius: 4px;
 }
 
 .sidebar-button {
@@ -77,6 +374,11 @@ body {
 
 .sidebar-active {
     border-left: 2px solid #0078d4;
+}
+
+.sidebar-active svg {
+    stroke: #d7d7d7;
+    fill: #d7d7d7;
 }
 
 #button-settings {

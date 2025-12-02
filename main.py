@@ -33,18 +33,6 @@ def _root():
 def _assets(path):
     return send_from_directory("static/assets", path)
 
-@app.route("/login", methods=["GET"])
-def _login():
-    return send_from_directory("static", "login.html")
-
-@app.route("/form", methods=["GET"])
-def _form():
-    return send_from_directory("static", "form.html")
-
-@app.route("/schedule", methods=["GET"])
-def _schedule():
-    return send_from_directory("static", "schedule.html")
-
 @app.route("/api/v1/register", methods=["POST"])
 def _api_v1_register():
     if BLOCK_REGISTRATION:
@@ -116,10 +104,21 @@ def _api_v1_verify():
     token = auth_header.split(" ")[1]
     try:
         payload = jwt.decode(token, RSA_PUBLIC_KEY, algorithms=["RS256"])
-        return {"status": "success!"}, 200
+        return {"status": "success!", "id": payload.get("id")}, 200
     except jwt.ExpiredSignatureError:
         return {"status": "fuck", "error": "token expired"}, 401
-    except jwt.InvalidTokenError:
+    except:
+        return {"status": "fuck", "error": "invalid token"}, 401
+        return {"status": "fuck", "error": "no auth"}, 401
+    
+    token = auth_header.split(" ")[1]
+    try:
+        payload = jwt.decode(token, RSA_PUBLIC_KEY, algorithms=["RS256"])
+        team_id = payload.get("id")
+        return {"status": "success!", "id": team_id}, 200
+    except jwt.ExpiredSignatureError:
+        return {"status": "fuck", "error": "token expired"}, 401
+    except:
         return {"status": "fuck", "error": "invalid token"}, 401
 
 @app.route("/api/v1/events", methods=["GET"])
@@ -134,7 +133,7 @@ def _api_v1_events():
         team_id = payload.get("id")
     except jwt.ExpiredSignatureError:
         return {"status": "fuck", "error": "token expired"}, 401
-    except jwt.InvalidTokenError:
+    except:
         return {"status": "fuck", "error": "invalid token"}, 401
     
     # fetch events from FTC API
@@ -143,6 +142,33 @@ def _api_v1_events():
     year = now.year
 
     r = s.get(f"{FTC_API_URL}/{year}/events?teamNumber={team_id}")
+    return r.json(), r.status_code
+
+@app.route("/api/v1/event", methods=["GET"])
+def _api_v1_event():
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return {"status": "fuck", "error": "no auth"}, 401
+    
+    token = auth_header.split(" ")[1]
+    try:
+        payload = jwt.decode(token, RSA_PUBLIC_KEY, algorithms=["RS256"])
+    except jwt.ExpiredSignatureError:
+        return {"status": "fuck", "error": "token expired"}, 401
+    except:
+        return {"status": "fuck", "error": "invalid token"}, 401
+    
+    # fetch event from FTC API
+
+    try:
+        event = request.args.get("event")
+    except:
+        return {"status": "fuck", "error": "bad request"}, 400
+
+    now = datetime.now()
+    year = now.year
+
+    r = s.get(f"{FTC_API_URL}/{year}/events?eventCode={event}")
     return r.json(), r.status_code
 
 @app.route("/api/v1/schedule", methods=["GET"])
@@ -157,16 +183,73 @@ def _api_v1_schedule():
         team_id = payload.get("id")
     except jwt.ExpiredSignatureError:
         return {"status": "fuck", "error": "token expired"}, 401
-    except jwt.InvalidTokenError:
+    except:
         return {"status": "fuck", "error": "invalid token"}, 401
     
     # fetch schedule from FTC API
 
+    try:
+        event = request.args.get("event")
+    except:
+        return {"status": "fuck", "error": "bad request"}, 400
+
     now = datetime.now()
     year = now.year
-    event = request.args.get("event")
     
     r = s.get(f"{FTC_API_URL}/{year}/schedule/{event}?teamNumber={team_id}")
+    return r.json(), r.status_code
+
+@app.route("/api/v1/rankings", methods=["GET"])
+def _api_v1_rankings():
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return {"status": "fuck", "error": "no auth"}, 401
+    
+    token = auth_header.split(" ")[1]
+    try:
+        payload = jwt.decode(token, RSA_PUBLIC_KEY, algorithms=["RS256"])
+    except jwt.ExpiredSignatureError:
+        return {"status": "fuck", "error": "token expired"}, 401
+    except:
+        return {"status": "fuck", "error": "invalid token"}, 401
+    
+    # fetch rankings from FTC API
+
+    try:
+        region = request.args.get("region")
+        league = request.args.get("league")
+    except:
+        return {"status": "fuck", "error": "bad request"}, 400
+
+    now = datetime.now()
+    year = now.year
+    
+    r = s.get(f"{FTC_API_URL}/{year}/leagues/rankings/{region}/{league}")
+    return r.json(), r.status_code
+
+@app.route("/api/v1/teams", methods=["GET"])
+def _api_v1_teams():
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return {"status": "fuck", "error": "no auth"}, 401
+    
+    token = auth_header.split(" ")[1]
+    try:
+        payload = jwt.decode(token, RSA_PUBLIC_KEY, algorithms=["RS256"])
+    except jwt.ExpiredSignatureError:
+        return {"status": "fuck", "error": "token expired"}, 401
+    except jwt.InvalidTokenError:
+        return {"status": "fuck", "error": "invalid token"}, 401
+    
+    try:
+        event = request.args.get("event")
+    except:
+        return {"status": "fuck", "error": "bad request"}, 400
+    
+    now = datetime.now()
+    year = now.year
+    
+    r = s.get(f"{FTC_API_URL}/{year}/teams?eventCode={event}")
     return r.json(), r.status_code
 
 if __name__ == "__main__":
