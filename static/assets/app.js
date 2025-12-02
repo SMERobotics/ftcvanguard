@@ -2,12 +2,16 @@
 const tabs = [
     { buttonId: "button-schedule", viewId: "view-schedule" },
     { buttonId: "button-rankings", viewId: "view-rankings" },
+    { buttonId: "button-notes", viewId: "view-notes" },
     { buttonId: "button-settings", viewId: "view-settings" },
 ];
 let currentMatches = [];
 let currentRankings = [];
 let currentTeams = [];
+let currentEventCode = "";
+let currentNotesStatus = {};
 let loggedInTeamId = null;
+let notesAutoSaveTimeout = null;
 function switchTab(activeTab) {
     tabs.forEach(tab => {
         const button = document.getElementById(tab.buttonId);
@@ -114,10 +118,12 @@ function populateMeetSelector(events) {
     }
     if (defaultEvent) {
         selector.value = defaultEvent.code;
+        currentEventCode = defaultEvent.code;
         loadSchedule(defaultEvent.code);
     }
     selector.addEventListener("change", () => {
         console.log("Selected meet:", selector.value);
+        currentEventCode = selector.value;
         loadSchedule(selector.value);
     });
 }
@@ -175,8 +181,9 @@ function renderRankings(rankings) {
     if (!tbody)
         return;
     tbody.innerHTML = "";
-    rankings.forEach(rank => {
+    rankings.forEach((rank, index) => {
         const tr = document.createElement("tr");
+        tr.style.animationDelay = `${index * 0.03}s`;
         if (loggedInTeamId && rank.teamNumber === loggedInTeamId) {
             tr.classList.add("current-team-rank");
         }
@@ -205,6 +212,7 @@ function renderSchedule(matches, rankings, teams) {
     matches.forEach((match, index) => {
         const item = document.createElement("div");
         item.className = "match-item";
+        item.style.animationDelay = `${index * 0.03}s`;
         item.onclick = () => {
             document.querySelectorAll(".match-item").forEach(el => el.classList.remove("active"));
             item.classList.add("active");
@@ -288,7 +296,7 @@ function updateQueueTimers() {
         el.textContent = text + fieldInfo;
     });
 }
-function renderMatchDetails(match, rankings, teams) {
+async function renderMatchDetails(match, rankings, teams) {
     const detailsContainer = document.getElementById("schedule-details");
     if (!detailsContainer)
         return;
@@ -360,26 +368,72 @@ function renderMatchDetails(match, rankings, teams) {
             </table>
         </div>
     `;
+    const teamNumbers = allTeams.map(t => t.teamNumber);
+    const notesMap = await loadNotesForTeams(teamNumbers);
+    const notesSection = allTeams.length > 0 ? `
+        <div class="notes-display-container">
+            <div class="notes-display-title">Scouting Notes</div>
+            ${allTeams.map(team => {
+        const notes = notesMap.get(team.teamNumber);
+        const teamInfo = teams.find(t => t.teamNumber === team.teamNumber);
+        const teamName = teamInfo ? (teamInfo.nameShort || teamInfo.nameFull) : `Team ${team.teamNumber}`;
+        const isRed = team.station.startsWith("Red");
+        const allianceClass = isRed ? "team-red" : "team-blue";
+        if (!notes || (!notes.autoPerformance && !notes.teleopPerformance && !notes.generalNotes)) {
+            return `
+                        <div class="notes-display-card no-notes">
+                            <div class="notes-display-header">
+                                <span class="${allianceClass}">${team.teamNumber} - ${teamName}</span>
+                                <span class="notes-status-pending">No notes</span>
+                            </div>
+                        </div>
+                    `;
+        }
+        const escapeHtml = (text) => {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        };
+        const formatMultiline = (text) => {
+            return escapeHtml(text).replace(/\n/g, '<br>');
+        };
+        return `
+                    <div class="notes-display-card">
+                        <div class="notes-display-header">
+                            <span class="${allianceClass}">${team.teamNumber} - ${teamName}</span>
+                            <span class="notes-status-complete">✓</span>
+                        </div>
+                        ${notes.autoPerformance ? `<div class="notes-display-field"><strong>Auto:</strong><br>${formatMultiline(notes.autoPerformance)}</div>` : ''}
+                        ${notes.teleopPerformance ? `<div class="notes-display-field"><strong>TeleOp:</strong><br>${formatMultiline(notes.teleopPerformance)}</div>` : ''}
+                        ${notes.generalNotes ? `<div class="notes-display-field"><strong>Notes:</strong><br>${formatMultiline(notes.generalNotes)}</div>` : ''}
+                    </div>
+                `;
+    }).join("")}
+        </div>
+    ` : '';
     detailsContainer.innerHTML = `
-        <div class="details-header">
-            <div class="details-title">${match.description}</div>
-            <div class="details-time">Scheduled: ${new Date(match.startTime).toLocaleString()}</div>
-            ${match.actualStartTime ? `<div class="details-time">Actual: ${new Date(match.actualStartTime).toLocaleString()}</div>` : ''}
-            ${match.field ? `<div class="details-time">Field: ${match.field}</div>` : ''}
-        </div>
-        
-        <div class="alliance-container">
-            <div class="alliance-card red">
-                <div class="alliance-title">Red Alliance ${match.scoreRedFinal !== undefined ? `- ${match.scoreRedFinal}` : ''}</div>
-                ${redTeams.map(t => getTeamRow(t, 'team-red')).join("")}
+        <div class="details-animate">
+            <div class="details-header">
+                <div class="details-title">${match.description}</div>
+                <div class="details-time">Scheduled: ${new Date(match.startTime).toLocaleString()}</div>
+                ${match.actualStartTime ? `<div class="details-time">Actual: ${new Date(match.actualStartTime).toLocaleString()}</div>` : ''}
+                ${match.field ? `<div class="details-time">Field: ${match.field}</div>` : ''}
             </div>
-            <div class="alliance-card blue">
-                <div class="alliance-title">Blue Alliance ${match.scoreBlueFinal !== undefined ? `- ${match.scoreBlueFinal}` : ''}</div>
-                ${blueTeams.map(t => getTeamRow(t, 'team-blue')).join("")}
+            
+            <div class="alliance-container">
+                <div class="alliance-card red">
+                    <div class="alliance-title">Red Alliance ${match.scoreRedFinal !== undefined ? `- ${match.scoreRedFinal}` : ''}</div>
+                    ${redTeams.map(t => getTeamRow(t, 'team-red')).join("")}
+                </div>
+                <div class="alliance-card blue">
+                    <div class="alliance-title">Blue Alliance ${match.scoreBlueFinal !== undefined ? `- ${match.scoreBlueFinal}` : ''}</div>
+                    ${blueTeams.map(t => getTeamRow(t, 'team-blue')).join("")}
+                </div>
             </div>
-        </div>
 
-        ${statsTable}
+            ${statsTable}
+            ${notesSection}
+        </div>
     `;
 }
 async function verifyToken(token) {
@@ -454,12 +508,217 @@ async function handleLogin(event) {
         errorElement.style.display = "block";
     }
 }
+function getRelativeTime(timestamp) {
+    const now = Math.floor(Date.now() / 1000);
+    const diff = now - timestamp;
+    if (diff < 60)
+        return "just now";
+    if (diff < 3600)
+        return `${Math.floor(diff / 60)} minute${Math.floor(diff / 60) !== 1 ? "s" : ""} ago`;
+    if (diff < 86400)
+        return `${Math.floor(diff / 3600)} hour${Math.floor(diff / 3600) !== 1 ? "s" : ""} ago`;
+    return `${Math.floor(diff / 86400)} day${Math.floor(diff / 86400) !== 1 ? "s" : ""} ago`;
+}
+async function loadNotesStatus() {
+    const token = localStorage.getItem("token");
+    if (!token)
+        return;
+    try {
+        const response = await fetch(`/api/v1/notes/list`, {
+            headers: { "Authorization": `Bearer ${token}` }
+        });
+        if (response.ok) {
+            const data = await response.json();
+            currentNotesStatus = data.notesStatus || {};
+        }
+    }
+    catch (error) {
+        console.error("Failed to load notes status:", error);
+    }
+}
+async function loadNotesForTeams(teamIds) {
+    const token = localStorage.getItem("token");
+    const notesMap = new Map();
+    if (!token)
+        return notesMap;
+    try {
+        const promises = teamIds.map(teamId => fetch(`/api/v1/notes?team=${teamId}`, {
+            headers: { "Authorization": `Bearer ${token}` }
+        }).then(res => res.ok ? res.json() : null));
+        const results = await Promise.all(promises);
+        teamIds.forEach((teamId, index) => {
+            if (results[index]) {
+                notesMap.set(teamId, results[index].notes);
+            }
+        });
+    }
+    catch (error) {
+        console.error("Failed to load notes for teams:", error);
+    }
+    return notesMap;
+}
+async function loadNotes(teamId) {
+    const token = localStorage.getItem("token");
+    if (!token)
+        return { autoPerformance: "", teleopPerformance: "", generalNotes: "", updatedAt: null };
+    try {
+        const response = await fetch(`/api/v1/notes?team=${teamId}`, {
+            headers: { "Authorization": `Bearer ${token}` }
+        });
+        if (response.ok) {
+            const data = await response.json();
+            return data.notes;
+        }
+    }
+    catch (error) {
+        console.error("Failed to load notes:", error);
+    }
+    return { autoPerformance: "", teleopPerformance: "", generalNotes: "", updatedAt: null };
+}
+async function saveNotes(teamId, notes) {
+    const token = localStorage.getItem("token");
+    if (!token)
+        return;
+    const isComplete = notes.autoPerformance.trim() !== "" &&
+        notes.teleopPerformance.trim() !== "" &&
+        notes.generalNotes.trim() !== "";
+    const timestamp = Math.floor(Date.now() / 1000);
+    // Optimistically update UI immediately
+    currentNotesStatus[teamId] = isComplete ? timestamp : undefined;
+    renderNotesTeamList(currentTeams, currentEventCode);
+    // Then save to backend
+    try {
+        fetch("/api/v1/notes", {
+            method: "POST",
+            headers: {
+                "Authorization": `Bearer ${token}`,
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                subjectTeamId: teamId,
+                autoPerformance: notes.autoPerformance,
+                teleopPerformance: notes.teleopPerformance,
+                generalNotes: notes.generalNotes
+            })
+        }).then(response => {
+            if (response.ok) {
+                return response.json();
+            }
+            throw new Error("Save failed");
+        }).then(data => {
+            currentNotesStatus[teamId] = isComplete ? data.updatedAt : undefined;
+        }).catch(error => {
+            console.error("Failed to save notes:", error);
+            // Revert optimistic update on failure
+            delete currentNotesStatus[teamId];
+            renderNotesTeamList(currentTeams, currentEventCode);
+        });
+    }
+    catch (error) {
+        console.error("Failed to save notes:", error);
+    }
+}
+function renderNotesTeamList(teams, eventCode) {
+    const listContainer = document.getElementById("notes-list");
+    if (!listContainer)
+        return;
+    listContainer.innerHTML = "";
+    teams.forEach((team, index) => {
+        const item = document.createElement("div");
+        item.className = "notes-team-item";
+        item.style.animationDelay = `${index * 0.03}s`;
+        const hasNotes = currentNotesStatus[team.teamNumber] !== undefined;
+        if (!hasNotes) {
+            item.classList.add("needs-notes");
+        }
+        item.onclick = () => {
+            document.querySelectorAll(".notes-team-item").forEach(el => el.classList.remove("active"));
+            item.classList.add("active");
+            renderNotesEditor(team, eventCode);
+        };
+        const teamName = team.nameShort || team.nameFull || `Team ${team.teamNumber}`;
+        const statusIndicator = hasNotes ? '<span class="notes-status-complete">✓</span>' : '<span class="notes-status-pending">!</span>';
+        item.innerHTML = `
+            <div class="notes-team-header">
+                <span class="notes-team-number">${team.teamNumber}</span>
+                ${statusIndicator}
+            </div>
+            <div class="notes-team-name">${teamName}</div>
+        `;
+        listContainer.appendChild(item);
+    });
+}
+async function renderNotesEditor(team, eventCode) {
+    const detailsContainer = document.getElementById("notes-details");
+    if (!detailsContainer)
+        return;
+    const notes = await loadNotes(team.teamNumber);
+    const teamName = team.nameShort || team.nameFull || `Team ${team.teamNumber}`;
+    detailsContainer.innerHTML = `
+        <div class="notes-editor-container details-animate">
+            <div class="notes-editor-header">
+                <div class="notes-editor-title">Team ${team.teamNumber} - ${teamName}</div>
+                <div class="notes-editor-subtitle">Event: ${eventCode}</div>
+            </div>
+            
+            <div class="notes-section">
+                <label class="notes-label" for="notes-auto">Autonomous Performance</label>
+                <textarea class="notes-textarea" id="notes-auto" placeholder="Describe autonomous performance...">${notes.autoPerformance}</textarea>
+            </div>
+            
+            <div class="notes-section">
+                <label class="notes-label" for="notes-teleop">Teleoperated Performance</label>
+                <textarea class="notes-textarea" id="notes-teleop" placeholder="Describe teleoperated performance...">${notes.teleopPerformance}</textarea>
+            </div>
+            
+            <div class="notes-section">
+                <label class="notes-label" for="notes-general">General Notes</label>
+                <textarea class="notes-textarea" id="notes-general" placeholder="General observations and notes...">${notes.generalNotes}</textarea>
+            </div>
+            
+            <div class="notes-footer">
+                ${notes.updatedAt ? `<span class="notes-last-saved">Last saved: ${new Date(notes.updatedAt * 1000).toLocaleString()} (${getRelativeTime(notes.updatedAt)})</span>` : '<span class="notes-last-saved">Not yet saved</span>'}
+            </div>
+        </div>
+    `;
+    const autoTextarea = document.getElementById("notes-auto");
+    const teleopTextarea = document.getElementById("notes-teleop");
+    const generalTextarea = document.getElementById("notes-general");
+    const handleInput = () => {
+        if (notesAutoSaveTimeout) {
+            clearTimeout(notesAutoSaveTimeout);
+        }
+        notesAutoSaveTimeout = window.setTimeout(() => {
+            const updatedNotes = {
+                autoPerformance: autoTextarea.value,
+                teleopPerformance: teleopTextarea.value,
+                generalNotes: generalTextarea.value,
+                updatedAt: Math.floor(Date.now() / 1000)
+            };
+            saveNotes(team.teamNumber, updatedNotes);
+        }, 500);
+    };
+    autoTextarea.addEventListener("input", handleInput);
+    teleopTextarea.addEventListener("input", handleInput);
+    generalTextarea.addEventListener("input", handleInput);
+}
+async function initializeNotesView(eventCode) {
+    if (!currentTeams.length)
+        return;
+    await loadNotesStatus();
+    renderNotesTeamList(currentTeams, eventCode);
+}
 document.addEventListener("DOMContentLoaded", async () => {
     // Tab initialization
     tabs.forEach(tab => {
         const button = document.getElementById(tab.buttonId);
         if (button) {
-            button.addEventListener("click", () => switchTab(tab));
+            button.addEventListener("click", () => {
+                switchTab(tab);
+                if (tab.viewId === "view-notes" && currentEventCode && currentTeams.length > 0) {
+                    initializeNotesView(currentEventCode);
+                }
+            });
         }
     });
     // Login initialization
