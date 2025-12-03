@@ -70,6 +70,7 @@ const tabs: Tab[] = [
     { buttonId: "button-schedule", viewId: "view-schedule" },
     { buttonId: "button-rankings", viewId: "view-rankings" },
     { buttonId: "button-notes", viewId: "view-notes" },
+    { buttonId: "button-insights", viewId: "view-insights" },
     { buttonId: "button-settings", viewId: "view-settings" },
 ];
 
@@ -80,22 +81,51 @@ let currentEventCode: string = "";
 let currentNotesStatus: { [teamId: number]: number | undefined } = {};
 let loggedInTeamId: number | null = null;
 let notesAutoSaveTimeout: number | null = null;
+let activeViewId: string = tabs[0]?.viewId || "view-schedule";
+let currentEventStartTimestamp: number | null = null;
 
 function switchTab(activeTab: Tab) {
-    tabs.forEach(tab => {
-        const button = document.getElementById(tab.buttonId);
-        const view = document.getElementById(tab.viewId);
+    const currentView = document.getElementById(activeViewId);
+    
+    if (currentView && activeViewId !== activeTab.viewId) {
+        currentView.classList.add("fade-out");
+        
+        setTimeout(() => {
+            tabs.forEach(tab => {
+                const button = document.getElementById(tab.buttonId);
+                const view = document.getElementById(tab.viewId);
 
-        if (button && view) {
-            if (tab === activeTab) {
-                button.classList.add("sidebar-active");
-                view.style.display = "block";
-            } else {
-                button.classList.remove("sidebar-active");
-                view.style.display = "none";
+                if (button && view) {
+                    if (tab === activeTab) {
+                        button.classList.add("sidebar-active");
+                        view.style.display = "block";
+                        view.classList.remove("fade-out");
+                        activeViewId = activeTab.viewId;
+                    } else {
+                        button.classList.remove("sidebar-active");
+                        view.style.display = "none";
+                        view.classList.remove("fade-out");
+                    }
+                }
+            });
+        }, 200);
+    } else {
+        tabs.forEach(tab => {
+            const button = document.getElementById(tab.buttonId);
+            const view = document.getElementById(tab.viewId);
+
+            if (button && view) {
+                if (tab === activeTab) {
+                    button.classList.add("sidebar-active");
+                    view.style.display = "block";
+                    activeViewId = activeTab.viewId;
+                } else {
+                    button.classList.remove("sidebar-active");
+                    view.style.display = "none";
+                }
             }
-        }
-    });
+        });
+    }
 }
 
 function showLoading() {
@@ -103,7 +133,10 @@ function showLoading() {
     const bar = document.getElementById("loading-bar");
     const status = document.getElementById("status-text");
     
-    if (container) container.style.display = "block";
+    if (container) {
+        container.classList.remove("hide");
+        container.style.display = "block";
+    }
     if (status) status.textContent = "Loading...";
     
     if (bar) {
@@ -125,12 +158,24 @@ function hideLoading() {
         bar.style.width = "100%";
         
         setTimeout(() => {
-            if (container) container.style.display = "none";
+            if (container) {
+                container.classList.add("hide");
+                setTimeout(() => {
+                    container.style.display = "none";
+                    container.classList.remove("hide");
+                    bar.style.width = "0%";
+                }, 150);
+            }
             if (status) status.textContent = "Ready";
-            bar.style.width = "0%";
         }, 300);
     } else {
-        if (container) container.style.display = "none";
+        if (container) {
+            container.classList.add("hide");
+            setTimeout(() => {
+                container.style.display = "none";
+                container.classList.remove("hide");
+            }, 150);
+        }
         if (status) status.textContent = "Ready";
     }
 }
@@ -234,6 +279,8 @@ async function loadSchedule(eventCode: string) {
             return;
         }
 
+        currentEventStartTimestamp = event.dateStart ? new Date(event.dateStart).getTime() : null;
+
         const regionCode = event.regionCode;
         const leagueCode = event.leagueCode;
 
@@ -251,9 +298,14 @@ async function loadSchedule(eventCode: string) {
             currentMatches = scheduleData.schedule || [];
             currentRankings = rankingsData.rankings || [];
             currentTeams = teamsData.teams || [];
+            await enrichMatchesWithResults(eventCode, currentMatches, token);
             
             renderSchedule(currentMatches, currentRankings, currentTeams);
             renderRankings(currentRankings);
+
+            if (activeViewId === "view-notes" && currentTeams.length > 0) {
+                await initializeNotesView(eventCode);
+            }
         }
     } catch (error) {
         console.error("Failed to load schedule/rankings/teams:", error);
@@ -263,6 +315,114 @@ async function loadSchedule(eventCode: string) {
 }
 
 let queueInterval: number;
+
+type MatchResultVariant = "win" | "loss" | "tie";
+
+interface MatchResultIndicator {
+    label: string;
+    variant: MatchResultVariant;
+    tooltip: string;
+}
+
+function parseScore(value: unknown): number | null {
+    if (typeof value === "number") {
+        return value;
+    }
+
+    if (typeof value === "string") {
+        const parsed = parseInt(value, 10);
+        return Number.isNaN(parsed) ? null : parsed;
+    }
+
+    return null;
+}
+
+function buildMatchKey(match: Pick<Match, "matchNumber" | "series" | "tournamentLevel">): string {
+    const level = match.tournamentLevel || "";
+    const seriesValue = typeof match.series === "number" ? match.series : 0;
+    return `${level}-${seriesValue}-${match.matchNumber}`;
+}
+
+function mergeMatchResults(scheduleMatches: Match[], resultMatches: Match[]): void {
+    const resultMap = new Map<string, Match>();
+    resultMatches.forEach(result => {
+        resultMap.set(buildMatchKey(result), result);
+    });
+
+    scheduleMatches.forEach(match => {
+        const result = resultMap.get(buildMatchKey(match));
+        if (!result) return;
+
+        const redScore = parseScore(result.scoreRedFinal);
+        const blueScore = parseScore(result.scoreBlueFinal);
+
+        if (redScore !== null) {
+            match.scoreRedFinal = redScore;
+        }
+        if (blueScore !== null) {
+            match.scoreBlueFinal = blueScore;
+        }
+    });
+}
+
+async function enrichMatchesWithResults(eventCode: string, matches: Match[], token: string): Promise<void> {
+    if (!matches.length) return;
+
+    const uniqueLevels = Array.from(new Set(matches
+        .map(match => match.tournamentLevel)
+        .filter((level): level is string => typeof level === "string" && level.length > 0)));
+
+    if (!uniqueLevels.length) return;
+
+    const headers = { "Authorization": `Bearer ${token}` };
+
+    try {
+        const responses = await Promise.all(uniqueLevels.map(level => {
+            const params = new URLSearchParams({ event: eventCode, level });
+            return fetch(`/api/v1/matches?${params.toString()}`, { headers })
+                .then(res => res.ok ? res.json() : null)
+                .catch(() => null);
+        }));
+
+        const resultMatches = responses.flatMap(response => response?.matches ?? []);
+        if (resultMatches.length > 0) {
+            mergeMatchResults(matches, resultMatches);
+        }
+    } catch (error) {
+        console.warn("Failed to enrich match results", error);
+    }
+}
+
+function getMatchResultIndicator(match: Match): MatchResultIndicator | null {
+    if (loggedInTeamId === null) {
+        return null;
+    }
+
+    const teamEntry = match.teams.find(team => team.teamNumber === loggedInTeamId);
+    if (!teamEntry) {
+        return null;
+    }
+
+    const redScore = parseScore(match.scoreRedFinal);
+    const blueScore = parseScore(match.scoreBlueFinal);
+
+    if (redScore === null || blueScore === null) {
+        return null;
+    }
+
+    if (redScore === blueScore) {
+        return { label: "T", variant: "tie", tooltip: "Tie" };
+    }
+
+    const isRedAlliance = teamEntry.station.startsWith("Red");
+    const didWin = isRedAlliance ? redScore > blueScore : blueScore > redScore;
+
+    if (didWin) {
+        return { label: "W", variant: "win", tooltip: "Win" };
+    }
+
+    return { label: "L", variant: "loss", tooltip: "Loss" };
+}
 
 function renderRankings(rankings: Ranking[]) {
     const tbody = document.querySelector("#rankings-table tbody");
@@ -354,10 +514,13 @@ function renderSchedule(matches: Match[], rankings: Ranking[], teams: TeamInfo[]
         const fieldInfo = match.field ? ` • Field ${match.field}` : '';
         const fieldInfoAttr = fieldInfo ? `data-field-info="${fieldInfo}"` : '';
 
+        const resultIndicator = getMatchResultIndicator(match);
+        const matchTime = new Date(match.startTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+
         item.innerHTML = `
             <div class="match-header">
                 <span class="match-title">${match.description}</span>
-                <span class="match-time">${new Date(match.startTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                <span class="match-time">${matchTime}</span>
             </div>
             <div class="match-teams">
                 <span class="team-red">${redTeams.join(", ")}</span>
@@ -366,6 +529,7 @@ function renderSchedule(matches: Match[], rankings: Ranking[], teams: TeamInfo[]
             </div>
             <div class="match-meta">
                 <span class="queue-status ${queueClass}" ${queueTimeAttr} ${fieldInfoAttr}>${queueText}${fieldInfo}</span>
+                ${resultIndicator ? `<span class="match-result match-${resultIndicator.variant}" title="${resultIndicator.tooltip}">${resultIndicator.label}</span>` : ""}
             </div>
         `;
         listContainer.appendChild(item);
@@ -402,6 +566,8 @@ function updateQueueTimers() {
 async function renderMatchDetails(match: Match, rankings: Ranking[], teams: TeamInfo[]) {
     const detailsContainer = document.getElementById("schedule-details");
     if (!detailsContainer) return;
+
+    showLoading();
 
     const redTeams = match.teams.filter(t => t.station.startsWith("Red"));
     const blueTeams = match.teams.filter(t => t.station.startsWith("Blue"));
@@ -480,54 +646,21 @@ async function renderMatchDetails(match: Match, rankings: Ranking[], teams: Team
         </div>
     `;
 
-    const teamNumbers = allTeams.map(t => t.teamNumber);
-    const notesMap = await loadNotesForTeams(teamNumbers);
+    const redScore = parseScore(match.scoreRedFinal);
+    const blueScore = parseScore(match.scoreBlueFinal);
+    const redWon = redScore !== null && blueScore !== null && redScore > blueScore;
+    const blueWon = redScore !== null && blueScore !== null && blueScore > redScore;
+    const redScoreText = redScore !== null ? ` - ${redScore}${redWon ? " 👑" : ""}` : "";
+    const blueScoreText = blueScore !== null ? ` - ${blueScore}${blueWon ? " 👑" : ""}` : "";
+    const redAllianceTitle = `Red Alliance${redScoreText}`;
+    const blueAllianceTitle = `Blue Alliance${blueScoreText}`;
     
-    const notesSection = allTeams.length > 0 ? `
-        <div class="notes-display-container">
+    const notesLoadingSection = allTeams.length > 0 ? `
+        <div class="notes-display-container" id="notes-section">
             <div class="notes-display-title">Scouting Notes</div>
-            ${allTeams.map(team => {
-                const notes = notesMap.get(team.teamNumber);
-                const teamInfo = teams.find(t => t.teamNumber === team.teamNumber);
-                const teamName = teamInfo ? (teamInfo.nameShort || teamInfo.nameFull) : `Team ${team.teamNumber}`;
-                const isRed = team.station.startsWith("Red");
-                const allianceClass = isRed ? "team-red" : "team-blue";
-                
-                if (!notes || (!notes.autoPerformance && !notes.teleopPerformance && !notes.generalNotes)) {
-                    return `
-                        <div class="notes-display-card no-notes">
-                            <div class="notes-display-header">
-                                <span class="${allianceClass}">${team.teamNumber} - ${teamName}</span>
-                                <span class="notes-status-pending">No notes</span>
-                            </div>
-                        </div>
-                    `;
-                }
-                
-                const escapeHtml = (text: string) => {
-                    const div = document.createElement('div');
-                    div.textContent = text;
-                    return div.innerHTML;
-                };
-                
-                const formatMultiline = (text: string) => {
-                    return escapeHtml(text).replace(/\n/g, '<br>');
-                };
-                
-                return `
-                    <div class="notes-display-card">
-                        <div class="notes-display-header">
-                            <span class="${allianceClass}">${team.teamNumber} - ${teamName}</span>
-                            <span class="notes-status-complete">✓</span>
-                        </div>
-                        ${notes.autoPerformance ? `<div class="notes-display-field"><strong>Auto:</strong><br>${formatMultiline(notes.autoPerformance)}</div>` : ''}
-                        ${notes.teleopPerformance ? `<div class="notes-display-field"><strong>TeleOp:</strong><br>${formatMultiline(notes.teleopPerformance)}</div>` : ''}
-                        ${notes.generalNotes ? `<div class="notes-display-field"><strong>Notes:</strong><br>${formatMultiline(notes.generalNotes)}</div>` : ''}
-                    </div>
-                `;
-            }).join("")}
+            <div class="notes-loading">Loading notes...</div>
         </div>
-    ` : '';
+    ` : "";
 
     detailsContainer.innerHTML = `
         <div class="details-animate">
@@ -540,19 +673,73 @@ async function renderMatchDetails(match: Match, rankings: Ranking[], teams: Team
             
             <div class="alliance-container">
                 <div class="alliance-card red">
-                    <div class="alliance-title">Red Alliance ${match.scoreRedFinal !== undefined ? `- ${match.scoreRedFinal}` : ''}</div>
+                    <div class="alliance-title">${redAllianceTitle}</div>
                     ${redTeams.map(t => getTeamRow(t, 'team-red')).join("")}
                 </div>
                 <div class="alliance-card blue">
-                    <div class="alliance-title">Blue Alliance ${match.scoreBlueFinal !== undefined ? `- ${match.scoreBlueFinal}` : ''}</div>
+                    <div class="alliance-title">${blueAllianceTitle}</div>
                     ${blueTeams.map(t => getTeamRow(t, 'team-blue')).join("")}
                 </div>
             </div>
 
             ${statsTable}
-            ${notesSection}
+            ${notesLoadingSection}
         </div>
     `;
+
+    if (allTeams.length > 0) {
+        const teamNumbers = allTeams.map(t => t.teamNumber);
+        const notesMap = await loadNotesForTeams(teamNumbers);
+        
+        const notesSection = document.getElementById("notes-section");
+        if (notesSection) {
+            const escapeHtml = (text: string) => {
+                const div = document.createElement("div");
+                div.textContent = text;
+                return div.innerHTML;
+            };
+            
+            const formatMultiline = (text: string) => {
+                return escapeHtml(text).replace(/\n/g, "<br>");
+            };
+
+            notesSection.innerHTML = `
+                <div class="notes-display-title">Scouting Notes</div>
+                ${allTeams.map(team => {
+                    const notes = notesMap.get(team.teamNumber);
+                    const teamInfo = teams.find(t => t.teamNumber === team.teamNumber);
+                    const teamName = teamInfo ? (teamInfo.nameShort || teamInfo.nameFull) : `Team ${team.teamNumber}`;
+                    const isRed = team.station.startsWith("Red");
+                    const allianceClass = isRed ? "team-red" : "team-blue";
+                    
+                    if (!notes || (!notes.autoPerformance && !notes.teleopPerformance && !notes.generalNotes)) {
+                        return `
+                            <div class="notes-display-card no-notes">
+                                <div class="notes-display-header">
+                                    <span class="${allianceClass}">${team.teamNumber} - ${teamName}</span>
+                                    <span class="notes-status-pending">No notes</span>
+                                </div>
+                            </div>
+                        `;
+                    }
+                    
+                    return `
+                        <div class="notes-display-card">
+                            <div class="notes-display-header">
+                                <span class="${allianceClass}">${team.teamNumber} - ${teamName}</span>
+                                <span class="notes-status-complete">✓</span>
+                            </div>
+                            ${notes.autoPerformance ? `<div class="notes-display-field"><strong>Auto:</strong><br>${formatMultiline(notes.autoPerformance)}</div>` : ""}
+                            ${notes.teleopPerformance ? `<div class="notes-display-field"><strong>TeleOp:</strong><br>${formatMultiline(notes.teleopPerformance)}</div>` : ""}
+                            ${notes.generalNotes ? `<div class="notes-display-field"><strong>Notes:</strong><br>${formatMultiline(notes.generalNotes)}</div>` : ""}
+                        </div>
+                    `;
+                }).join("")}
+            `;
+        }
+    }
+
+    hideLoading();
 }
 
 async function verifyToken(token: string): Promise<boolean> {
@@ -654,7 +841,15 @@ async function loadNotesStatus() {
         
         if (response.ok) {
             const data = await response.json();
-            currentNotesStatus = data.notesStatus || {};
+            const rawStatus = data.notesStatus || {};
+            currentNotesStatus = {};
+            Object.keys(rawStatus).forEach(key => {
+                const numericKey = parseInt(key, 10);
+                const value = rawStatus[key];
+                if (!Number.isNaN(numericKey)) {
+                    currentNotesStatus[numericKey] = typeof value === "number" ? value : undefined;
+                }
+            });
         }
     } catch (error) {
         console.error("Failed to load notes status:", error);
@@ -707,6 +902,39 @@ async function loadNotes(teamId: number): Promise<Notes> {
     return { autoPerformance: "", teleopPerformance: "", generalNotes: "", updatedAt: null };
 }
 
+function isNoteStale(updatedAt?: number): boolean {
+    if (!updatedAt || currentEventStartTimestamp === null) return false;
+    const noteTimeMs = updatedAt * 1000;
+    const oneDayMs = 24 * 60 * 60 * 1000;
+    return noteTimeMs < currentEventStartTimestamp - oneDayMs;
+}
+
+function updateTeamNoteStatus(teamId: number) {
+    const item = document.querySelector(`.notes-team-item[data-team-id="${teamId}"]`);
+    if (!item) return;
+
+    const updatedAt = currentNotesStatus[teamId];
+    const hasNotes = updatedAt !== undefined;
+    const stale = hasNotes && isNoteStale(updatedAt);
+
+    item.classList.toggle("needs-notes", !hasNotes);
+    item.classList.toggle("stale-notes", !!hasNotes && stale);
+
+    const statusIndicator = item.querySelector(".notes-status-complete, .notes-status-pending, .notes-status-warning");
+    if (statusIndicator) {
+        if (!hasNotes) {
+            statusIndicator.className = "notes-status-pending";
+            statusIndicator.textContent = "!";
+        } else if (stale) {
+            statusIndicator.className = "notes-status-warning";
+            statusIndicator.textContent = "!";
+        } else {
+            statusIndicator.className = "notes-status-complete";
+            statusIndicator.textContent = "✓";
+        }
+    }
+}
+
 async function saveNotes(teamId: number, notes: Notes) {
     const token = localStorage.getItem("token");
     if (!token) return;
@@ -718,7 +946,7 @@ async function saveNotes(teamId: number, notes: Notes) {
     
     // Optimistically update UI immediately
     currentNotesStatus[teamId] = isComplete ? timestamp : undefined;
-    renderNotesTeamList(currentTeams, currentEventCode);
+    updateTeamNoteStatus(teamId);
 
     // Then save to backend
     try {
@@ -741,11 +969,12 @@ async function saveNotes(teamId: number, notes: Notes) {
             throw new Error("Save failed");
         }).then(data => {
             currentNotesStatus[teamId] = isComplete ? data.updatedAt : undefined;
+            updateTeamNoteStatus(teamId);
         }).catch(error => {
             console.error("Failed to save notes:", error);
             // Revert optimistic update on failure
             delete currentNotesStatus[teamId];
-            renderNotesTeamList(currentTeams, currentEventCode);
+            updateTeamNoteStatus(teamId);
         });
     } catch (error) {
         console.error("Failed to save notes:", error);
@@ -761,11 +990,17 @@ function renderNotesTeamList(teams: TeamInfo[], eventCode: string) {
     teams.forEach((team, index) => {
         const item = document.createElement("div");
         item.className = "notes-team-item";
+        item.dataset.teamId = team.teamNumber.toString();
         item.style.animationDelay = `${index * 0.03}s`;
         
-        const hasNotes = currentNotesStatus[team.teamNumber] !== undefined;
+        const updatedAt = currentNotesStatus[team.teamNumber];
+        const hasNotes = updatedAt !== undefined;
+        const stale = hasNotes && isNoteStale(updatedAt);
+
         if (!hasNotes) {
             item.classList.add("needs-notes");
+        } else if (stale) {
+            item.classList.add("stale-notes");
         }
 
         item.onclick = () => {
@@ -775,7 +1010,10 @@ function renderNotesTeamList(teams: TeamInfo[], eventCode: string) {
         };
 
         const teamName = team.nameShort || team.nameFull || `Team ${team.teamNumber}`;
-        const statusIndicator = hasNotes ? '<span class="notes-status-complete">✓</span>' : '<span class="notes-status-pending">!</span>';
+        let statusIndicator = '<span class="notes-status-pending">!</span>';
+        if (hasNotes) {
+            statusIndicator = stale ? '<span class="notes-status-warning">!</span>' : '<span class="notes-status-complete">✓</span>';
+        }
 
         item.innerHTML = `
             <div class="notes-team-header">
@@ -804,17 +1042,17 @@ async function renderNotesEditor(team: TeamInfo, eventCode: string) {
             
             <div class="notes-section">
                 <label class="notes-label" for="notes-auto">Autonomous Performance</label>
-                <textarea class="notes-textarea" id="notes-auto" placeholder="Describe autonomous performance...">${notes.autoPerformance}</textarea>
+                <textarea class="notes-textarea" id="notes-auto" placeholder="Describe autonomous performance: Start location, ball count, reliability...">${notes.autoPerformance}</textarea>
             </div>
             
             <div class="notes-section">
                 <label class="notes-label" for="notes-teleop">Teleoperated Performance</label>
-                <textarea class="notes-textarea" id="notes-teleop" placeholder="Describe teleoperated performance...">${notes.teleopPerformance}</textarea>
+                <textarea class="notes-textarea" id="notes-teleop" placeholder="Describe teleoperated performance: Shooting location, throughput, accuracy, strategy...">${notes.teleopPerformance}</textarea>
             </div>
             
             <div class="notes-section">
                 <label class="notes-label" for="notes-general">General Notes</label>
-                <textarea class="notes-textarea" id="notes-general" placeholder="General observations and notes...">${notes.generalNotes}</textarea>
+                <textarea class="notes-textarea" id="notes-general" placeholder="Overall vibe check/misc yap...">${notes.generalNotes}</textarea>
             </div>
             
             <div class="notes-footer">
@@ -855,6 +1093,449 @@ async function initializeNotesView(eventCode: string) {
     renderNotesTeamList(currentTeams, eventCode);
 }
 
+function findTeamMatches(teamNumber: number, schedule: Match[], matchScores: any[]): any[] {
+    const teamMatchNumbers = new Set<number>();
+    const teamAlliances = new Map<number, string>();
+
+    for (const match of schedule) {
+        for (const team of match.teams) {
+            if (team.teamNumber === teamNumber) {
+                teamMatchNumbers.add(match.matchNumber);
+                const alliance = team.station.startsWith("Red") ? "Red" : "Blue";
+                teamAlliances.set(match.matchNumber, alliance);
+                break;
+            }
+        }
+    }
+
+    const filteredScores: any[] = [];
+    for (const matchScore of matchScores) {
+        if (teamMatchNumbers.has(matchScore.matchNumber)) {
+            const alliance = teamAlliances.get(matchScore.matchNumber);
+            const allianceData = matchScore.alliances.find((a: any) => a.alliance === alliance);
+            
+            if (allianceData) {
+                filteredScores.push({
+                    ...matchScore,
+                    alliances: [allianceData]
+                });
+            }
+        }
+    }
+
+    return filteredScores;
+}
+
+async function analyzeTeam(teamNumber: number) {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+
+    const content = document.getElementById("insights-content");
+    if (!content) return;
+
+    content.innerHTML = '<div class="insights-loading">Loading team data...</div>';
+    showLoading();
+
+    try {
+        const eventsRes = await fetch(`/api/v1/team/${teamNumber}/events`, {
+            headers: { "Authorization": `Bearer ${token}` }
+        });
+
+        if (!eventsRes.ok) {
+            content.innerHTML = '<div class="insights-error">Failed to load team events. Please check the team number.</div>';
+            hideLoading();
+            return;
+        }
+
+        const eventsData = await eventsRes.json();
+        const events = eventsData.events || [];
+
+        if (events.length === 0) {
+            content.innerHTML = '<div class="insights-error">No events found for this team.</div>';
+            hideLoading();
+            return;
+        }
+
+        const allScoreData: any[] = [];
+        for (const event of events) {
+            try {
+                const [scoresRes, scheduleRes] = await Promise.all([
+                    fetch(`/api/v1/scores/${event.code}/qual`, {
+                        headers: { "Authorization": `Bearer ${token}` }
+                    }),
+                    fetch(`/api/v1/schedule?event=${event.code}&teamNumber=${teamNumber}`, {
+                        headers: { "Authorization": `Bearer ${token}` }
+                    })
+                ]);
+
+                if (scoresRes.ok && scheduleRes.ok) {
+                    const scoresData = await scoresRes.json();
+                    const scheduleData = await scheduleRes.json();
+                    
+                    if (scoresData.matchScores && scheduleData.schedule) {
+                        const teamMatches = findTeamMatches(teamNumber, scheduleData.schedule, scoresData.matchScores);
+                        if (teamMatches.length > 0) {
+                            allScoreData.push({ event: event.name, eventCode: event.code, scores: teamMatches });
+                        }
+                    }
+                }
+            } catch (e) {
+                console.warn(`Failed to fetch scores for ${event.code}`, e);
+            }
+        }
+
+        renderInsights(teamNumber, events, allScoreData);
+    } catch (error) {
+        console.error("Failed to analyze team:", error);
+        content.innerHTML = '<div class="insights-error">An error occurred while analyzing the team.</div>';
+    } finally {
+        hideLoading();
+    }
+}
+
+function renderInsights(teamNumber: number, events: any[], scoreData: any[]) {
+    const content = document.getElementById("insights-content");
+    if (!content) return;
+
+    const eventCodes = new Set(scoreData.map(s => s.eventCode));
+    const playedEvents = events.filter(e => eventCodes.has(e.code));
+
+    const stats = calculateTeamStatistics(teamNumber, scoreData);
+    const charts = generateChartsHTML(stats);
+
+    content.innerHTML = `
+        <div class="insights-results">
+            <div class="insights-team-header">
+                <h2>Team ${teamNumber} - Performance Analysis</h2>
+                <p>${playedEvents.length} events competed</p>
+            </div>
+
+            <div class="insights-events">
+                <h3>Select Events to Analyze</h3>
+                <div class="events-selector">
+                    <button class="event-selector-btn" id="select-all-events">Select All</button>
+                    <button class="event-selector-btn" id="deselect-all-events">Deselect All</button>
+                </div>
+                <div class="events-list">
+                    ${playedEvents.map(event => `
+                        <label class="event-checkbox-item">
+                            <input type="checkbox" class="event-checkbox" value="${event.code}" checked data-event='${JSON.stringify(event)}'>
+                            <div class="event-checkbox-label">
+                                <div class="event-name">${event.name}</div>
+                                <div class="event-meta">${event.code} • ${new Date(event.dateStart).toLocaleDateString()}</div>
+                            </div>
+                        </label>
+                    `).join("")}
+                </div>
+            </div>
+
+            <div class="insights-grid">
+                <div class="insight-card">
+                    <h3>Overall Statistics</h3>
+                    <div class="stat-row"><span>Total Matches:</span><strong>${stats.totalMatches}</strong></div>
+                    <div class="stat-row"><span>Win Rate:</span><strong>${stats.winRate.toFixed(1)}%</strong></div>
+                    <div class="stat-row"><span>Avg Score:</span><strong>${stats.avgScore.toFixed(1)}</strong></div>
+                    <div class="stat-row"><span>Max Score:</span><strong>${stats.maxScore}</strong></div>
+                    <div class="stat-row"><span>Min Score:</span><strong>${stats.minScore}</strong></div>
+                </div>
+
+                <div class="insight-card">
+                    <h3>Autonomous Performance</h3>
+                    <div class="stat-row"><span>Avg Auto Points:</span><strong>${stats.avgAutoPoints.toFixed(1)}</strong></div>
+                    <div class="stat-row"><span>Auto Success Rate:</span><strong>${stats.autoSuccessRate.toFixed(1)}%</strong></div>
+                    <div class="stat-row"><span>Avg Leave Points:</span><strong>${stats.avgAutoLeave.toFixed(1)}</strong></div>
+                    <div class="stat-row"><span>Avg Artifact Points:</span><strong>${stats.avgAutoArtifacts.toFixed(1)}</strong></div>
+                </div>
+
+                <div class="insight-card">
+                    <h3>Teleop Performance</h3>
+                    <div class="stat-row"><span>Avg Teleop Points:</span><strong>${stats.avgTeleopPoints.toFixed(1)}</strong></div>
+                    <div class="stat-row"><span>Avg Classified:</span><strong>${stats.avgTeleopClassified.toFixed(1)}</strong></div>
+                    <div class="stat-row"><span>Endgame Rate:</span><strong>${stats.endgameRate.toFixed(1)}%</strong></div>
+                    <div class="stat-row"><span>Full Hang Rate:</span><strong>${stats.fullHangRate.toFixed(1)}%</strong></div>
+                </div>
+
+                <div class="insight-card">
+                    <h3>Ranking Points</h3>
+                    <div class="stat-row"><span>Movement RP:</span><strong>${stats.movementRP} (${stats.movementRPRate.toFixed(1)}%)</strong></div>
+                    <div class="stat-row"><span>Goal RP:</span><strong>${stats.goalRP} (${stats.goalRPRate.toFixed(1)}%)</strong></div>
+                    <div class="stat-row"><span>Pattern RP:</span><strong>${stats.patternRP} (${stats.patternRPRate.toFixed(1)}%)</strong></div>
+                </div>
+
+                <div class="insight-card">
+                    <h3>Fouls & Penalties</h3>
+                    <div class="stat-row"><span>Avg Fouls Committed:</span><strong>${stats.avgFoulsCommitted.toFixed(1)}</strong></div>
+                    <div class="stat-row"><span>Major Fouls:</span><strong>${stats.totalMajorFouls}</strong></div>
+                    <div class="stat-row"><span>Minor Fouls:</span><strong>${stats.totalMinorFouls}</strong></div>
+                    <div class="stat-row"><span>Clean Matches:</span><strong>${stats.cleanMatchRate.toFixed(1)}%</strong></div>
+                </div>
+
+                <div class="insight-card">
+                    <h3>Consistency Metrics</h3>
+                    <div class="stat-row"><span>Score Std Dev:</span><strong>${stats.scoreStdDev.toFixed(1)}</strong></div>
+                    <div class="stat-row"><span>Auto Consistency:</span><strong>${stats.autoConsistency.toFixed(1)}%</strong></div>
+                    <div class="stat-row"><span>Teleop Consistency:</span><strong>${stats.teleopConsistency.toFixed(1)}%</strong></div>
+                </div>
+            </div>
+
+            ${charts}
+        </div>
+    `;
+
+    setupEventSelectors(teamNumber, playedEvents, scoreData);
+}
+
+function setupEventSelectors(teamNumber: number, events: any[], allScoreData: any[]) {
+    const checkboxes = document.querySelectorAll(".event-checkbox") as NodeListOf<HTMLInputElement>;
+    const selectAllBtn = document.getElementById("select-all-events");
+    const deselectAllBtn = document.getElementById("deselect-all-events");
+
+    const updateStats = () => {
+        const selectedCodes = Array.from(checkboxes)
+            .filter(cb => cb.checked)
+            .map(cb => cb.value);
+
+        const filteredScoreData = allScoreData.filter(data => selectedCodes.includes(data.eventCode));
+        const stats = calculateTeamStatistics(teamNumber, filteredScoreData);
+        const charts = generateChartsHTML(stats);
+
+        const statsContainer = document.querySelector(".insights-grid");
+        const chartsContainer = document.querySelector(".insights-charts");
+
+        if (statsContainer) {
+            statsContainer.innerHTML = `
+                <div class="insight-card">
+                    <h3>Overall Statistics</h3>
+                    <div class="stat-row"><span>Total Matches:</span><strong>${stats.totalMatches}</strong></div>
+                    <div class="stat-row"><span>Win Rate:</span><strong>${stats.winRate.toFixed(1)}%</strong></div>
+                    <div class="stat-row"><span>Avg Score:</span><strong>${stats.avgScore.toFixed(1)}</strong></div>
+                    <div class="stat-row"><span>Max Score:</span><strong>${stats.maxScore}</strong></div>
+                    <div class="stat-row"><span>Min Score:</span><strong>${stats.minScore}</strong></div>
+                </div>
+
+                <div class="insight-card">
+                    <h3>Autonomous Performance</h3>
+                    <div class="stat-row"><span>Avg Auto Points:</span><strong>${stats.avgAutoPoints.toFixed(1)}</strong></div>
+                    <div class="stat-row"><span>Auto Success Rate:</span><strong>${stats.autoSuccessRate.toFixed(1)}%</strong></div>
+                    <div class="stat-row"><span>Avg Leave Points:</span><strong>${stats.avgAutoLeave.toFixed(1)}</strong></div>
+                    <div class="stat-row"><span>Avg Artifact Points:</span><strong>${stats.avgAutoArtifacts.toFixed(1)}</strong></div>
+                </div>
+
+                <div class="insight-card">
+                    <h3>Teleop Performance</h3>
+                    <div class="stat-row"><span>Avg Teleop Points:</span><strong>${stats.avgTeleopPoints.toFixed(1)}</strong></div>
+                    <div class="stat-row"><span>Avg Classified:</span><strong>${stats.avgTeleopClassified.toFixed(1)}</strong></div>
+                    <div class="stat-row"><span>Endgame Rate:</span><strong>${stats.endgameRate.toFixed(1)}%</strong></div>
+                    <div class="stat-row"><span>Full Hang Rate:</span><strong>${stats.fullHangRate.toFixed(1)}%</strong></div>
+                </div>
+
+                <div class="insight-card">
+                    <h3>Ranking Points</h3>
+                    <div class="stat-row"><span>Movement RP:</span><strong>${stats.movementRP} (${stats.movementRPRate.toFixed(1)}%)</strong></div>
+                    <div class="stat-row"><span>Goal RP:</span><strong>${stats.goalRP} (${stats.goalRPRate.toFixed(1)}%)</strong></div>
+                    <div class="stat-row"><span>Pattern RP:</span><strong>${stats.patternRP} (${stats.patternRPRate.toFixed(1)}%)</strong></div>
+                </div>
+
+                <div class="insight-card">
+                    <h3>Fouls & Penalties</h3>
+                    <div class="stat-row"><span>Avg Fouls Committed:</span><strong>${stats.avgFoulsCommitted.toFixed(1)}</strong></div>
+                    <div class="stat-row"><span>Major Fouls:</span><strong>${stats.totalMajorFouls}</strong></div>
+                    <div class="stat-row"><span>Minor Fouls:</span><strong>${stats.totalMinorFouls}</strong></div>
+                    <div class="stat-row"><span>Clean Matches:</span><strong>${stats.cleanMatchRate.toFixed(1)}%</strong></div>
+                </div>
+
+                <div class="insight-card">
+                    <h3>Consistency Metrics</h3>
+                    <div class="stat-row"><span>Score Std Dev:</span><strong>${stats.scoreStdDev.toFixed(1)}</strong></div>
+                    <div class="stat-row"><span>Auto Consistency:</span><strong>${stats.autoConsistency.toFixed(1)}%</strong></div>
+                    <div class="stat-row"><span>Teleop Consistency:</span><strong>${stats.teleopConsistency.toFixed(1)}%</strong></div>
+                </div>
+            `;
+        }
+
+        if (chartsContainer) {
+            chartsContainer.innerHTML = charts;
+        }
+    };
+
+    checkboxes.forEach(cb => {
+        cb.addEventListener("change", updateStats);
+    });
+
+    if (selectAllBtn) {
+        selectAllBtn.addEventListener("click", () => {
+            checkboxes.forEach(cb => cb.checked = true);
+            updateStats();
+        });
+    }
+
+    if (deselectAllBtn) {
+        deselectAllBtn.addEventListener("click", () => {
+            checkboxes.forEach(cb => cb.checked = false);
+            updateStats();
+        });
+    }
+}
+
+function calculateTeamStatistics(teamNumber: number, scoreData: any[]) {
+    let totalMatches = 0;
+    let wins = 0;
+    const scores: number[] = [];
+    const autoPoints: number[] = [];
+    const teleopPoints: number[] = [];
+    let autoSuccessCount = 0;
+    let teleopClassified = 0;
+    let autoLeaveTotal = 0;
+    let autoArtifactsTotal = 0;
+    let endgameCount = 0;
+    let fullHangCount = 0;
+    let movementRP = 0;
+    let goalRP = 0;
+    let patternRP = 0;
+    let foulsCommitted = 0;
+    let majorFouls = 0;
+    let minorFouls = 0;
+    let cleanMatches = 0;
+
+    for (const eventData of scoreData) {
+        for (const match of eventData.scores) {
+            for (const alliance of match.alliances) {
+                totalMatches++;
+                scores.push(alliance.totalPoints);
+                autoPoints.push(alliance.autoPoints);
+                teleopPoints.push(alliance.teleopPoints);
+
+                if (alliance.robot1Auto || alliance.robot2Auto) autoSuccessCount++;
+                autoLeaveTotal += alliance.autoLeavePoints;
+                autoArtifactsTotal += alliance.autoArtifactPoints;
+                teleopClassified += alliance.teleopClassifiedArtifacts;
+
+                if (alliance.robot1Teleop !== "NONE" || alliance.robot2Teleop !== "NONE") endgameCount++;
+                if (alliance.robot1Teleop === "FULL" || alliance.robot2Teleop === "FULL") fullHangCount++;
+
+                if (alliance.movementRP) movementRP++;
+                if (alliance.goalRP) goalRP++;
+                if (alliance.patternRP) patternRP++;
+
+                foulsCommitted += alliance.foulPointsCommitted;
+                majorFouls += alliance.majorFouls;
+                minorFouls += alliance.minorFouls;
+
+                if (alliance.majorFouls === 0 && alliance.minorFouls === 0) cleanMatches++;
+
+                const otherAlliance = match.alliances.find((a: any) => a.alliance !== alliance.alliance);
+                if (otherAlliance && alliance.totalPoints > otherAlliance.totalPoints) wins++;
+            }
+        }
+    }
+
+    const avgScore = scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : 0;
+    const scoreStdDev = scores.length > 1 
+        ? Math.sqrt(scores.map(s => Math.pow(s - avgScore, 2)).reduce((a, b) => a + b, 0) / scores.length)
+        : 0;
+
+    const avgAuto = autoPoints.length > 0 ? autoPoints.reduce((a, b) => a + b, 0) / autoPoints.length : 0;
+    const avgTeleop = teleopPoints.length > 0 ? teleopPoints.reduce((a, b) => a + b, 0) / teleopPoints.length : 0;
+
+    const autoStdDev = autoPoints.length > 1
+        ? Math.sqrt(autoPoints.map(a => Math.pow(a - avgAuto, 2)).reduce((a, b) => a + b, 0) / autoPoints.length)
+        : 0;
+
+    const teleopStdDev = teleopPoints.length > 1
+        ? Math.sqrt(teleopPoints.map(t => Math.pow(t - avgTeleop, 2)).reduce((a, b) => a + b, 0) / teleopPoints.length)
+        : 0;
+
+    return {
+        totalMatches,
+        winRate: totalMatches > 0 ? (wins / totalMatches) * 100 : 0,
+        avgScore,
+        maxScore: scores.length > 0 ? Math.max(...scores) : 0,
+        minScore: scores.length > 0 ? Math.min(...scores) : 0,
+        avgAutoPoints: avgAuto,
+        autoSuccessRate: totalMatches > 0 ? (autoSuccessCount / totalMatches) * 100 : 0,
+        avgAutoLeave: totalMatches > 0 ? autoLeaveTotal / totalMatches : 0,
+        avgAutoArtifacts: totalMatches > 0 ? autoArtifactsTotal / totalMatches : 0,
+        avgTeleopPoints: avgTeleop,
+        avgTeleopClassified: totalMatches > 0 ? teleopClassified / totalMatches : 0,
+        endgameRate: totalMatches > 0 ? (endgameCount / totalMatches) * 100 : 0,
+        fullHangRate: totalMatches > 0 ? (fullHangCount / totalMatches) * 100 : 0,
+        movementRP,
+        movementRPRate: totalMatches > 0 ? (movementRP / totalMatches) * 100 : 0,
+        goalRP,
+        goalRPRate: totalMatches > 0 ? (goalRP / totalMatches) * 100 : 0,
+        patternRP,
+        patternRPRate: totalMatches > 0 ? (patternRP / totalMatches) * 100 : 0,
+        avgFoulsCommitted: totalMatches > 0 ? foulsCommitted / totalMatches : 0,
+        totalMajorFouls: majorFouls,
+        totalMinorFouls: minorFouls,
+        cleanMatchRate: totalMatches > 0 ? (cleanMatches / totalMatches) * 100 : 0,
+        scoreStdDev,
+        autoConsistency: avgAuto > 0 ? Math.max(0, 100 - (autoStdDev / avgAuto) * 100) : 0,
+        teleopConsistency: avgTeleop > 0 ? Math.max(0, 100 - (teleopStdDev / avgTeleop) * 100) : 0,
+        scores,
+        autoPoints,
+        teleopPoints
+    };
+}
+
+function generateChartsHTML(stats: any) {
+    const maxScore = Math.max(...stats.scores, 100);
+    const scoreChart = generateBarChart(stats.scores, maxScore, "Match Performance");
+    const autoTeleopChart = generateComparisonChart(stats.autoPoints, stats.teleopPoints, Math.max(...stats.autoPoints, ...stats.teleopPoints, 50));
+
+    return `
+        <div class="insights-charts">
+            <div class="chart-container">
+                <h3>Score Progression</h3>
+                ${scoreChart}
+            </div>
+            <div class="chart-container">
+                <h3>Auto vs Teleop Points</h3>
+                ${autoTeleopChart}
+            </div>
+        </div>
+    `;
+}
+
+function generateBarChart(data: number[], maxValue: number, label: string) {
+    const bars = data.map((value, index) => {
+        const height = (value / maxValue) * 100;
+        return `
+            <div class="chart-bar-container">
+                <div class="chart-bar-value">${value}</div>
+                <div class="chart-bar" style="height: ${height}%" title="Match ${index + 1}: ${value}"></div>
+                <div class="chart-bar-index">${index + 1}</div>
+            </div>
+        `;
+    }).join("");
+
+    return `<div class="bar-chart">${bars}</div>`;
+}
+
+function generateComparisonChart(data1: number[], data2: number[], maxValue: number) {
+    const bars = data1.map((value, index) => {
+        const height1 = (value / maxValue) * 100;
+        const height2 = (data2[index] / maxValue) * 100;
+        return `
+            <div class="chart-group">
+                <div class="chart-group-bars">
+                    <div class="chart-bar-container">
+                        <div class="chart-bar-value">${value}</div>
+                        <div class="chart-bar auto" style="height: ${height1}%" title="Auto: ${value}"></div>
+                    </div>
+                    <div class="chart-bar-container">
+                        <div class="chart-bar-value">${data2[index]}</div>
+                        <div class="chart-bar teleop" style="height: ${height2}%" title="Teleop: ${data2[index]}"></div>
+                    </div>
+                </div>
+                <div class="chart-group-index">${index + 1}</div>
+            </div>
+        `;
+    }).join("");
+
+    return `<div class="comparison-chart">${bars}</div>`;
+}
+
 document.addEventListener("DOMContentLoaded", async () => {
     // Tab initialization
     tabs.forEach(tab => {
@@ -868,6 +1549,26 @@ document.addEventListener("DOMContentLoaded", async () => {
             });
         }
     });
+
+    // Insights initialization
+    const analyzeBtn = document.getElementById("insights-analyze-btn");
+    const teamInput = document.getElementById("insights-team-input") as HTMLInputElement;
+    if (analyzeBtn && teamInput) {
+        analyzeBtn.addEventListener("click", () => {
+            const teamNumber = parseInt(teamInput.value);
+            if (!isNaN(teamNumber) && teamNumber > 0) {
+                analyzeTeam(teamNumber);
+            }
+        });
+        teamInput.addEventListener("keypress", (e) => {
+            if (e.key === "Enter") {
+                const teamNumber = parseInt(teamInput.value);
+                if (!isNaN(teamNumber) && teamNumber > 0) {
+                    analyzeTeam(teamNumber);
+                }
+            }
+        });
+    }
 
     // Login initialization
     const loginForm = document.getElementById("login-form");
