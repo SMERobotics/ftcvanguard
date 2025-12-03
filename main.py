@@ -24,10 +24,32 @@ s = requests.Session()
 
 s.auth = (FTC_API_USERNAME, FTC_API_TOKEN)
 
-def get_db():
-    """Get a thread-local database connection"""
-    db = sqlite3.connect("default.db", check_same_thread=True)
-    return db
+ssh_dir = os.path.expanduser("~/.ssh")
+with open(os.path.join(ssh_dir, "id_rsa.pub"), "r") as f:
+    RSA_PUBLIC_KEY = f.read()
+with open(os.path.join(ssh_dir, "id_rsa.pem"), "r") as f:
+    RSA_PRIVATE_KEY = f.read()
+
+get_db = lambda: sqlite3.connect("default.db", check_same_thread=True)
+
+db = get_db()
+cursor = db.cursor()
+cursor.execute("PRAGMA journal_mode=WAL;")
+cursor.execute("CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, password TEXT)")
+
+# Create new notes table with updated schema (no event_code)
+cursor.execute("""CREATE TABLE IF NOT EXISTS notes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    team_id INTEGER NOT NULL,
+    subject_team_id INTEGER NOT NULL,
+    auto_performance TEXT,
+    teleop_performance TEXT,
+    general_notes TEXT,
+    updated_at INTEGER NOT NULL,
+    UNIQUE(team_id, subject_team_id)
+)""")
+db.commit()
+db.close()
 
 @app.route("/", methods=["GET"])
 def _root():
@@ -480,29 +502,4 @@ def _api_v1_notes_list():
         return {"status": "fuck", "error": "idk"}, 500
 
 if __name__ == "__main__":
-    ssh_dir = os.path.expanduser("~/.ssh")
-    with open(os.path.join(ssh_dir, "id_rsa.pub"), "r") as f:
-        RSA_PUBLIC_KEY = f.read()
-    with open(os.path.join(ssh_dir, "id_rsa.pem"), "r") as f:
-        RSA_PRIVATE_KEY = f.read()
-    
-    db = get_db()
-    cursor = db.cursor()
-    cursor.execute("PRAGMA journal_mode=WAL;")
-    cursor.execute("CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, password TEXT)")
-    
-    # Create new notes table with updated schema (no event_code)
-    cursor.execute("""CREATE TABLE IF NOT EXISTS notes (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        team_id INTEGER NOT NULL,
-        subject_team_id INTEGER NOT NULL,
-        auto_performance TEXT,
-        teleop_performance TEXT,
-        general_notes TEXT,
-        updated_at INTEGER NOT NULL,
-        UNIQUE(team_id, subject_team_id)
-    )""")
-    db.commit()
-    db.close()
-
     app.run(host="0.0.0.0", port=8080)
