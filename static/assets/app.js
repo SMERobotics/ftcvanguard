@@ -5,6 +5,7 @@ const tabs = [
     { buttonId: "button-notes", viewId: "view-notes" },
     { buttonId: "button-insights", viewId: "view-insights" },
     { buttonId: "button-settings", viewId: "view-settings" },
+    { buttonId: "button-about", viewId: "view-about" },
 ];
 let currentMatches = [];
 let currentRankings = [];
@@ -924,14 +925,11 @@ function findTeamMatches(teamNumber, schedule, matchScores) {
     const filteredScores = [];
     for (const matchScore of matchScores) {
         if (teamMatchNumbers.has(matchScore.matchNumber)) {
-            const alliance = teamAlliances.get(matchScore.matchNumber);
-            const allianceData = matchScore.alliances.find((a) => a.alliance === alliance);
-            if (allianceData) {
-                filteredScores.push({
-                    ...matchScore,
-                    alliances: [allianceData]
-                });
-            }
+            const teamAllianceName = teamAlliances.get(matchScore.matchNumber);
+            filteredScores.push({
+                ...matchScore,
+                teamAlliance: teamAllianceName
+            });
         }
     }
     return filteredScores;
@@ -997,6 +995,58 @@ async function analyzeTeam(teamNumber) {
         hideLoading();
     }
 }
+function generateStatsHTML(stats) {
+    return `
+        <div class="insight-card">
+            <h3>Overall Statistics</h3>
+            <div class="stat-row"><span>Total Matches:</span><strong>${stats.totalMatches}</strong></div>
+            <div class="stat-row"><span>Win Rate:</span><strong>${stats.winRate.toFixed(1)}% (${stats.wins}ts)</strong></div>
+            <div class="stat-row"><span>Avg Score:</span><strong>${stats.avgScore.toFixed(1)}</strong></div>
+            <div class="stat-row"><span>Median Score:</span><strong>${stats.medianScore.toFixed(1)}</strong></div>
+            <div class="stat-row"><span>Standard Deviation:</span><strong>${stats.scoreStdDev.toFixed(1)}</strong></div>
+            <div class="stat-row"><span>Max Score:</span><strong>${stats.maxScore}</strong></div>
+            <div class="stat-row"><span>Min Score:</span><strong>${stats.minScore}</strong></div>
+        </div>
+
+        <div class="insight-card">
+            <h3>Autonomous Performance</h3>
+            <div class="stat-row"><span>Avg Auto Points:</span><strong>${stats.avgAutoPoints.toFixed(1)}</strong></div>
+            <div class="stat-row"><span>Avg Leave Points:</span><strong>${stats.avgAutoLeave.toFixed(1)}</strong></div>
+            <div class="stat-row"><span>Avg Artifact Points:</span><strong>${stats.avgAutoArtifactPoints.toFixed(1)}</strong></div>
+            <div class="stat-row"><span>Avg Pattern Points:</span><strong>${stats.avgAutoPatternPoints.toFixed(1)}</strong></div>
+            <div class="stat-row"><span>Avg Artifacts Scored:</span><strong>${stats.avgAutoArtifacts.toFixed(1)}</strong></div>
+            <div class="stat-row"><span>Median Artifacts Scored:</span><strong>${stats.medianAutoArtifacts.toFixed(1)}</strong></div>
+            <div class="stat-row"><span>Mode Artifacts Scored:</span><strong>${stats.modeAutoArtifacts !== null && stats.modeAutoArtifacts !== undefined ? stats.modeAutoArtifacts : 'n/a'}</strong></div>
+            <div class="stat-row"><span>Std Dev Artifacts:</span><strong>${stats.stdDevAutoArtifacts.toFixed(1)}</strong></div>
+        </div>
+
+        <div class="insight-card">
+            <h3>Teleop Performance</h3>
+            <div class="stat-row"><span>Avg Teleop Points:</span><strong>${stats.avgTeleopPoints.toFixed(1)}</strong></div>
+            <div class="stat-row"><span>Avg Artifact Points:</span><strong>${stats.avgTeleopArtifactPoints.toFixed(1)}</strong></div>
+            <div class="stat-row"><span>Avg Pattern Points:</span><strong>${stats.avgTeleopPatternPoints.toFixed(1)}</strong></div>
+            <div class="stat-row"><span>Avg Artifacts Scored:</span><strong>${stats.avgTeleopArtifacts.toFixed(1)}</strong></div>
+            <div class="stat-row"><span>Median Artifacts Scored:</span><strong>${stats.medianTeleopArtifacts.toFixed(1)}</strong></div>
+            <div class="stat-row"><span>Mode Artifacts Scored:</span><strong>${stats.modeTeleopArtifacts !== null && stats.modeTeleopArtifacts !== undefined ? stats.modeTeleopArtifacts : 'n/a'}</strong></div>
+            <div class="stat-row"><span>Std Dev Artifacts:</span><strong>${stats.stdDevTeleopArtifacts.toFixed(1)}</strong></div>
+        </div>
+
+        <div class="insight-card">
+            <h3>Ranking Points</h3>
+            <div class="stat-row"><span>Movement RP:</span><strong>${stats.movementRPRate.toFixed(1)}%</strong></div>
+            <div class="stat-row"><span>Goal RP:</span><strong>${stats.goalRPRate.toFixed(1)}%</strong></div>
+            <div class="stat-row"><span>Pattern RP:</span><strong>${stats.patternRPRate.toFixed(1)}%</strong></div>
+        </div>
+
+        <div class="insight-card">
+            <h3>Penalties</h3>
+            <div class="stat-row"><span>Avg Points Committed:</span><strong>${stats.avgPenaltyPoints.toFixed(1)}</strong></div>
+            <div class="stat-row"><span>Major Fouls:</span><strong>${stats.totalMajorFouls}</strong></div>
+            <div class="stat-row"><span>Minor Fouls:</span><strong>${stats.totalMinorFouls}</strong></div>
+            <div class="stat-row"><span>Clean Matches:</span><strong>${stats.cleanMatches}</strong></div>
+        </div>
+    `;
+}
 function renderInsights(teamNumber, events, scoreData) {
     const content = document.getElementById("insights-content");
     if (!content)
@@ -1008,8 +1058,8 @@ function renderInsights(teamNumber, events, scoreData) {
     content.innerHTML = `
         <div class="insights-results">
             <div class="insights-team-header">
-                <h2>Team ${teamNumber} - Performance Analysis</h2>
-                <p>${playedEvents.length} events competed</p>
+                <h2>Team ${teamNumber} - Performance Analysis <span class="header-info-icon" title="Most statistics exclude penalty points">(i)</span></h2>
+                <p>${playedEvents.length} events completed</p>
             </div>
 
             <div class="insights-events">
@@ -1032,52 +1082,7 @@ function renderInsights(teamNumber, events, scoreData) {
             </div>
 
             <div class="insights-grid">
-                <div class="insight-card">
-                    <h3>Overall Statistics</h3>
-                    <div class="stat-row"><span>Total Matches:</span><strong>${stats.totalMatches}</strong></div>
-                    <div class="stat-row"><span>Win Rate:</span><strong>${stats.winRate.toFixed(1)}%</strong></div>
-                    <div class="stat-row"><span>Avg Score:</span><strong>${stats.avgScore.toFixed(1)}</strong></div>
-                    <div class="stat-row"><span>Max Score:</span><strong>${stats.maxScore}</strong></div>
-                    <div class="stat-row"><span>Min Score:</span><strong>${stats.minScore}</strong></div>
-                </div>
-
-                <div class="insight-card">
-                    <h3>Autonomous Performance</h3>
-                    <div class="stat-row"><span>Avg Auto Points:</span><strong>${stats.avgAutoPoints.toFixed(1)}</strong></div>
-                    <div class="stat-row"><span>Auto Success Rate:</span><strong>${stats.autoSuccessRate.toFixed(1)}%</strong></div>
-                    <div class="stat-row"><span>Avg Leave Points:</span><strong>${stats.avgAutoLeave.toFixed(1)}</strong></div>
-                    <div class="stat-row"><span>Avg Artifact Points:</span><strong>${stats.avgAutoArtifacts.toFixed(1)}</strong></div>
-                </div>
-
-                <div class="insight-card">
-                    <h3>Teleop Performance</h3>
-                    <div class="stat-row"><span>Avg Teleop Points:</span><strong>${stats.avgTeleopPoints.toFixed(1)}</strong></div>
-                    <div class="stat-row"><span>Avg Classified:</span><strong>${stats.avgTeleopClassified.toFixed(1)}</strong></div>
-                    <div class="stat-row"><span>Endgame Rate:</span><strong>${stats.endgameRate.toFixed(1)}%</strong></div>
-                    <div class="stat-row"><span>Full Hang Rate:</span><strong>${stats.fullHangRate.toFixed(1)}%</strong></div>
-                </div>
-
-                <div class="insight-card">
-                    <h3>Ranking Points</h3>
-                    <div class="stat-row"><span>Movement RP:</span><strong>${stats.movementRP} (${stats.movementRPRate.toFixed(1)}%)</strong></div>
-                    <div class="stat-row"><span>Goal RP:</span><strong>${stats.goalRP} (${stats.goalRPRate.toFixed(1)}%)</strong></div>
-                    <div class="stat-row"><span>Pattern RP:</span><strong>${stats.patternRP} (${stats.patternRPRate.toFixed(1)}%)</strong></div>
-                </div>
-
-                <div class="insight-card">
-                    <h3>Fouls & Penalties</h3>
-                    <div class="stat-row"><span>Avg Fouls Committed:</span><strong>${stats.avgFoulsCommitted.toFixed(1)}</strong></div>
-                    <div class="stat-row"><span>Major Fouls:</span><strong>${stats.totalMajorFouls}</strong></div>
-                    <div class="stat-row"><span>Minor Fouls:</span><strong>${stats.totalMinorFouls}</strong></div>
-                    <div class="stat-row"><span>Clean Matches:</span><strong>${stats.cleanMatchRate.toFixed(1)}%</strong></div>
-                </div>
-
-                <div class="insight-card">
-                    <h3>Consistency Metrics</h3>
-                    <div class="stat-row"><span>Score Std Dev:</span><strong>${stats.scoreStdDev.toFixed(1)}</strong></div>
-                    <div class="stat-row"><span>Auto Consistency:</span><strong>${stats.autoConsistency.toFixed(1)}%</strong></div>
-                    <div class="stat-row"><span>Teleop Consistency:</span><strong>${stats.teleopConsistency.toFixed(1)}%</strong></div>
-                </div>
+                ${generateStatsHTML(stats)}
             </div>
 
             ${charts}
@@ -1097,59 +1102,12 @@ function setupEventSelectors(teamNumber, events, allScoreData) {
         const stats = calculateTeamStatistics(teamNumber, filteredScoreData);
         const charts = generateChartsHTML(stats);
         const statsContainer = document.querySelector(".insights-grid");
-        const chartsContainer = document.querySelector(".insights-charts");
+        const chartsWrapper = document.querySelector(".insights-charts-wrapper");
         if (statsContainer) {
-            statsContainer.innerHTML = `
-                <div class="insight-card">
-                    <h3>Overall Statistics</h3>
-                    <div class="stat-row"><span>Total Matches:</span><strong>${stats.totalMatches}</strong></div>
-                    <div class="stat-row"><span>Win Rate:</span><strong>${stats.winRate.toFixed(1)}%</strong></div>
-                    <div class="stat-row"><span>Avg Score:</span><strong>${stats.avgScore.toFixed(1)}</strong></div>
-                    <div class="stat-row"><span>Max Score:</span><strong>${stats.maxScore}</strong></div>
-                    <div class="stat-row"><span>Min Score:</span><strong>${stats.minScore}</strong></div>
-                </div>
-
-                <div class="insight-card">
-                    <h3>Autonomous Performance</h3>
-                    <div class="stat-row"><span>Avg Auto Points:</span><strong>${stats.avgAutoPoints.toFixed(1)}</strong></div>
-                    <div class="stat-row"><span>Auto Success Rate:</span><strong>${stats.autoSuccessRate.toFixed(1)}%</strong></div>
-                    <div class="stat-row"><span>Avg Leave Points:</span><strong>${stats.avgAutoLeave.toFixed(1)}</strong></div>
-                    <div class="stat-row"><span>Avg Artifact Points:</span><strong>${stats.avgAutoArtifacts.toFixed(1)}</strong></div>
-                </div>
-
-                <div class="insight-card">
-                    <h3>Teleop Performance</h3>
-                    <div class="stat-row"><span>Avg Teleop Points:</span><strong>${stats.avgTeleopPoints.toFixed(1)}</strong></div>
-                    <div class="stat-row"><span>Avg Classified:</span><strong>${stats.avgTeleopClassified.toFixed(1)}</strong></div>
-                    <div class="stat-row"><span>Endgame Rate:</span><strong>${stats.endgameRate.toFixed(1)}%</strong></div>
-                    <div class="stat-row"><span>Full Hang Rate:</span><strong>${stats.fullHangRate.toFixed(1)}%</strong></div>
-                </div>
-
-                <div class="insight-card">
-                    <h3>Ranking Points</h3>
-                    <div class="stat-row"><span>Movement RP:</span><strong>${stats.movementRP} (${stats.movementRPRate.toFixed(1)}%)</strong></div>
-                    <div class="stat-row"><span>Goal RP:</span><strong>${stats.goalRP} (${stats.goalRPRate.toFixed(1)}%)</strong></div>
-                    <div class="stat-row"><span>Pattern RP:</span><strong>${stats.patternRP} (${stats.patternRPRate.toFixed(1)}%)</strong></div>
-                </div>
-
-                <div class="insight-card">
-                    <h3>Fouls & Penalties</h3>
-                    <div class="stat-row"><span>Avg Fouls Committed:</span><strong>${stats.avgFoulsCommitted.toFixed(1)}</strong></div>
-                    <div class="stat-row"><span>Major Fouls:</span><strong>${stats.totalMajorFouls}</strong></div>
-                    <div class="stat-row"><span>Minor Fouls:</span><strong>${stats.totalMinorFouls}</strong></div>
-                    <div class="stat-row"><span>Clean Matches:</span><strong>${stats.cleanMatchRate.toFixed(1)}%</strong></div>
-                </div>
-
-                <div class="insight-card">
-                    <h3>Consistency Metrics</h3>
-                    <div class="stat-row"><span>Score Std Dev:</span><strong>${stats.scoreStdDev.toFixed(1)}</strong></div>
-                    <div class="stat-row"><span>Auto Consistency:</span><strong>${stats.autoConsistency.toFixed(1)}%</strong></div>
-                    <div class="stat-row"><span>Teleop Consistency:</span><strong>${stats.teleopConsistency.toFixed(1)}%</strong></div>
-                </div>
-            `;
+            statsContainer.innerHTML = generateStatsHTML(stats);
         }
-        if (chartsContainer) {
-            chartsContainer.innerHTML = charts;
+        if (chartsWrapper) {
+            chartsWrapper.outerHTML = charts;
         }
     };
     checkboxes.forEach(cb => {
@@ -1168,120 +1126,185 @@ function setupEventSelectors(teamNumber, events, allScoreData) {
         });
     }
 }
+function calculateMedian(arr) {
+    if (arr.length === 0)
+        return 0;
+    const sorted = [...arr].sort((a, b) => a - b);
+    const mid = Math.floor(sorted.length / 2);
+    return sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+}
+function calculateMode(arr) {
+    if (arr.length === 0)
+        return null;
+    const freq = {};
+    let maxFreq = 0;
+    let mode = arr[0];
+    for (const val of arr) {
+        freq[val] = (freq[val] || 0) + 1;
+        if (freq[val] > maxFreq) {
+            maxFreq = freq[val];
+            mode = val;
+        }
+    }
+    // if the highest frequency is 1 (all values unique), consider there to be no mode
+    if (maxFreq <= 1)
+        return null;
+    return mode;
+}
+function calculateStdDev(arr, avg) {
+    if (arr.length <= 1)
+        return 0;
+    return Math.sqrt(arr.map(v => Math.pow(v - avg, 2)).reduce((a, b) => a + b, 0) / arr.length);
+}
 function calculateTeamStatistics(teamNumber, scoreData) {
     let totalMatches = 0;
     let wins = 0;
-    const scores = [];
+    const scoresNoPenalty = [];
     const autoPoints = [];
     const teleopPoints = [];
-    let autoSuccessCount = 0;
-    let teleopClassified = 0;
+    const autoArtifactsCounts = [];
+    const teleopArtifactsCounts = [];
     let autoLeaveTotal = 0;
-    let autoArtifactsTotal = 0;
-    let endgameCount = 0;
-    let fullHangCount = 0;
+    let autoArtifactPointsTotal = 0;
+    let autoPatternPointsTotal = 0;
+    let teleopArtifactPointsTotal = 0;
+    let teleopPatternPointsTotal = 0;
     let movementRP = 0;
     let goalRP = 0;
     let patternRP = 0;
-    let foulsCommitted = 0;
+    let penaltyPointsTotal = 0;
     let majorFouls = 0;
     let minorFouls = 0;
     let cleanMatches = 0;
     for (const eventData of scoreData) {
         for (const match of eventData.scores) {
-            for (const alliance of match.alliances) {
-                totalMatches++;
-                scores.push(alliance.totalPoints);
-                autoPoints.push(alliance.autoPoints);
-                teleopPoints.push(alliance.teleopPoints);
-                if (alliance.robot1Auto || alliance.robot2Auto)
-                    autoSuccessCount++;
-                autoLeaveTotal += alliance.autoLeavePoints;
-                autoArtifactsTotal += alliance.autoArtifactPoints;
-                teleopClassified += alliance.teleopClassifiedArtifacts;
-                if (alliance.robot1Teleop !== "NONE" || alliance.robot2Teleop !== "NONE")
-                    endgameCount++;
-                if (alliance.robot1Teleop === "FULL" || alliance.robot2Teleop === "FULL")
-                    fullHangCount++;
-                if (alliance.movementRP)
-                    movementRP++;
-                if (alliance.goalRP)
-                    goalRP++;
-                if (alliance.patternRP)
-                    patternRP++;
-                foulsCommitted += alliance.foulPointsCommitted;
-                majorFouls += alliance.majorFouls;
-                minorFouls += alliance.minorFouls;
-                if (alliance.majorFouls === 0 && alliance.minorFouls === 0)
-                    cleanMatches++;
-                const otherAlliance = match.alliances.find((a) => a.alliance !== alliance.alliance);
-                if (otherAlliance && alliance.totalPoints > otherAlliance.totalPoints)
-                    wins++;
-            }
+            const teamAllianceName = match.teamAlliance;
+            const alliance = match.alliances.find((a) => a.alliance === teamAllianceName);
+            if (!alliance)
+                continue;
+            totalMatches++;
+            const scoreWithoutPenalty = (alliance.autoPoints || 0) + (alliance.teleopPoints || 0);
+            scoresNoPenalty.push(scoreWithoutPenalty);
+            autoPoints.push(alliance.autoPoints || 0);
+            teleopPoints.push(alliance.teleopPoints || 0);
+            autoLeaveTotal += alliance.autoLeavePoints || 0;
+            autoArtifactPointsTotal += alliance.autoArtifactPoints || 0;
+            autoPatternPointsTotal += alliance.autoPatternPoints || 0;
+            const autoArtifacts = (alliance.autoClassifiedArtifacts || 0) + (alliance.autoOverflowArtifacts || 0);
+            autoArtifactsCounts.push(autoArtifacts);
+            teleopArtifactPointsTotal += alliance.teleopArtifactPoints || 0;
+            teleopPatternPointsTotal += alliance.teleopPatternPoints || 0;
+            const teleopArtifacts = (alliance.teleopClassifiedArtifacts || 0) + (alliance.teleopOverflowArtifacts || 0);
+            teleopArtifactsCounts.push(teleopArtifacts);
+            if (alliance.movementRP)
+                movementRP++;
+            if (alliance.goalRP)
+                goalRP++;
+            if (alliance.patternRP)
+                patternRP++;
+            penaltyPointsTotal += alliance.foulPointsCommitted || 0;
+            majorFouls += alliance.majorFouls || 0;
+            minorFouls += alliance.minorFouls || 0;
+            if ((alliance.majorFouls || 0) === 0 && (alliance.minorFouls || 0) === 0)
+                cleanMatches++;
+            // Check if this alliance won by comparing to opponent alliance
+            const otherAlliance = match.alliances.find((a) => a.alliance !== teamAllianceName);
+            if (otherAlliance && alliance.totalPoints > otherAlliance.totalPoints)
+                wins++;
         }
     }
-    const avgScore = scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : 0;
-    const scoreStdDev = scores.length > 1
-        ? Math.sqrt(scores.map(s => Math.pow(s - avgScore, 2)).reduce((a, b) => a + b, 0) / scores.length)
-        : 0;
+    const avgScore = scoresNoPenalty.length > 0 ? scoresNoPenalty.reduce((a, b) => a + b, 0) / scoresNoPenalty.length : 0;
+    const medianScore = calculateMedian(scoresNoPenalty);
+    const scoreStdDev = calculateStdDev(scoresNoPenalty, avgScore);
     const avgAuto = autoPoints.length > 0 ? autoPoints.reduce((a, b) => a + b, 0) / autoPoints.length : 0;
     const avgTeleop = teleopPoints.length > 0 ? teleopPoints.reduce((a, b) => a + b, 0) / teleopPoints.length : 0;
-    const autoStdDev = autoPoints.length > 1
-        ? Math.sqrt(autoPoints.map(a => Math.pow(a - avgAuto, 2)).reduce((a, b) => a + b, 0) / autoPoints.length)
-        : 0;
-    const teleopStdDev = teleopPoints.length > 1
-        ? Math.sqrt(teleopPoints.map(t => Math.pow(t - avgTeleop, 2)).reduce((a, b) => a + b, 0) / teleopPoints.length)
-        : 0;
+    const avgAutoArtifacts = autoArtifactsCounts.length > 0 ? autoArtifactsCounts.reduce((a, b) => a + b, 0) / autoArtifactsCounts.length : 0;
+    const medianAutoArtifacts = calculateMedian(autoArtifactsCounts);
+    const modeAutoArtifacts = calculateMode(autoArtifactsCounts);
+    const stdDevAutoArtifacts = calculateStdDev(autoArtifactsCounts, avgAutoArtifacts);
+    const avgTeleopArtifacts = teleopArtifactsCounts.length > 0 ? teleopArtifactsCounts.reduce((a, b) => a + b, 0) / teleopArtifactsCounts.length : 0;
+    const medianTeleopArtifacts = calculateMedian(teleopArtifactsCounts);
+    const modeTeleopArtifacts = calculateMode(teleopArtifactsCounts);
+    const stdDevTeleopArtifacts = calculateStdDev(teleopArtifactsCounts, avgTeleopArtifacts);
     return {
         totalMatches,
+        wins,
         winRate: totalMatches > 0 ? (wins / totalMatches) * 100 : 0,
         avgScore,
-        maxScore: scores.length > 0 ? Math.max(...scores) : 0,
-        minScore: scores.length > 0 ? Math.min(...scores) : 0,
+        medianScore,
+        scoreStdDev,
+        maxScore: scoresNoPenalty.length > 0 ? Math.max(...scoresNoPenalty) : 0,
+        minScore: scoresNoPenalty.length > 0 ? Math.min(...scoresNoPenalty) : 0,
         avgAutoPoints: avgAuto,
-        autoSuccessRate: totalMatches > 0 ? (autoSuccessCount / totalMatches) * 100 : 0,
         avgAutoLeave: totalMatches > 0 ? autoLeaveTotal / totalMatches : 0,
-        avgAutoArtifacts: totalMatches > 0 ? autoArtifactsTotal / totalMatches : 0,
+        avgAutoArtifactPoints: totalMatches > 0 ? autoArtifactPointsTotal / totalMatches : 0,
+        avgAutoPatternPoints: totalMatches > 0 ? autoPatternPointsTotal / totalMatches : 0,
+        avgAutoArtifacts,
+        medianAutoArtifacts,
+        modeAutoArtifacts,
+        stdDevAutoArtifacts,
         avgTeleopPoints: avgTeleop,
-        avgTeleopClassified: totalMatches > 0 ? teleopClassified / totalMatches : 0,
-        endgameRate: totalMatches > 0 ? (endgameCount / totalMatches) * 100 : 0,
-        fullHangRate: totalMatches > 0 ? (fullHangCount / totalMatches) * 100 : 0,
-        movementRP,
+        avgTeleopArtifactPoints: totalMatches > 0 ? teleopArtifactPointsTotal / totalMatches : 0,
+        avgTeleopPatternPoints: totalMatches > 0 ? teleopPatternPointsTotal / totalMatches : 0,
+        avgTeleopArtifacts,
+        medianTeleopArtifacts,
+        modeTeleopArtifacts,
+        stdDevTeleopArtifacts,
         movementRPRate: totalMatches > 0 ? (movementRP / totalMatches) * 100 : 0,
-        goalRP,
         goalRPRate: totalMatches > 0 ? (goalRP / totalMatches) * 100 : 0,
-        patternRP,
         patternRPRate: totalMatches > 0 ? (patternRP / totalMatches) * 100 : 0,
-        avgFoulsCommitted: totalMatches > 0 ? foulsCommitted / totalMatches : 0,
+        avgPenaltyPoints: totalMatches > 0 ? penaltyPointsTotal / totalMatches : 0,
         totalMajorFouls: majorFouls,
         totalMinorFouls: minorFouls,
-        cleanMatchRate: totalMatches > 0 ? (cleanMatches / totalMatches) * 100 : 0,
-        scoreStdDev,
-        autoConsistency: avgAuto > 0 ? Math.max(0, 100 - (autoStdDev / avgAuto) * 100) : 0,
-        teleopConsistency: avgTeleop > 0 ? Math.max(0, 100 - (teleopStdDev / avgTeleop) * 100) : 0,
-        scores,
+        cleanMatches,
+        scoresNoPenalty,
         autoPoints,
-        teleopPoints
+        teleopPoints,
+        autoArtifactsCounts,
+        teleopArtifactsCounts
     };
 }
 function generateChartsHTML(stats) {
-    const maxScore = Math.max(...stats.scores, 100);
-    const scoreChart = generateBarChart(stats.scores, maxScore, "Match Performance");
-    const autoTeleopChart = generateComparisonChart(stats.autoPoints, stats.teleopPoints, Math.max(...stats.autoPoints, ...stats.teleopPoints, 50));
+    const scores = stats.scoresNoPenalty || [];
+    const maxScore = scores.length > 0 ? Math.max(...scores, 100) : 100;
+    const scoreChart = generateBarChart(scores, maxScore);
+    const autoMax = stats.autoPoints.length > 0 ? Math.max(...stats.autoPoints) : 50;
+    const teleopMax = stats.teleopPoints.length > 0 ? Math.max(...stats.teleopPoints) : 50;
+    const autoTeleopMax = Math.max(autoMax, teleopMax, 50);
+    const autoTeleopChart = generateComparisonChart(stats.autoPoints, stats.teleopPoints, autoTeleopMax);
+    const autoArtifacts = stats.autoArtifactsCounts || [];
+    const teleopArtifacts = stats.teleopArtifactsCounts || [];
+    const maxArtifacts = Math.max(autoArtifacts.length > 0 ? Math.max(...autoArtifacts) : 10, teleopArtifacts.length > 0 ? Math.max(...teleopArtifacts) : 10, 10);
+    const artifactsLineChart = generateLineChart(autoArtifacts, teleopArtifacts, maxArtifacts);
     return `
-        <div class="insights-charts">
-            <div class="chart-container">
-                <h3>Score Progression</h3>
-                ${scoreChart}
+        <div class="insights-charts-wrapper">
+            <div class="insights-charts">
+                <div class="chart-container">
+                    <h3>Score Progression</h3>
+                    ${scoreChart}
+                </div>
+                <div class="chart-container">
+                    <h3>Auto vs Teleop Points</h3>
+                    ${autoTeleopChart}
+                </div>
             </div>
-            <div class="chart-container">
-                <h3>Auto vs Teleop Points</h3>
-                ${autoTeleopChart}
+            <div class="insights-charts full-width">
+                <div class="chart-container wide">
+                    <h3>Artifacts Scored <span class="chart-info-icon" title="Includes both classified and overflow artifacts">(i)</span></h3>
+                    <div class="chart-legend">
+                        <span class="legend-item"><span class="legend-color auto"></span> Auto</span>
+                        <span class="legend-item"><span class="legend-color teleop"></span> Teleop</span>
+                    </div>
+                    ${artifactsLineChart}
+                </div>
             </div>
         </div>
     `;
 }
-function generateBarChart(data, maxValue, label) {
+function generateBarChart(data, maxValue) {
+    if (data.length === 0) {
+        return '<div class="bar-chart"><div class="chart-empty">No data available</div></div>';
+    }
     const bars = data.map((value, index) => {
         const height = (value / maxValue) * 100;
         return `
@@ -1295,9 +1318,12 @@ function generateBarChart(data, maxValue, label) {
     return `<div class="bar-chart">${bars}</div>`;
 }
 function generateComparisonChart(data1, data2, maxValue) {
+    if (data1.length === 0) {
+        return '<div class="comparison-chart"><div class="chart-empty">No data available</div></div>';
+    }
     const bars = data1.map((value, index) => {
         const height1 = (value / maxValue) * 100;
-        const height2 = (data2[index] / maxValue) * 100;
+        const height2 = ((data2[index] || 0) / maxValue) * 100;
         return `
             <div class="chart-group">
                 <div class="chart-group-bars">
@@ -1306,8 +1332,8 @@ function generateComparisonChart(data1, data2, maxValue) {
                         <div class="chart-bar auto" style="height: ${height1}%" title="Auto: ${value}"></div>
                     </div>
                     <div class="chart-bar-container">
-                        <div class="chart-bar-value">${data2[index]}</div>
-                        <div class="chart-bar teleop" style="height: ${height2}%" title="Teleop: ${data2[index]}"></div>
+                        <div class="chart-bar-value">${data2[index] || 0}</div>
+                        <div class="chart-bar teleop" style="height: ${height2}%" title="Teleop: ${data2[index] || 0}"></div>
                     </div>
                 </div>
                 <div class="chart-group-index">${index + 1}</div>
@@ -1315,6 +1341,137 @@ function generateComparisonChart(data1, data2, maxValue) {
         `;
     }).join("");
     return `<div class="comparison-chart">${bars}</div>`;
+}
+function generateLineChart(data1, data2, maxValue) {
+    if (data1.length === 0) {
+        return '<div class="line-chart"><div class="line-chart-container"><div class="chart-empty">No data available</div></div></div>';
+    }
+    const chartId = `line-chart-${Date.now()}`;
+    const xLabels = data1.map((_, i) => {
+        if (data1.length <= 15 || i % Math.ceil(data1.length / 15) === 0 || i === data1.length - 1) {
+            return `<span class="line-x-label">${i + 1}</span>`;
+        }
+        return "";
+    }).filter(l => l).join("");
+    setTimeout(() => {
+        const canvas = document.getElementById(chartId);
+        if (!canvas)
+            return;
+        const ctx = canvas.getContext("2d");
+        if (!ctx)
+            return;
+        const rect = canvas.getBoundingClientRect();
+        canvas.width = rect.width * 2;
+        canvas.height = rect.height * 2;
+        ctx.scale(2, 2);
+        const width = rect.width;
+        const height = rect.height;
+        const padding = 10;
+        const chartWidth = width - padding * 2;
+        const chartHeight = height - padding * 2;
+        const getX = (i) => padding + (i / (data1.length - 1 || 1)) * chartWidth;
+        const getY = (v) => padding + chartHeight - (v / maxValue) * chartHeight;
+        // Draw lines
+        ctx.lineWidth = 2;
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+        // Auto line (green)
+        ctx.strokeStyle = "#4ec9b0";
+        ctx.beginPath();
+        data1.forEach((v, i) => {
+            const x = getX(i);
+            const y = getY(v);
+            if (i === 0)
+                ctx.moveTo(x, y);
+            else
+                ctx.lineTo(x, y);
+        });
+        ctx.stroke();
+        // Teleop line (red)
+        ctx.strokeStyle = "#ff6b6b";
+        ctx.beginPath();
+        data2.forEach((v, i) => {
+            const x = getX(i);
+            const y = getY(v);
+            if (i === 0)
+                ctx.moveTo(x, y);
+            else
+                ctx.lineTo(x, y);
+        });
+        ctx.stroke();
+        // Draw dots
+        data1.forEach((v, i) => {
+            ctx.fillStyle = "#4ec9b0";
+            ctx.beginPath();
+            ctx.arc(getX(i), getY(v), 5, 0, Math.PI * 2);
+            ctx.fill();
+        });
+        data2.forEach((v, i) => {
+            ctx.fillStyle = "#ff6b6b";
+            ctx.beginPath();
+            ctx.arc(getX(i), getY(v), 5, 0, Math.PI * 2);
+            ctx.fill();
+        });
+        // Handle hover
+        const tooltip = document.getElementById(`${chartId}-tooltip`);
+        canvas.addEventListener("mousemove", (e) => {
+            const canvasRect = canvas.getBoundingClientRect();
+            const mouseX = e.clientX - canvasRect.left;
+            const mouseY = e.clientY - canvasRect.top;
+            let found = false;
+            const checkPoint = (data, label, color) => {
+                for (let i = 0; i < data.length; i++) {
+                    const x = getX(i);
+                    const y = getY(data[i]);
+                    const dist = Math.sqrt((mouseX - x) ** 2 + (mouseY - y) ** 2);
+                    if (dist < 10) {
+                        if (tooltip) {
+                            tooltip.textContent = `${data[i]} artifact${data[i] !== 1 ? "s" : ""} (${label} @ Match ${i + 1})`;
+                            tooltip.style.display = "block";
+                            tooltip.style.borderColor = color;
+                            const tooltipRect = tooltip.getBoundingClientRect();
+                            let tooltipX = mouseX + 10;
+                            let tooltipY = mouseY - 25;
+                            if (tooltipX + tooltipRect.width > canvasRect.width) {
+                                tooltipX = mouseX - tooltipRect.width - 10;
+                            }
+                            if (tooltipY < 0) {
+                                tooltipY = mouseY + 15;
+                            }
+                            tooltip.style.left = `${tooltipX}px`;
+                            tooltip.style.top = `${tooltipY}px`;
+                        }
+                        canvas.style.cursor = "pointer";
+                        found = true;
+                        return true;
+                    }
+                }
+                return false;
+            };
+            if (!checkPoint(data1, "Auto", "#4ec9b0")) {
+                checkPoint(data2, "Teleop", "#ff6b6b");
+            }
+            if (!found) {
+                if (tooltip)
+                    tooltip.style.display = "none";
+                canvas.style.cursor = "default";
+            }
+        });
+        canvas.addEventListener("mouseleave", () => {
+            if (tooltip)
+                tooltip.style.display = "none";
+            canvas.style.cursor = "default";
+        });
+    }, 0);
+    return `
+        <div class="line-chart">
+            <div class="line-chart-container">
+                <canvas id="${chartId}"></canvas>
+                <div id="${chartId}-tooltip" class="line-chart-tooltip"></div>
+            </div>
+            <div class="line-chart-x-axis">${xLabels}</div>
+        </div>
+    `;
 }
 document.addEventListener("DOMContentLoaded", async () => {
     // Tab initialization
