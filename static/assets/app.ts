@@ -85,6 +85,68 @@ let notesAutoSaveTimeout: number | null = null;
 let activeViewId: string = tabs[0]?.viewId || "view-schedule";
 let currentEventStartTimestamp: number | null = null;
 let isMobileMenuOpen: boolean = false;
+let currentSelectedMatch: number | null = null;
+let currentSelectedNotesTeam: number | null = null;
+let currentInsightsTeam: number | null = null;
+
+// URL State Management
+interface AppState {
+    view?: string;
+    event?: string;
+    match?: number;
+    team?: number;
+    insights?: number;
+}
+
+function getViewNameFromId(viewId: string): string {
+    return viewId.replace("view-", "");
+}
+
+function getViewIdFromName(viewName: string): string {
+    return `view-${viewName}`;
+}
+
+function buildUrlFromState(state: AppState): string {
+    const params = new URLSearchParams();
+    if (state.view) params.set("view", state.view);
+    if (state.event) params.set("event", state.event);
+    if (state.match !== undefined && state.match !== null) params.set("match", state.match.toString());
+    if (state.team !== undefined && state.team !== null) params.set("team", state.team.toString());
+    if (state.insights !== undefined && state.insights !== null) params.set("insights", state.insights.toString());
+    const queryString = params.toString();
+    return queryString ? `?${queryString}` : window.location.pathname;
+}
+
+function getCurrentState(): AppState {
+    return {
+        view: getViewNameFromId(activeViewId),
+        event: currentEventCode || undefined,
+        match: currentSelectedMatch ?? undefined,
+        team: currentSelectedNotesTeam ?? undefined,
+        insights: currentInsightsTeam ?? undefined
+    };
+}
+
+function updateUrl(replace: boolean = false) {
+    const state = getCurrentState();
+    const url = buildUrlFromState(state);
+    if (replace) {
+        history.replaceState(state, "", url);
+    } else {
+        history.pushState(state, "", url);
+    }
+}
+
+function parseUrlState(): AppState {
+    const params = new URLSearchParams(window.location.search);
+    return {
+        view: params.get("view") || undefined,
+        event: params.get("event") || undefined,
+        match: params.has("match") ? parseInt(params.get("match")!, 10) : undefined,
+        team: params.has("team") ? parseInt(params.get("team")!, 10) : undefined,
+        insights: params.has("insights") ? parseInt(params.get("insights")!, 10) : undefined
+    };
+}
 
 function toggleMobileMenu(open?: boolean) {
     const sidebar = document.getElementById("sidebar");
@@ -105,7 +167,7 @@ function closeMobileMenu() {
     toggleMobileMenu(false);
 }
 
-function switchTab(activeTab: Tab) {
+function switchTab(activeTab: Tab, updateHistory: boolean = true) {
     const currentView = document.getElementById(activeViewId);
     
     closeMobileMenu();
@@ -131,6 +193,9 @@ function switchTab(activeTab: Tab) {
                     }
                 }
             });
+            if (updateHistory) {
+                updateUrl();
+            }
         }, 200);
     } else {
         tabs.forEach(tab => {
@@ -148,6 +213,11 @@ function switchTab(activeTab: Tab) {
                 }
             }
         });
+        if (updateHistory && currentView && activeViewId === activeTab.viewId) {
+            // Only update URL if we're not switching tabs (staying on same tab)
+        } else if (updateHistory) {
+            updateUrl();
+        }
     }
 }
 
@@ -226,6 +296,175 @@ async function loadEvents() {
     }
 }
 
+async function loadEventsWithStateRestore() {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+
+    const urlState = parseUrlState();
+
+    showLoading();
+    try {
+        const response = await fetch("/api/v1/events", {
+            headers: { "Authorization": `Bearer ${token}` }
+        });
+        
+        if (!response.ok) return;
+
+        const data = await response.json();
+        const events: FTCEvent[] = data.events || [];
+        await populateMeetSelectorWithStateRestore(events, urlState);
+
+    } catch (error) {
+        console.error("Failed to load events:", error);
+    } finally {
+        hideLoading();
+    }
+}
+
+async function populateMeetSelectorWithStateRestore(events: FTCEvent[], urlState: AppState) {
+    const selector = document.getElementById("meet-selector") as HTMLSelectElement;
+    if (!selector) return;
+
+    selector.innerHTML = "";
+    
+    events.sort((a, b) => new Date(a.dateStart).getTime() - new Date(b.dateStart).getTime());
+
+    const now = new Date();
+
+    events.forEach(event => {
+        const option = document.createElement("option");
+        option.value = event.code;
+        option.textContent = `${event.name} (${event.code})`;
+        selector.appendChild(option);
+    });
+
+    let defaultEvent: FTCEvent | undefined;
+
+    // Check if URL has an event specified
+    if (urlState.event) {
+        defaultEvent = events.find(e => e.code === urlState.event);
+    }
+
+    // Fall back to most recent event that has begun
+    if (!defaultEvent) {
+        for (let i = events.length - 1; i >= 0; i--) {
+            const start = new Date(events[i].dateStart);
+            if (start <= now) {
+                defaultEvent = events[i];
+                break;
+            }
+        }
+    }
+
+    // Fall back to first upcoming event
+    if (!defaultEvent && events.length > 0) {
+        defaultEvent = events[0];
+    }
+
+    if (defaultEvent) {
+        selector.value = defaultEvent.code;
+        currentEventCode = defaultEvent.code;
+        await loadScheduleWithStateRestore(defaultEvent.code, urlState);
+    }
+    
+    selector.addEventListener("change", () => {
+        console.log("Selected meet:", selector.value);
+        currentEventCode = selector.value;
+        currentSelectedMatch = null;
+        currentSelectedNotesTeam = null;
+        loadSchedule(selector.value);
+        updateUrl();
+    });
+
+    // Switch to the correct tab from URL state
+    if (urlState.view) {
+        const viewId = getViewIdFromName(urlState.view);
+        const tab = tabs.find(t => t.viewId === viewId);
+        if (tab) {
+            switchTab(tab, false);
+            
+            // Initialize notes view if that's the active tab
+            if (viewId === "view-notes" && currentEventCode && currentTeams.length > 0) {
+                await initializeNotesView(currentEventCode);
+                restoreNotesTeamSelection();
+            }
+            
+            // Trigger insights analysis if that's the active tab
+            if (viewId === "view-insights" && urlState.insights) {
+                analyzeTeam(urlState.insights, false);
+            }
+        }
+    } else if (tabs.length > 0) {
+        switchTab(tabs[0], false);
+    }
+    
+    // Set initial URL state
+    updateUrl(true);
+}
+
+async function loadScheduleWithStateRestore(eventCode: string, urlState: AppState) {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+
+    const detailsContainer = document.getElementById("schedule-details");
+    if (detailsContainer) {
+        detailsContainer.innerHTML = '<div class="empty-state">Select a match to view details</div>';
+    }
+
+    showLoading();
+    try {
+        const eventRes = await fetch(`/api/v1/event?event=${eventCode}`, { headers: { "Authorization": `Bearer ${token}` } });
+        
+        if (!eventRes.ok) {
+            console.error("Failed to load event details");
+            return;
+        }
+
+        const eventData = await eventRes.json();
+        const event = eventData.events && eventData.events.length > 0 ? eventData.events[0] : null;
+        
+        if (!event) {
+            console.error("Event not found");
+            return;
+        }
+
+        currentEventStartTimestamp = event.dateStart ? new Date(event.dateStart).getTime() : null;
+
+        const regionCode = event.regionCode;
+        const leagueCode = event.leagueCode;
+
+        const [scheduleRes, rankingsRes, teamsRes] = await Promise.all([
+            fetch(`/api/v1/schedule?event=${eventCode}`, { headers: { "Authorization": `Bearer ${token}` } }),
+            fetch(`/api/v1/rankings?event=${eventCode}&region=${regionCode}&league=${leagueCode}`, { headers: { "Authorization": `Bearer ${token}` } }),
+            fetch(`/api/v1/teams?event=${eventCode}`, { headers: { "Authorization": `Bearer ${token}` } })
+        ]);
+
+        if (scheduleRes.ok && rankingsRes.ok && teamsRes.ok) {
+            const scheduleData = await scheduleRes.json();
+            const rankingsData = await rankingsRes.json();
+            const teamsData = await teamsRes.json();
+            
+            currentMatches = scheduleData.schedule || [];
+            currentRankings = rankingsData.rankings || [];
+            currentTeams = teamsData.teams || [];
+            await enrichMatchesWithResults(eventCode, currentMatches, token);
+            
+            renderSchedule(currentMatches, currentRankings, currentTeams);
+            renderRankings(currentRankings);
+
+            // Restore match selection from URL
+            if (urlState.match !== undefined) {
+                currentSelectedMatch = urlState.match;
+                restoreMatchSelection();
+            }
+        }
+    } catch (error) {
+        console.error("Failed to load schedule/rankings/teams:", error);
+    } finally {
+        hideLoading();
+    }
+}
+
 function populateMeetSelector(events: FTCEvent[]) {
     const selector = document.getElementById("meet-selector") as HTMLSelectElement;
     if (!selector) return;
@@ -270,7 +509,10 @@ function populateMeetSelector(events: FTCEvent[]) {
     selector.addEventListener("change", () => {
         console.log("Selected meet:", selector.value);
         currentEventCode = selector.value;
+        currentSelectedMatch = null;
+        currentSelectedNotesTeam = null;
         loadSchedule(selector.value);
+        updateUrl();
     });
 }
 
@@ -486,11 +728,14 @@ function renderSchedule(matches: Match[], rankings: Ranking[], teams: TeamInfo[]
     matches.forEach((match, index) => {
         const item = document.createElement("div");
         item.className = "match-item";
+        item.dataset.matchNumber = match.matchNumber.toString();
         item.style.animationDelay = `${index * 0.03}s`;
         item.onclick = () => {
             document.querySelectorAll(".match-item").forEach(el => el.classList.remove("active"));
             item.classList.add("active");
+            currentSelectedMatch = match.matchNumber;
             renderMatchDetails(match, rankings, teams);
+            updateUrl();
         };
 
         const redTeams = match.teams.filter(t => t.station.startsWith("Red")).map(t => t.teamNumber);
@@ -578,9 +823,11 @@ document.addEventListener("click", (e) => {
             const teamInput = document.getElementById("insights-team-input") as HTMLInputElement;
             
             if (insightsTab && teamInput) {
-                switchTab(insightsTab);
+                switchTab(insightsTab, false);
                 teamInput.value = teamNumber.toString();
+                currentInsightsTeam = teamNumber;
                 analyzeTeam(teamNumber);
+                updateUrl();
             }
         }
     }
@@ -1054,7 +1301,9 @@ function renderNotesTeamList(teams: TeamInfo[], eventCode: string) {
         item.onclick = () => {
             document.querySelectorAll(".notes-team-item").forEach(el => el.classList.remove("active"));
             item.classList.add("active");
+            currentSelectedNotesTeam = team.teamNumber;
             renderNotesEditor(team, eventCode);
+            updateUrl();
         };
 
         const teamName = team.nameShort || team.nameFull || `Team ${team.teamNumber}`;
@@ -1171,12 +1420,17 @@ function findTeamMatches(teamNumber: number, schedule: Match[], matchScores: any
     return filteredScores;
 }
 
-async function analyzeTeam(teamNumber: number) {
+async function analyzeTeam(teamNumber: number, updateHistory: boolean = true) {
     const token = localStorage.getItem("token");
     if (!token) return;
 
     const content = document.getElementById("insights-content");
     if (!content) return;
+
+    currentInsightsTeam = teamNumber;
+    if (updateHistory) {
+        updateUrl();
+    }
 
     content.innerHTML = '<div class="insights-loading">Loading team data...</div>';
     showLoading();
@@ -1869,6 +2123,190 @@ function generateLineChart(data1: number[], data2: number[], maxValue: number) {
     `;
 }
 
+function handleLogout() {
+    localStorage.removeItem("token");
+    loggedInTeamId = null;
+    currentMatches = [];
+    currentRankings = [];
+    currentTeams = [];
+    currentEventCode = "";
+    currentNotesStatus = {};
+    currentSelectedMatch = null;
+    currentSelectedNotesTeam = null;
+    currentInsightsTeam = null;
+    
+    // Clear URL state
+    history.replaceState(null, "", window.location.pathname);
+    
+    // Reset UI elements
+    const scheduleList = document.getElementById("schedule-list");
+    if (scheduleList) scheduleList.innerHTML = "";
+    
+    const scheduleDetails = document.getElementById("schedule-details");
+    if (scheduleDetails) scheduleDetails.innerHTML = '<div class="empty-state">Select a match to view details</div>';
+    
+    const rankingsBody = document.querySelector("#rankings-table tbody");
+    if (rankingsBody) rankingsBody.innerHTML = "";
+    
+    const notesList = document.getElementById("notes-list");
+    if (notesList) notesList.innerHTML = "";
+    
+    const notesDetails = document.getElementById("notes-details");
+    if (notesDetails) notesDetails.innerHTML = '<div class="empty-state">Select a team to view or edit notes</div>';
+    
+    const insightsContent = document.getElementById("insights-content");
+    if (insightsContent) insightsContent.innerHTML = "";
+
+    showLogin();
+}
+
+async function restoreStateFromUrl() {
+    const urlState = parseUrlState();
+    
+    // Restore view/tab
+    if (urlState.view) {
+        const viewId = getViewIdFromName(urlState.view);
+        const tab = tabs.find(t => t.viewId === viewId);
+        if (tab) {
+            switchTab(tab, false);
+        }
+    }
+    
+    // Restore event selection
+    if (urlState.event) {
+        const selector = document.getElementById("meet-selector") as HTMLSelectElement;
+        if (selector && selector.querySelector(`option[value="${urlState.event}"]`)) {
+            selector.value = urlState.event;
+            currentEventCode = urlState.event;
+        }
+    }
+    
+    // Restore match selection (after schedule loads)
+    if (urlState.match !== undefined) {
+        currentSelectedMatch = urlState.match;
+    }
+    
+    // Restore notes team selection
+    if (urlState.team !== undefined) {
+        currentSelectedNotesTeam = urlState.team;
+    }
+    
+    // Restore insights team
+    if (urlState.insights !== undefined) {
+        currentInsightsTeam = urlState.insights;
+        const teamInput = document.getElementById("insights-team-input") as HTMLInputElement;
+        if (teamInput) {
+            teamInput.value = urlState.insights.toString();
+        }
+    }
+}
+
+function restoreMatchSelection() {
+    if (currentSelectedMatch !== null && currentMatches.length > 0) {
+        const match = currentMatches.find(m => m.matchNumber === currentSelectedMatch);
+        if (match) {
+            const matchItem = document.querySelector(`.match-item[data-match-number="${currentSelectedMatch}"]`);
+            if (matchItem) {
+                document.querySelectorAll(".match-item").forEach(el => el.classList.remove("active"));
+                matchItem.classList.add("active");
+                renderMatchDetails(match, currentRankings, currentTeams);
+            }
+        }
+    }
+}
+
+function restoreNotesTeamSelection() {
+    if (currentSelectedNotesTeam !== null && currentTeams.length > 0) {
+        const team = currentTeams.find(t => t.teamNumber === currentSelectedNotesTeam);
+        if (team) {
+            const teamItem = document.querySelector(`.notes-team-item[data-team-id="${currentSelectedNotesTeam}"]`);
+            if (teamItem) {
+                document.querySelectorAll(".notes-team-item").forEach(el => el.classList.remove("active"));
+                teamItem.classList.add("active");
+                renderNotesEditor(team, currentEventCode);
+            }
+        }
+    }
+}
+
+window.addEventListener("popstate", async (event) => {
+    const state = event.state as AppState | null;
+    
+    if (state) {
+        // Restore view
+        if (state.view) {
+            const viewId = getViewIdFromName(state.view);
+            const tab = tabs.find(t => t.viewId === viewId);
+            if (tab) {
+                switchTab(tab, false);
+            }
+        }
+        
+        // Restore event if different
+        if (state.event && state.event !== currentEventCode) {
+            const selector = document.getElementById("meet-selector") as HTMLSelectElement;
+            if (selector) {
+                selector.value = state.event;
+                currentEventCode = state.event;
+                await loadSchedule(state.event);
+            }
+        }
+        
+        // Restore match selection
+        if (state.match !== undefined) {
+            currentSelectedMatch = state.match;
+            restoreMatchSelection();
+        } else {
+            currentSelectedMatch = null;
+            const detailsContainer = document.getElementById("schedule-details");
+            if (detailsContainer) {
+                detailsContainer.innerHTML = '<div class="empty-state">Select a match to view details</div>';
+            }
+            document.querySelectorAll(".match-item").forEach(el => el.classList.remove("active"));
+        }
+        
+        // Restore notes team selection
+        if (state.team !== undefined) {
+            currentSelectedNotesTeam = state.team;
+            if (activeViewId === "view-notes") {
+                restoreNotesTeamSelection();
+            }
+        } else {
+            currentSelectedNotesTeam = null;
+            const notesDetails = document.getElementById("notes-details");
+            if (notesDetails) {
+                notesDetails.innerHTML = '<div class="empty-state">Select a team to view or edit notes</div>';
+            }
+            document.querySelectorAll(".notes-team-item").forEach(el => el.classList.remove("active"));
+        }
+        
+        // Restore insights team
+        if (state.insights !== undefined) {
+            currentInsightsTeam = state.insights;
+            const teamInput = document.getElementById("insights-team-input") as HTMLInputElement;
+            if (teamInput) {
+                teamInput.value = state.insights.toString();
+            }
+            if (activeViewId === "view-insights") {
+                analyzeTeam(state.insights, false);
+            }
+        } else {
+            currentInsightsTeam = null;
+            const teamInput = document.getElementById("insights-team-input") as HTMLInputElement;
+            if (teamInput) {
+                teamInput.value = "";
+            }
+            const insightsContent = document.getElementById("insights-content");
+            if (insightsContent) {
+                insightsContent.innerHTML = "";
+            }
+        }
+    } else {
+        // No state, restore from URL
+        await restoreStateFromUrl();
+    }
+});
+
 document.addEventListener("DOMContentLoaded", async () => {
     // Mobile menu initialization
     const mobileMenuBtn = document.getElementById("mobile-menu-btn");
@@ -1957,16 +2395,20 @@ document.addEventListener("DOMContentLoaded", async () => {
         loginForm.addEventListener("submit", handleLogin);
     }
 
+    // Logout initialization
+    const logoutBtn = document.getElementById("button-logout");
+    if (logoutBtn) {
+        logoutBtn.addEventListener("click", handleLogout);
+    }
+
     // Auth check
     const token = localStorage.getItem("token");
     if (token) {
         const isValid = await verifyToken(token);
         if (isValid) {
             hideLogin();
-            loadEvents();
-            if (tabs.length > 0) {
-                switchTab(tabs[0]);
-            }
+            await restoreStateFromUrl();
+            await loadEventsWithStateRestore();
         } else {
             localStorage.removeItem("token");
             showLogin();
