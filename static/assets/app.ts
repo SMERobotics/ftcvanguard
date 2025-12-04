@@ -84,9 +84,31 @@ let loggedInTeamId: number | null = null;
 let notesAutoSaveTimeout: number | null = null;
 let activeViewId: string = tabs[0]?.viewId || "view-schedule";
 let currentEventStartTimestamp: number | null = null;
+let isMobileMenuOpen: boolean = false;
+
+function toggleMobileMenu(open?: boolean) {
+    const sidebar = document.getElementById("sidebar");
+    if (!sidebar) return;
+    
+    isMobileMenuOpen = open !== undefined ? open : !isMobileMenuOpen;
+    
+    if (isMobileMenuOpen) {
+        sidebar.classList.add("open");
+        document.body.style.overflow = "hidden";
+    } else {
+        sidebar.classList.remove("open");
+        document.body.style.overflow = "";
+    }
+}
+
+function closeMobileMenu() {
+    toggleMobileMenu(false);
+}
 
 function switchTab(activeTab: Tab) {
     const currentView = document.getElementById(activeViewId);
+    
+    closeMobileMenu();
     
     if (currentView && activeViewId !== activeTab.viewId) {
         currentView.classList.add("fade-out");
@@ -474,6 +496,10 @@ function renderSchedule(matches: Match[], rankings: Ranking[], teams: TeamInfo[]
         const redTeams = match.teams.filter(t => t.station.startsWith("Red")).map(t => t.teamNumber);
         const blueTeams = match.teams.filter(t => t.station.startsWith("Blue")).map(t => t.teamNumber);
 
+        const formatTeamNumbers = (teams: number[], colorClass: string) => {
+            return teams.join(", ");
+        };
+
         // Queue logic
         let queueText = "";
         let queueClass = "";
@@ -524,9 +550,9 @@ function renderSchedule(matches: Match[], rankings: Ranking[], teams: TeamInfo[]
                 <span class="match-time">${matchTime}</span>
             </div>
             <div class="match-teams">
-                <span class="team-red">${redTeams.join(", ")}</span>
+                <span class="team-red">${formatTeamNumbers(redTeams, "team-red")}</span>
                 <span class="team-vs">vs</span>
-                <span class="team-blue">${blueTeams.join(", ")}</span>
+                <span class="team-blue">${formatTeamNumbers(blueTeams, "team-blue")}</span>
             </div>
             <div class="match-meta">
                 <span class="queue-status ${queueClass}" ${queueTimeAttr} ${fieldInfoAttr}>${queueText}${fieldInfo}</span>
@@ -538,6 +564,27 @@ function renderSchedule(matches: Match[], rankings: Ranking[], teams: TeamInfo[]
 
     queueInterval = window.setInterval(updateQueueTimers, 1000);
 }
+
+// Handle team number clicks for instant insights
+document.addEventListener("click", (e) => {
+    const target = e.target as HTMLElement;
+    if (target.classList.contains("team-number-link")) {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        const teamNumber = parseInt(target.getAttribute("data-team") || "0");
+        if (teamNumber) {
+            const insightsTab = tabs.find(t => t.viewId === "view-insights");
+            const teamInput = document.getElementById("insights-team-input") as HTMLInputElement;
+            
+            if (insightsTab && teamInput) {
+                switchTab(insightsTab);
+                teamInput.value = teamNumber.toString();
+                analyzeTeam(teamNumber);
+            }
+        }
+    }
+});
 
 function updateQueueTimers() {
     const now = new Date();
@@ -589,7 +636,7 @@ async function renderMatchDetails(match: Match, rankings: Ranking[], teams: Team
 
         return `
             <div class="team-row">
-                <span class="${colorClass}">${team.teamNumber} ${name}</span>
+                <span class="${colorClass} team-number-link" data-team="${team.teamNumber}">${team.teamNumber} ${name}</span>
                 <span class="team-rank">${rankText}</span>
             </div>
         `;
@@ -612,7 +659,7 @@ async function renderMatchDetails(match: Match, rankings: Ranking[], teams: Team
 
         return `
             <tr class="${rowClass}">
-                <td class="${allianceClass}">${team.teamNumber}</td>
+                <td class="${allianceClass}"><span class="team-number-link" data-team="${team.teamNumber}">${team.teamNumber}</span></td>
                 <td>${rankText}</td>
                 <td>${rp}</td>
                 <td>${mp}</td>
@@ -1196,7 +1243,7 @@ function generateStatsHTML(stats: any) {
         <div class="insight-card">
             <h3>Overall Statistics</h3>
             <div class="stat-row"><span>Total Matches:</span><strong>${stats.totalMatches}</strong></div>
-            <div class="stat-row"><span>Win Rate:</span><strong>${stats.winRate.toFixed(1)}% (${stats.wins}ts)</strong></div>
+            <div class="stat-row"><span>Win Rate:</span><strong>${stats.winRate.toFixed(1)}% (${stats.wins})</strong></div>
             <div class="stat-row"><span>Avg Score:</span><strong>${stats.avgScore.toFixed(1)}</strong></div>
             <div class="stat-row"><span>Median Score:</span><strong>${stats.medianScore.toFixed(1)}</strong></div>
             <div class="stat-row"><span>Standard Deviation:</span><strong>${stats.scoreStdDev.toFixed(1)}</strong></div>
@@ -1207,9 +1254,9 @@ function generateStatsHTML(stats: any) {
         <div class="insight-card">
             <h3>Autonomous Performance</h3>
             <div class="stat-row"><span>Avg Auto Points:</span><strong>${stats.avgAutoPoints.toFixed(1)}</strong></div>
-            <div class="stat-row"><span>Avg Leave Points:</span><strong>${stats.avgAutoLeave.toFixed(1)}</strong></div>
             <div class="stat-row"><span>Avg Artifact Points:</span><strong>${stats.avgAutoArtifactPoints.toFixed(1)}</strong></div>
             <div class="stat-row"><span>Avg Pattern Points:</span><strong>${stats.avgAutoPatternPoints.toFixed(1)}</strong></div>
+            <div class="stat-row"><span>Avg Leave Points:</span><strong>${stats.avgAutoLeave.toFixed(1)}</strong></div>
             <div class="stat-row"><span>Avg Artifacts Scored:</span><strong>${stats.avgAutoArtifacts.toFixed(1)}</strong></div>
             <div class="stat-row"><span>Median Artifacts Scored:</span><strong>${stats.medianAutoArtifacts.toFixed(1)}</strong></div>
             <div class="stat-row"><span>Mode Artifacts Scored:</span><strong>${stats.modeAutoArtifacts !== null && stats.modeAutoArtifacts !== undefined ? stats.modeAutoArtifacts : 'n/a'}</strong></div>
@@ -1221,6 +1268,7 @@ function generateStatsHTML(stats: any) {
             <div class="stat-row"><span>Avg Teleop Points:</span><strong>${stats.avgTeleopPoints.toFixed(1)}</strong></div>
             <div class="stat-row"><span>Avg Artifact Points:</span><strong>${stats.avgTeleopArtifactPoints.toFixed(1)}</strong></div>
             <div class="stat-row"><span>Avg Pattern Points:</span><strong>${stats.avgTeleopPatternPoints.toFixed(1)}</strong></div>
+            <div class="stat-row"><span>Avg Base Points:</span><strong>${stats.avgTeleopBasePoints.toFixed(1)}</strong></div>
             <div class="stat-row"><span>Avg Artifacts Scored:</span><strong>${stats.avgTeleopArtifacts.toFixed(1)}</strong></div>
             <div class="stat-row"><span>Median Artifacts Scored:</span><strong>${stats.medianTeleopArtifacts.toFixed(1)}</strong></div>
             <div class="stat-row"><span>Mode Artifacts Scored:</span><strong>${stats.modeTeleopArtifacts !== null && stats.modeTeleopArtifacts !== undefined ? stats.modeTeleopArtifacts : 'n/a'}</strong></div>
@@ -1380,6 +1428,7 @@ function calculateTeamStatistics(teamNumber: number, scoreData: any[]) {
     let autoPatternPointsTotal = 0;
     let teleopArtifactPointsTotal = 0;
     let teleopPatternPointsTotal = 0;
+    let teleopBasePointsTotal = 0;
 
     let movementRP = 0;
     let goalRP = 0;
@@ -1412,6 +1461,7 @@ function calculateTeamStatistics(teamNumber: number, scoreData: any[]) {
 
             teleopArtifactPointsTotal += alliance.teleopArtifactPoints || 0;
             teleopPatternPointsTotal += alliance.teleopPatternPoints || 0;
+            teleopBasePointsTotal += alliance.teleopBasePoints || 0;
 
             const teleopArtifacts = (alliance.teleopClassifiedArtifacts || 0) + (alliance.teleopOverflowArtifacts || 0);
             teleopArtifactsCounts.push(teleopArtifacts);
@@ -1471,6 +1521,7 @@ function calculateTeamStatistics(teamNumber: number, scoreData: any[]) {
         avgTeleopPoints: avgTeleop,
         avgTeleopArtifactPoints: totalMatches > 0 ? teleopArtifactPointsTotal / totalMatches : 0,
         avgTeleopPatternPoints: totalMatches > 0 ? teleopPatternPointsTotal / totalMatches : 0,
+        avgTeleopBasePoints: totalMatches > 0 ? teleopBasePointsTotal / totalMatches : 0,
         avgTeleopArtifacts,
         medianTeleopArtifacts,
         modeTeleopArtifacts,
@@ -1614,11 +1665,12 @@ function generateLineChart(data1: number[], data2: number[], maxValue: number) {
         const width = rect.width;
         const height = rect.height;
         const padding = 10;
+        const topPadding = 30;
         const chartWidth = width - padding * 2;
-        const chartHeight = height - padding * 2;
+        const chartHeight = height - topPadding - padding;
 
         const getX = (i: number) => padding + (i / (data1.length - 1 || 1)) * chartWidth;
-        const getY = (v: number) => padding + chartHeight - (v / maxValue) * chartHeight;
+        const getY = (v: number) => topPadding + chartHeight - (v / maxValue) * chartHeight;
 
         // Draw lines
         ctx.lineWidth = 2;
@@ -1661,6 +1713,93 @@ function generateLineChart(data1: number[], data2: number[], maxValue: number) {
             ctx.arc(getX(i), getY(v), 5, 0, Math.PI * 2);
             ctx.fill();
         });
+
+        // Draw value labels above dots with improved overlap prevention
+        ctx.font = "11px 'JetBrains Mono', monospace";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "bottom";
+
+        // Track occupied label positions to prevent overlap
+        const labelPositions: { x: number, y: number, width: number, height: number }[] = [];
+        const minLabelSpacing = 2;
+        const textHeight = 11;
+
+        const drawLabel = (value: number, x: number, y: number, color: string) => {
+            ctx.fillStyle = color;
+            const text = value.toString();
+            const metrics = ctx.measureText(text);
+            const textWidth = metrics.width;
+            
+            let labelY = y - 8;
+            let bestY = labelY;
+            let minOverlap = Infinity;
+            
+            // Try positions above the dot, preferring closer positions
+            for (let offset = 0; offset <= 20; offset += 1) {
+                const tryY = y - 8 - offset;
+                if (tryY - textHeight < topPadding) break;
+                
+                const bounds = {
+                    x: x - textWidth / 2 - minLabelSpacing,
+                    y: tryY - textHeight - minLabelSpacing,
+                    width: textWidth + minLabelSpacing * 2,
+                    height: textHeight + minLabelSpacing * 2
+                };
+                
+                // Calculate overlap amount
+                let overlapAmount = 0;
+                for (const pos of labelPositions) {
+                    if (bounds.x < pos.x + pos.width &&
+                        bounds.x + bounds.width > pos.x &&
+                        bounds.y < pos.y + pos.height &&
+                        bounds.y + bounds.height > pos.y) {
+                        
+                        const xOverlap = Math.min(bounds.x + bounds.width, pos.x + pos.width) - Math.max(bounds.x, pos.x);
+                        const yOverlap = Math.min(bounds.y + bounds.height, pos.y + pos.height) - Math.max(bounds.y, pos.y);
+                        overlapAmount += xOverlap * yOverlap;
+                    }
+                }
+                
+                if (overlapAmount === 0) {
+                    bestY = tryY;
+                    labelPositions.push(bounds);
+                    ctx.fillText(text, x, bestY);
+                    return;
+                }
+                
+                if (overlapAmount < minOverlap) {
+                    minOverlap = overlapAmount;
+                    bestY = tryY;
+                }
+            }
+            
+            // Use best position found (minimal overlap)
+            const bounds = {
+                x: x - textWidth / 2 - minLabelSpacing,
+                y: bestY - textHeight - minLabelSpacing,
+                width: textWidth + minLabelSpacing * 2,
+                height: textHeight + minLabelSpacing * 2
+            };
+            labelPositions.push(bounds);
+            ctx.fillText(text, x, bestY);
+        };
+
+        // Collect all points to draw, sorted by y position (highest values first)
+        const allPoints: { value: number, x: number, y: number, color: string }[] = [];
+        for (let i = 0; i < data1.length; i++) {
+            allPoints.push({ value: data1[i], x: getX(i), y: getY(data1[i]), color: "#4ec9b0" });
+        }
+        for (let i = 0; i < data2.length; i++) {
+            allPoints.push({ value: data2[i], x: getX(i), y: getY(data2[i]), color: "#ff6b6b" });
+        }
+        
+        // Sort by y position (lowest y = highest value = draw first to get best position)
+        allPoints.sort((a, b) => a.y - b.y);
+        
+        // Draw labels in order
+        for (const point of allPoints) {
+            drawLabel(point.value, point.x, point.y, point.color);
+        }
 
         // Handle hover
         const tooltip = document.getElementById(`${chartId}-tooltip`);
@@ -1731,6 +1870,25 @@ function generateLineChart(data1: number[], data2: number[], maxValue: number) {
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
+    // Mobile menu initialization
+    const mobileMenuBtn = document.getElementById("mobile-menu-btn");
+    const sidebarOverlay = document.getElementById("sidebar-overlay");
+    
+    if (mobileMenuBtn) {
+        mobileMenuBtn.addEventListener("click", () => toggleMobileMenu());
+    }
+    
+    if (sidebarOverlay) {
+        sidebarOverlay.addEventListener("click", closeMobileMenu);
+    }
+    
+    // Close menu on escape key
+    document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape" && isMobileMenuOpen) {
+            closeMobileMenu();
+        }
+    });
+
     // Tab initialization
     tabs.forEach(tab => {
         const button = document.getElementById(tab.buttonId);
@@ -1741,6 +1899,35 @@ document.addEventListener("DOMContentLoaded", async () => {
                     initializeNotesView(currentEventCode);
                 }
             });
+        }
+    });
+
+    // Keyboard shortcuts for navigation
+    document.addEventListener("keydown", (e) => {
+        // Only trigger if not typing in an input field
+        if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+            return;
+        }
+
+        // Don't interfere with browser shortcuts (Ctrl, Cmd, Alt)
+        if (e.ctrlKey || e.metaKey || e.altKey) {
+            return;
+        }
+
+        const keyMap: { [key: string]: string } = {
+            "s": "button-schedule",
+            "r": "button-rankings",
+            "n": "button-notes",
+            "i": "button-insights"
+        };
+
+        const buttonId = keyMap[e.key.toLowerCase()];
+        if (buttonId) {
+            const button = document.getElementById(buttonId);
+            if (button) {
+                button.click();
+                e.preventDefault();
+            }
         }
     });
 
