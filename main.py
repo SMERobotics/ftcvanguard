@@ -7,17 +7,161 @@ import jwt
 import os
 import requests
 import sqlite3
+import threading
+import time
 
 FTC_API_URL = "https://ftc-api.firstinspires.org/v2.0"
 BLOCK_REGISTRATION = True
 RSA_PUBLIC_KEY = ""
 RSA_PRIVATE_KEY = ""
 
-app = Flask(__name__)
-
 load_dotenv()
 FTC_API_USERNAME = os.getenv("FTC_API_USERNAME")
 FTC_API_TOKEN = os.getenv("FTC_API_TOKEN")
+NTFY_SERVER_URL = os.getenv("NTFY_SERVER_URL", "https://ntfy.sh")
+NTFY_TOPIC = os.getenv("NTFY_TOPIC", "FTC_{}")
+NTFY_TEAMS = [int(t.strip()) for t in os.getenv("NTFY_TEAMS", "").split() if t.strip()]
+
+get_db = lambda: sqlite3.connect("default.db", check_same_thread=True)
+
+def get_active_event(team_id: int) -> str | None:
+    now = datetime.now()
+    year = now.year
+
+    r = s.get(f"{FTC_API_URL}/{year}/events?teamNumber={team_id}")
+    if r.status_code != 200:
+        return None
+
+    events = r.json().get("events", [])
+    for event in events:
+        start_date = datetime.fromisoformat(event.get("dateStart"))
+        end_date = start_date + timedelta(days=4)
+        if start_date <= now <= end_date:
+            return event.get("code")
+    return None
+
+def get_next_match(schedule: list[dict], team_id: int, now: datetime) -> tuple[str, str, datetime] | None:
+    next_match: tuple[str, str, datetime] | None = None
+
+    for i, match in enumerate(schedule):
+        if not match.get("teams"):
+            continue
+        if not any(team.get("teamNumber") == team_id for team in match.get("teams", [])):
+            continue
+
+        queue_time: datetime | None = None
+
+        if match.get("matchNumber") == 1:
+            queue_time = datetime.fromisoformat(match.get("startTime")) - timedelta(minutes=10)
+        else:
+            prev_match = None
+            for prev in schedule[:i]:
+                if prev.get("field") == match.get("field") and prev.get("teams"):
+                    prev_match = prev
+            if prev_match:
+                queue_time = datetime.fromisoformat(prev_match.get("startTime"))
+            else:
+                queue_time = datetime.fromisoformat(match.get("startTime")) - timedelta(minutes=10)
+
+        if queue_time <= now:
+            continue
+
+        if next_match is None or queue_time < next_match[2]:
+            next_match = (match.get("description"), match.get("field"), queue_time)
+
+    return next_match
+
+def send_notification(team_id: int, title: str, message: str, priority: int=3, click: str=""):
+    db = get_db()
+    cursor = db.cursor()
+    
+    cursor.execute(
+        "SELECT id FROM notifications WHERE team_id = ? AND title = ? AND message = ?",
+        (team_id, title, message)
+    )
+    if cursor.fetchone() is not None:
+        cursor.close()
+        db.close()
+        print(f"Skipping duplicate notification to team {team_id}: {title} - {message}")
+        return True
+    
+    print(f"Sending notification to team {team_id}: {title} - {message}")
+    topic = NTFY_TOPIC.format(team_id)
+    url = f"{NTFY_SERVER_URL}/{topic}"
+    headers = {
+        "Title": title,
+        "Priority": str(priority),
+    }
+    if click:
+        headers["Click"] = click
+    
+    try:
+        r = requests.post(url, data=message.encode("utf-8"), headers=headers)
+        if r.status_code == 200:
+            sent_at = int(datetime.now().timestamp())
+            cursor.execute(
+                "INSERT INTO notifications (team_id, title, message, sent_at) VALUES (?, ?, ?, ?)",
+                (team_id, title, message, sent_at)
+            )
+            db.commit()
+        cursor.close()
+        db.close()
+        return r.status_code == 200
+    except Exception as e:
+        print(f"Error sending notification to team {team_id}: {e}")
+        cursor.close()
+        db.close()
+        return False
+
+def notification_callback():
+    now = datetime.now()
+    year = now.year
+
+    for team_id in NTFY_TEAMS:
+        event = get_active_event(team_id)
+        if not event:
+            continue
+
+        r = s.get(f"{FTC_API_URL}/{year}/schedule/{event}?tournamentLevel=qual")
+        if r.status_code != 200:
+            continue
+
+        send_notification(team_id, "Schedule Available", f"Match schedule for {event} is available!", priority=5)
+
+        schedule = r.json().get("schedule", [])
+        match_info = get_next_match(schedule, team_id, now)
+        if not match_info:
+            continue
+
+        name, field, queue_time = match_info
+        until_queue = (queue_time - now).total_seconds()
+
+        if 240 < until_queue <= 360:
+            send_notification(
+            team_id,
+            "Upcoming Match",
+            f"{name} on field {field} in 5 minutes. Get ready!",
+            priority=3,
+            click=""
+            )
+        elif -60 <= until_queue <= 60:
+            send_notification(
+            team_id,
+            "Match Queueing",
+            f"{name} on field {field} is queueing now. Good luck!",
+            priority=5,
+            click=""
+            )
+
+def notification_loop():
+    while True:
+        try:
+            notification_callback()
+        except Exception as e:
+            print(f"Notification loop error: {e}")
+        time.sleep(30)
+
+app = Flask(__name__)
 
 ph = PasswordHasher()
 s = requests.Session()
@@ -30,14 +174,11 @@ with open(os.path.join(ssh_dir, "id_rsa.pub"), "r") as f:
 with open(os.path.join(ssh_dir, "id_rsa.pem"), "r") as f:
     RSA_PRIVATE_KEY = f.read()
 
-get_db = lambda: sqlite3.connect("default.db", check_same_thread=True)
-
 db = get_db()
 cursor = db.cursor()
 cursor.execute("PRAGMA journal_mode=WAL;")
 cursor.execute("CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, password TEXT)")
 
-# Create new notes table with updated schema (no event_code)
 cursor.execute("""CREATE TABLE IF NOT EXISTS notes (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     team_id INTEGER NOT NULL,
@@ -48,8 +189,19 @@ cursor.execute("""CREATE TABLE IF NOT EXISTS notes (
     updated_at INTEGER NOT NULL,
     UNIQUE(team_id, subject_team_id)
 )""")
+cursor.execute("""CREATE TABLE IF NOT EXISTS notifications (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    team_id INTEGER NOT NULL,
+    title TEXT NOT NULL,
+    message TEXT NOT NULL,
+    sent_at INTEGER NOT NULL,
+    UNIQUE(team_id, title, message)
+)""")
 db.commit()
 db.close()
+
+thread = threading.Thread(target=notification_loop, daemon=True)
+thread.start()
 
 @app.route("/", methods=["GET"])
 def _root():
