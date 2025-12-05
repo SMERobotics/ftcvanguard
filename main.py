@@ -200,8 +200,9 @@ cursor.execute("""CREATE TABLE IF NOT EXISTS notifications (
 db.commit()
 db.close()
 
-thread = threading.Thread(target=notification_loop, daemon=True)
-thread.start()
+if len(NTFY_TEAMS) > 0:
+    thread = threading.Thread(target=notification_loop, daemon=True)
+    thread.start()
 
 @app.route("/", methods=["GET"])
 def _root():
