@@ -21,6 +21,7 @@ FTC_API_TOKEN = os.getenv("FTC_API_TOKEN")
 NTFY_SERVER_URL = os.getenv("NTFY_SERVER_URL", "https://ntfy.sh")
 NTFY_TOPIC = os.getenv("NTFY_TOPIC", "FTC_{}")
 NTFY_TEAMS = [int(t.strip()) for t in os.getenv("NTFY_TEAMS", "").split() if t.strip()]
+VANGUARD_URL = os.getenv("VANGUARD_URL", "http://localhost:8080")
 
 get_db = lambda: sqlite3.connect("default.db", check_same_thread=True)
 
@@ -82,7 +83,6 @@ def send_notification(team_id: int, title: str, message: str, priority: int=3, c
     if cursor.fetchone() is not None:
         cursor.close()
         db.close()
-        print(f"Skipping duplicate notification to team {team_id}: {title} - {message}")
         return True
     
     print(f"Sending notification to team {team_id}: {title} - {message}")
@@ -128,7 +128,8 @@ def notification_callback():
         if not r.json().get("schedule"):
             continue
 
-        send_notification(team_id, "Schedule Available", f"Match schedule for {event} is available!", priority=5)
+        schedule_url = f"{VANGUARD_URL}/?view=schedule&event={event}"
+        send_notification(team_id, "Schedule Available", f"Match schedule for {event} is available!", priority=5, click=schedule_url)
 
         schedule = r.json().get("schedule", [])
         match_info = get_next_match(schedule, team_id, now)
@@ -138,13 +139,24 @@ def notification_callback():
         name, field, queue_time = match_info
         until_queue = (queue_time - now).total_seconds()
 
+        # Extract match number from match info if possible
+        match_number = None
+        for match in schedule:
+            if match.get("description") == name and match.get("field") == field:
+                match_number = match.get("matchNumber")
+                break
+        
+        match_url = f"{VANGUARD_URL}/?view=schedule&event={event}"
+        if match_number:
+            match_url += f"&match={match_number}"
+
         if 240 < until_queue <= 360:
             send_notification(
             team_id,
             "Upcoming Match",
             f"{name} on field {field} in 5 minutes. Get ready!",
             priority=3,
-            click=""
+            click=match_url
             )
         elif -60 <= until_queue <= 60:
             send_notification(
@@ -152,7 +164,7 @@ def notification_callback():
             "Match Queueing",
             f"{name} on field {field} is queueing now. Good luck!",
             priority=5,
-            click=""
+            click=match_url
             )
 
 def notification_loop():
