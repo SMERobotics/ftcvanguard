@@ -125,6 +125,8 @@ def notification_callback():
         r = s.get(f"{FTC_API_URL}/{year}/schedule/{event}?tournamentLevel=qual")
         if r.status_code != 200:
             continue
+        if not r.json().get("schedule"):
+            continue
 
         send_notification(team_id, "Schedule Available", f"Match schedule for {event} is available!", priority=5)
 
