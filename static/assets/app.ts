@@ -1213,7 +1213,7 @@ function renderScoreBreakdown(scoreMatch: ScoreMatch | undefined, chartJobs: Arr
 
     const classifier = renderClassifierSection(scoreMatch);
 
-    return `<div class="score-breakdown"><div class="score-breakdown-title">Score Breakdown</div>${cards}${classifier}</div>`;
+    return `<div class="score-breakdown"><div class="score-breakdown-title">Match Breakdown</div>${cards}${classifier}</div>`;
 }
 
 async function renderMatchDetails(match: Match, rankings: Ranking[], teams: TeamInfo[]) {
