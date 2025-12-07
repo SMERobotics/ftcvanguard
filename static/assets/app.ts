@@ -66,6 +66,49 @@ interface Notes {
     updatedAt: number | null;
 }
 
+interface ScoreAlliance {
+    alliance: string;
+    team: number;
+    autoClassifiedArtifacts: number;
+    autoOverflowArtifacts: number;
+    autoClassifierState: string[];
+    robot1Auto: boolean;
+    robot2Auto: boolean;
+    autoLeavePoints: number;
+    autoArtifactPoints: number;
+    autoPatternPoints: number;
+    teleopClassifiedArtifacts: number;
+    teleopOverflowArtifacts: number;
+    teleopDepotArtifacts: number;
+    teleopClassifierState: string[];
+    robot1Teleop: string;
+    robot2Teleop: string;
+    teleopArtifactPoints: number;
+    teleopDepotPoints: number;
+    teleopPatternPoints: number;
+    teleopBasePoints: number;
+    autoPoints: number;
+    teleopPoints: number;
+    foulPointsCommitted: number;
+    preFoulTotal: number;
+    movementRP: boolean;
+    goalRP: boolean;
+    patternRP: boolean;
+    totalPoints: number;
+    majorFouls: number;
+    minorFouls: number;
+}
+
+interface ScoreMatch {
+    matchLevel: string;
+    matchSeries: number;
+    matchNumber: number;
+    randomization: number;
+    alliances: ScoreAlliance[];
+}
+
+declare const Chart: any;
+
 const tabs: Tab[] = [
     { buttonId: "button-schedule", viewId: "view-schedule" },
     { buttonId: "button-rankings", viewId: "view-rankings" },
@@ -88,6 +131,8 @@ let isMobileMenuOpen: boolean = false;
 let currentSelectedMatch: number | null = null;
 let currentSelectedNotesTeam: number | null = null;
 let currentInsightsTeam: number | null = null;
+let currentScoreMatches: ScoreMatch[] = [];
+const activeCharts: Record<string, any> = {};
 
 // URL State Management
 interface AppState {
@@ -146,6 +191,25 @@ function parseUrlState(): AppState {
         team: params.has("team") ? parseInt(params.get("team")!, 10) : undefined,
         insights: params.has("insights") ? parseInt(params.get("insights")!, 10) : undefined
     };
+}
+
+async function assertAuthorized(response: Response): Promise<Response> {
+    if (response.status === 401) {
+        try {
+            const payload = await response.clone().json().catch(() => null);
+            if (payload && (payload as any).status === "fuck") {
+                handleLogout();
+            }
+        } catch {
+            // ignore JSON parsing errors here
+        }
+    }
+    return response;
+}
+
+async function authFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+    const res = await fetch(input, init);
+    return assertAuthorized(res);
 }
 
 function toggleMobileMenu(open?: boolean) {
@@ -279,7 +343,7 @@ async function loadEvents() {
 
     showLoading();
     try {
-        const response = await fetch("/api/v1/events", {
+        const response = await authFetch("/api/v1/events", {
             headers: { "Authorization": `Bearer ${token}` }
         });
         
@@ -304,7 +368,7 @@ async function loadEventsWithStateRestore() {
 
     showLoading();
     try {
-        const response = await fetch("/api/v1/events", {
+        const response = await authFetch("/api/v1/events", {
             headers: { "Authorization": `Bearer ${token}` }
         });
         
@@ -413,7 +477,7 @@ async function loadScheduleWithStateRestore(eventCode: string, urlState: AppStat
 
     showLoading();
     try {
-        const eventRes = await fetch(`/api/v1/event?event=${eventCode}`, { headers: { "Authorization": `Bearer ${token}` } });
+        const eventRes = await authFetch(`/api/v1/event?event=${eventCode}`, { headers: { "Authorization": `Bearer ${token}` } });
         
         if (!eventRes.ok) {
             console.error("Failed to load event details");
@@ -433,21 +497,24 @@ async function loadScheduleWithStateRestore(eventCode: string, urlState: AppStat
         const regionCode = event.regionCode;
         const leagueCode = event.leagueCode;
 
-        const [scheduleRes, rankingsRes, teamsRes] = await Promise.all([
-            fetch(`/api/v1/schedule?event=${eventCode}`, { headers: { "Authorization": `Bearer ${token}` } }),
-            fetch(`/api/v1/rankings?event=${eventCode}&region=${regionCode}&league=${leagueCode}`, { headers: { "Authorization": `Bearer ${token}` } }),
-            fetch(`/api/v1/teams?event=${eventCode}`, { headers: { "Authorization": `Bearer ${token}` } })
+        const [scheduleRes, rankingsRes, teamsRes, scoresRes] = await Promise.all([
+            authFetch(`/api/v1/schedule?event=${eventCode}`, { headers: { "Authorization": `Bearer ${token}` } }),
+            authFetch(`/api/v1/rankings?event=${eventCode}&region=${regionCode}&league=${leagueCode}`, { headers: { "Authorization": `Bearer ${token}` } }),
+            authFetch(`/api/v1/teams?event=${eventCode}`, { headers: { "Authorization": `Bearer ${token}` } }),
+            authFetch(`/api/v1/scores/${eventCode}/qual`, { headers: { "Authorization": `Bearer ${token}` } })
         ]);
 
         if (scheduleRes.ok && rankingsRes.ok && teamsRes.ok) {
             const scheduleData = await scheduleRes.json();
             const rankingsData = await rankingsRes.json();
             const teamsData = await teamsRes.json();
+            const scoresData = scoresRes.ok ? await scoresRes.json() : { matchScores: [] };
             
             currentMatches = scheduleData.schedule || [];
             currentRankings = rankingsData.rankings || [];
             currentTeams = teamsData.teams || [];
-            await enrichMatchesWithResults(eventCode, currentMatches, token);
+            currentScoreMatches = scoresData.matchScores || [];
+            mergeScoresIntoScheduleMatches(currentMatches, currentScoreMatches);
             
             renderSchedule(currentMatches, currentRankings, currentTeams);
             renderRankings(currentRankings);
@@ -529,7 +596,7 @@ async function loadSchedule(eventCode: string) {
     showLoading();
     try {
         // First, fetch event details to get regionCode and leagueCode
-        const eventRes = await fetch(`/api/v1/event?event=${eventCode}`, { headers: { "Authorization": `Bearer ${token}` } });
+        const eventRes = await authFetch(`/api/v1/event?event=${eventCode}`, { headers: { "Authorization": `Bearer ${token}` } });
         
         if (!eventRes.ok) {
             console.error("Failed to load event details");
@@ -549,21 +616,24 @@ async function loadSchedule(eventCode: string) {
         const regionCode = event.regionCode;
         const leagueCode = event.leagueCode;
 
-        const [scheduleRes, rankingsRes, teamsRes] = await Promise.all([
-            fetch(`/api/v1/schedule?event=${eventCode}`, { headers: { "Authorization": `Bearer ${token}` } }),
-            fetch(`/api/v1/rankings?event=${eventCode}&region=${regionCode}&league=${leagueCode}`, { headers: { "Authorization": `Bearer ${token}` } }),
-            fetch(`/api/v1/teams?event=${eventCode}`, { headers: { "Authorization": `Bearer ${token}` } })
+        const [scheduleRes, rankingsRes, teamsRes, scoresRes] = await Promise.all([
+            authFetch(`/api/v1/schedule?event=${eventCode}`, { headers: { "Authorization": `Bearer ${token}` } }),
+            authFetch(`/api/v1/rankings?event=${eventCode}&region=${regionCode}&league=${leagueCode}`, { headers: { "Authorization": `Bearer ${token}` } }),
+            authFetch(`/api/v1/teams?event=${eventCode}`, { headers: { "Authorization": `Bearer ${token}` } }),
+            authFetch(`/api/v1/scores/${eventCode}/qual`, { headers: { "Authorization": `Bearer ${token}` } })
         ]);
 
         if (scheduleRes.ok && rankingsRes.ok && teamsRes.ok) {
             const scheduleData = await scheduleRes.json();
             const rankingsData = await rankingsRes.json();
             const teamsData = await teamsRes.json();
+            const scoresData = scoresRes.ok ? await scoresRes.json() : { matchScores: [] };
             
             currentMatches = scheduleData.schedule || [];
             currentRankings = rankingsData.rankings || [];
             currentTeams = teamsData.teams || [];
-            await enrichMatchesWithResults(eventCode, currentMatches, token);
+            currentScoreMatches = scoresData.matchScores || [];
+            mergeScoresIntoScheduleMatches(currentMatches, currentScoreMatches);
             
             renderSchedule(currentMatches, currentRankings, currentTeams);
             renderRankings(currentRankings);
@@ -608,6 +678,20 @@ function buildMatchKey(match: Pick<Match, "matchNumber" | "series" | "tournament
     return `${level}-${seriesValue}-${match.matchNumber}`;
 }
 
+function normalizeLevel(level: string | undefined | null): string {
+    return (level || "").toUpperCase();
+}
+
+function buildScoreKeyFromSchedule(match: Pick<Match, "matchNumber" | "series" | "tournamentLevel">): string {
+    const seriesValue = typeof match.series === "number" ? match.series : 0;
+    return `${normalizeLevel(match.tournamentLevel)}-${seriesValue}-${match.matchNumber}`;
+}
+
+function buildScoreKeyFromScore(match: Pick<ScoreMatch, "matchLevel" | "matchSeries" | "matchNumber">): string {
+    const seriesValue = typeof match.matchSeries === "number" ? match.matchSeries : 0;
+    return `${normalizeLevel(match.matchLevel)}-${seriesValue}-${match.matchNumber}`;
+}
+
 function mergeMatchResults(scheduleMatches: Match[], resultMatches: Match[]): void {
     const resultMap = new Map<string, Match>();
     resultMatches.forEach(result => {
@@ -630,6 +714,30 @@ function mergeMatchResults(scheduleMatches: Match[], resultMatches: Match[]): vo
     });
 }
 
+function mergeScoresIntoScheduleMatches(scheduleMatches: Match[], scoreMatches: ScoreMatch[]): void {
+    const scoreMap = new Map<string, ScoreMatch>();
+    scoreMatches.forEach(score => scoreMap.set(buildScoreKeyFromScore(score), score));
+
+    scheduleMatches.forEach(match => {
+        const score = scoreMap.get(buildScoreKeyFromSchedule(match));
+        if (!score) return;
+
+        const red = score.alliances.find(a => a.alliance.toLowerCase() === "red");
+        const blue = score.alliances.find(a => a.alliance.toLowerCase() === "blue");
+
+        if (red && typeof red.totalPoints === "number") {
+            match.scoreRedFinal = red.totalPoints;
+        }
+        if (blue && typeof blue.totalPoints === "number") {
+            match.scoreBlueFinal = blue.totalPoints;
+        }
+    });
+}
+
+function findScoreMatchForScheduleMatch(match: Match): ScoreMatch | undefined {
+    return currentScoreMatches.find(score => buildScoreKeyFromScore(score) === buildScoreKeyFromSchedule(match));
+}
+
 async function enrichMatchesWithResults(eventCode: string, matches: Match[], token: string): Promise<void> {
     if (!matches.length) return;
 
@@ -644,7 +752,7 @@ async function enrichMatchesWithResults(eventCode: string, matches: Match[], tok
     try {
         const responses = await Promise.all(uniqueLevels.map(level => {
             const params = new URLSearchParams({ event: eventCode, level });
-            return fetch(`/api/v1/matches?${params.toString()}`, { headers })
+            return authFetch(`/api/v1/matches?${params.toString()}`, { headers })
                 .then(res => res.ok ? res.json() : null)
                 .catch(() => null);
         }));
@@ -858,6 +966,231 @@ function updateQueueTimers() {
     });
 }
 
+function getAllianceFromScore(scoreMatch: ScoreMatch | undefined, alliance: "red" | "blue"): ScoreAlliance | undefined {
+    return scoreMatch?.alliances.find(a => a.alliance.toLowerCase() === alliance);
+}
+
+function getMatchRankingPoints(alliance: ScoreAlliance, opponent?: ScoreAlliance): number {
+    if (!opponent) return 0;
+    if (alliance.totalPoints > opponent.totalPoints) return 3;
+    if (alliance.totalPoints === opponent.totalPoints) return 1;
+    return 0;
+}
+
+function renderMatchRPChips(count: number, allianceColor: "red" | "blue"): string {
+    return Array.from({ length: 3 }).map((_, index) => {
+        const filled = index < count;
+        return `<span class="rp-chip match ${allianceColor} ${filled ? "filled" : ""}" title="Match RP">Match</span>`;
+    }).join("");
+}
+
+function renderRPLine(alliance: ScoreAlliance, opponent: ScoreAlliance | undefined, allianceColor: "red" | "blue"): string {
+    const matchRP = getMatchRankingPoints(alliance, opponent);
+    const movement = `<span class="rp-chip ${allianceColor} ${alliance.movementRP ? "filled" : ""}" title="Movement RP">Movement</span>`;
+    const goal = `<span class="rp-chip ${allianceColor} ${alliance.goalRP ? "filled" : ""}" title="Goal RP">Goal</span>`;
+    const pattern = `<span class="rp-chip ${allianceColor} ${alliance.patternRP ? "filled" : ""}" title="Pattern RP">Pattern</span>`;
+    return `<div class="rp-line">${renderMatchRPChips(matchRP, allianceColor)}${movement}${goal}${pattern}</div>`;
+}
+
+function renderDonutChart(canvasId: string, values: number[], labels: string[], colors: string[]) {
+    const canvas = document.getElementById(canvasId) as HTMLCanvasElement | null;
+    if (!canvas || typeof Chart === "undefined") return;
+
+    if (activeCharts[canvasId]) {
+        activeCharts[canvasId].destroy();
+    }
+
+    activeCharts[canvasId] = new Chart(canvas, {
+        type: "doughnut",
+        data: {
+            labels,
+            datasets: [{ data: values, backgroundColor: colors, borderWidth: 0 }]
+        },
+        options: {
+            cutout: "58%",
+            plugins: { legend: { display: false }, tooltip: { enabled: true } },
+            animation: { duration: 350 }
+        }
+    });
+}
+
+function renderMetricRow(label: string, value: number | string): string {
+    return `<div class="metric-row"><span>${label}</span><span class="metric-value">${value}</span></div>`;
+}
+
+function renderRobotPill(label: string, value: string | boolean, allianceColor: "red" | "blue"): string {
+    const text = typeof value === "boolean" ? (value ? "Left" : "Stayed") : value.charAt(0).toUpperCase() + value.slice(1).toLowerCase();
+    const normalized = text || "–";
+    const stateClass = typeof value === "boolean" ? (value ? "pill-on" : "pill-off") : normalized.toLowerCase();
+    return `<span class="robot-pill ${allianceColor} ${stateClass}">${label} ${normalized}</span>`;
+}
+
+function renderAllianceBreakdown(scoreMatch: ScoreMatch, allianceColor: "red" | "blue", chartJobs: Array<() => void>): string {
+    const alliance = getAllianceFromScore(scoreMatch, allianceColor);
+    const opponent = getAllianceFromScore(scoreMatch, allianceColor === "red" ? "blue" : "red");
+
+    if (!alliance) {
+        return `<div class="score-card ${allianceColor}"><div class="score-card-empty">Scores unavailable</div></div>`;
+    }
+
+    const autoPoints = alliance.autoPoints || 0;
+    const teleopPoints = alliance.teleopPoints || 0;
+    const penaltyPointsEarned = opponent ? Math.max(opponent.foulPointsCommitted || 0, 0) : 0;
+    const donutId = `score-donut-${allianceColor}-${scoreMatch.matchNumber}-${Date.now()}`;
+    const palette = allianceColor === "red"
+        ? ["#ffb38a", "#ff6b6b", "#707070"]
+        : ["#7cd0ff", "#4da6ff", "#707070"];
+
+    chartJobs.push(() => renderDonutChart(donutId, [autoPoints, teleopPoints, penaltyPointsEarned], ["Auto Points", "Teleop Points", "Penalties Earned"], palette));
+
+    const autoSection = `
+        <div class="score-section">
+            <div class="section-title">Autonomous</div>
+            ${renderMetricRow("Auto Classified Artifacts", alliance.autoClassifiedArtifacts ?? 0)}
+            ${renderMetricRow("Auto Overflow Artifacts", alliance.autoOverflowArtifacts ?? 0)}
+            ${renderMetricRow("Auto Leave Points", alliance.autoLeavePoints ?? 0)}
+            ${renderMetricRow("Auto Pattern Points", alliance.autoPatternPoints ?? 0)}
+            ${renderMetricRow("Auto Artifact Point", alliance.autoArtifactPoints ?? 0)}
+        </div>
+    `;
+
+    const teleopSection = `
+        <div class="score-section">
+            <div class="section-title">Teleop</div>
+            ${renderMetricRow("Teleop Classified Artifacts", alliance.teleopClassifiedArtifacts ?? 0)}
+            ${renderMetricRow("Teleop Overflow Artifacts", alliance.teleopOverflowArtifacts ?? 0)}
+            ${renderMetricRow("Teleop Depot Artifacts", alliance.teleopDepotArtifacts ?? 0)}
+            ${renderMetricRow("Teleop Pattern Points", alliance.teleopPatternPoints ?? 0)}
+            ${renderMetricRow("Teleop Artifact Points", alliance.teleopArtifactPoints ?? 0)}
+            ${renderMetricRow("Teleop Base Points", alliance.teleopBasePoints ?? 0)}
+        </div>
+    `;
+
+    const robotsSection = `
+        <div class="score-section">
+            <div class="section-title">Robots</div>
+            <div class="metric-row">Auto Leave
+                <span class="metric-value robot-badges">${renderRobotPill("R1", alliance.robot1Auto, allianceColor)}${renderRobotPill("R2", alliance.robot2Auto, allianceColor)}</span>
+            </div>
+            <div class="metric-row">Teleop Park
+                <span class="metric-value robot-badges">${renderRobotPill("R1", alliance.robot1Teleop || "NONE", allianceColor)}${renderRobotPill("R2", alliance.robot2Teleop || "NONE", allianceColor)}</span>
+            </div>
+        </div>
+    `;
+
+    const penaltySection = `
+        <div class="score-section penalty-section">
+            ${renderMetricRow("Penalty Points Earned", penaltyPointsEarned)}
+        </div>
+    `;
+
+    return `
+        <div class="score-card ${allianceColor}">
+            <div class="score-card-header">
+                <div>
+                    <div class="score-card-label">${allianceColor === "red" ? "Red" : "Blue"} Alliance</div>
+                    <div class="score-card-total">${alliance.totalPoints ?? 0}</div>
+                </div>
+                ${renderRPLine(alliance, opponent, allianceColor)}
+            </div>
+            <div class="score-card-body">
+                <div class="score-donut-block">
+                    <canvas id="${donutId}" width="180" height="180"></canvas>
+                    <div class="donut-legend">
+                        <span><span class="legend-dot" style="background:${palette[0]}"></span>Auto</span>
+                        <span><span class="legend-dot" style="background:${palette[1]}"></span>Teleop</span>
+                        <span><span class="legend-dot" style="background:${palette[2]}"></span>Opponent Fouls</span>
+                    </div>
+                </div>
+                <div class="score-details-grid">
+                    ${autoSection}
+                    ${teleopSection}
+                    ${robotsSection}
+                    ${penaltySection}
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function getRandomizationTarget(randomization: number): ("P" | "G" | "-")[] {
+    switch (randomization) {
+        case 1: return ["G", "P", "P", "G", "P", "P", "G", "P", "P"];
+        case 2: return ["P", "G", "P", "P", "G", "P", "P", "G", "P"];
+        case 3: return ["P", "P", "G", "P", "P", "G", "P", "P", "G"];
+        default: return ["-", "-", "-", "-", "-", "-", "-", "-", "-"];
+    }
+}
+
+function abbreviateState(state: string | undefined): "P" | "G" | "-" {
+    if (!state) return "-";
+    if (state.toUpperCase() === "PURPLE") return "P";
+    if (state.toUpperCase() === "GREEN") return "G";
+    return "-";
+}
+
+function renderClassifierRow(label: string, values: string[], target: ("P" | "G" | "-")[], accentClass: string): string {
+    const cells = values.map((val, idx) => {
+        const letter = abbreviateState(val);
+        const matches = letter !== "-" && letter === target[idx];
+        const letterClass = letter === "P" ? "classifier-purple" : letter === "G" ? "classifier-green" : "classifier-empty";
+        const content = matches ? `<strong>${letter}</strong>` : letter;
+        return `<span class="classifier-cell ${letterClass}">${content}</span>`;
+    }).join("");
+    return `
+        <div class="classifier-row">
+            <span class="classifier-label ${accentClass}">${label}</span>
+            <div class="classifier-cells">${cells}</div>
+        </div>
+    `;
+}
+
+function renderClassifierSection(scoreMatch?: ScoreMatch): string {
+    if (!scoreMatch) {
+        return `<div class="classifier-section"><div class="classifier-row"><span class="classifier-label">Classifier</span><div class="classifier-cells">Pending scores</div></div></div>`;
+    }
+
+    const target = getRandomizationTarget(scoreMatch.randomization);
+    const targetCells = target.map(letter => {
+        const cls = letter === "P" ? "classifier-purple" : letter === "G" ? "classifier-green" : "classifier-empty";
+        return `<span class="classifier-cell ${cls}">${letter}</span>`;
+    }).join("");
+
+    const red = getAllianceFromScore(scoreMatch, "red");
+    const blue = getAllianceFromScore(scoreMatch, "blue");
+
+    return `
+        <div class="classifier-section">
+            <div class="classifier-row">
+                <span class="classifier-label">Target</span>
+                <div class="classifier-cells">${targetCells}</div>
+            </div>
+            <div class="classifier-separator"></div>
+            ${red ? renderClassifierRow("Red Auto", red.autoClassifierState || [], target, "red") : ""}
+            ${blue ? renderClassifierRow("Blue Auto", blue.autoClassifierState || [], target, "blue") : ""}
+            ${red ? renderClassifierRow("Red Teleop", red.teleopClassifierState || [], target, "red") : ""}
+            ${blue ? renderClassifierRow("Blue Teleop", blue.teleopClassifierState || [], target, "blue") : ""}
+        </div>
+    `;
+}
+
+function renderScoreBreakdown(scoreMatch: ScoreMatch | undefined, chartJobs: Array<() => void>): string {
+    if (!scoreMatch) {
+        return `<div class="score-breakdown-empty">Match scores are not available yet.</div>`;
+    }
+
+    const cards = `
+        <div class="score-breakdown-grid">
+            ${renderAllianceBreakdown(scoreMatch, "red", chartJobs)}
+            ${renderAllianceBreakdown(scoreMatch, "blue", chartJobs)}
+        </div>
+    `;
+
+    const classifier = renderClassifierSection(scoreMatch);
+
+    return `<div class="score-breakdown">${cards}${classifier}</div>`;
+}
+
 async function renderMatchDetails(match: Match, rankings: Ranking[], teams: TeamInfo[]) {
     const detailsContainer = document.getElementById("schedule-details");
     if (!detailsContainer) return;
@@ -867,6 +1200,9 @@ async function renderMatchDetails(match: Match, rankings: Ranking[], teams: Team
     const redTeams = match.teams.filter(t => t.station.startsWith("Red"));
     const blueTeams = match.teams.filter(t => t.station.startsWith("Blue"));
     const allTeams = [...redTeams, ...blueTeams];
+    const scoreMatch = findScoreMatchForScheduleMatch(match);
+    const chartJobs: Array<() => void> = [];
+    const scoreBreakdownHtml = renderScoreBreakdown(scoreMatch, chartJobs);
 
     const getTeamRow = (team: Team, colorClass: string) => {
         const rank = rankings.find(r => r.teamNumber === team.teamNumber);
@@ -977,10 +1313,13 @@ async function renderMatchDetails(match: Match, rankings: Ranking[], teams: Team
                 </div>
             </div>
 
+            ${scoreBreakdownHtml}
             ${statsTable}
             ${notesLoadingSection}
         </div>
     `;
+
+    chartJobs.forEach(job => job());
 
     if (allTeams.length > 0) {
         const teamNumbers = allTeams.map(t => t.teamNumber);
@@ -1039,7 +1378,7 @@ async function renderMatchDetails(match: Match, rankings: Ranking[], teams: Team
 
 async function verifyToken(token: string): Promise<boolean> {
     try {
-        const response = await fetch("/api/v1/verify", {
+        const response = await authFetch("/api/v1/verify", {
             method: "GET",
             headers: {
                 "Authorization": `Bearer ${token}`
@@ -1130,7 +1469,7 @@ async function loadNotesStatus() {
     if (!token) return;
 
     try {
-        const response = await fetch(`/api/v1/notes/list`, {
+        const response = await authFetch(`/api/v1/notes/list`, {
             headers: { "Authorization": `Bearer ${token}` }
         });
         
@@ -1159,7 +1498,7 @@ async function loadNotesForTeams(teamIds: number[]): Promise<Map<number, Notes>>
 
     try {
         const promises = teamIds.map(teamId => 
-            fetch(`/api/v1/notes?team=${teamId}`, {
+            authFetch(`/api/v1/notes?team=${teamId}`, {
                 headers: { "Authorization": `Bearer ${token}` }
             }).then(res => res.ok ? res.json() : null)
         );
@@ -1182,7 +1521,7 @@ async function loadNotes(teamId: number): Promise<Notes> {
     if (!token) return { autoPerformance: "", teleopPerformance: "", generalNotes: "", updatedAt: null };
 
     try {
-        const response = await fetch(`/api/v1/notes?team=${teamId}`, {
+        const response = await authFetch(`/api/v1/notes?team=${teamId}`, {
             headers: { "Authorization": `Bearer ${token}` }
         });
         
@@ -1245,7 +1584,7 @@ async function saveNotes(teamId: number, notes: Notes) {
 
     // Then save to backend
     try {
-        fetch("/api/v1/notes", {
+        authFetch("/api/v1/notes", {
             method: "POST",
             headers: {
                 "Authorization": `Bearer ${token}`,
@@ -1436,7 +1775,7 @@ async function analyzeTeam(teamNumber: number, updateHistory: boolean = true) {
     showLoading();
 
     try {
-        const eventsRes = await fetch(`/api/v1/team/${teamNumber}/events`, {
+        const eventsRes = await authFetch(`/api/v1/team/${teamNumber}/events`, {
             headers: { "Authorization": `Bearer ${token}` }
         });
 
@@ -1459,10 +1798,10 @@ async function analyzeTeam(teamNumber: number, updateHistory: boolean = true) {
         for (const event of events) {
             try {
                 const [scoresRes, scheduleRes] = await Promise.all([
-                    fetch(`/api/v1/scores/${event.code}/qual`, {
+                    authFetch(`/api/v1/scores/${event.code}/qual`, {
                         headers: { "Authorization": `Bearer ${token}` }
                     }),
-                    fetch(`/api/v1/schedule?event=${event.code}&teamNumber=${teamNumber}`, {
+                    authFetch(`/api/v1/schedule?event=${event.code}&teamNumber=${teamNumber}`, {
                         headers: { "Authorization": `Bearer ${token}` }
                     })
                 ]);
