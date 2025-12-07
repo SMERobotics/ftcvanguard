@@ -49,7 +49,15 @@
         <div id="main">
             <div class="view" id="view-schedule" style="display: none;">
                 <div id="schedule-container">
-                    <div id="schedule-list"></div>
+                    <div id="schedule-sidebar">
+                        <div id="schedule-controls">
+                            <label class="schedule-checkbox-container">
+                                <input type="checkbox" id="show-all-matches">
+                                <span class="schedule-checkbox-label">Show All Matches</span>
+                            </label>
+                        </div>
+                        <div id="schedule-list"></div>
+                    </div>
                     <div id="schedule-details">
                         <div class="empty-state">Select a match to view details</div>
                     </div>

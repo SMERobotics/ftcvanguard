@@ -1,4 +1,8 @@
 "use strict";
+/*
+not functional but nice things to do:
+- [ ] integrate bearer auth directly into authFetch()
+*/
 const tabs = [
     { buttonId: "button-schedule", viewId: "view-schedule" },
     { buttonId: "button-rankings", viewId: "view-rankings" },
@@ -21,6 +25,7 @@ let currentSelectedMatch = null;
 let currentSelectedNotesTeam = null;
 let currentInsightsTeam = null;
 let currentScoreMatches = [];
+let showAllMatches = false;
 const activeCharts = {};
 function getViewNameFromId(viewId) {
     return viewId.replace("view-", "");
@@ -40,6 +45,8 @@ function buildUrlFromState(state) {
         params.set("team", state.team.toString());
     if (state.insights !== undefined && state.insights !== null)
         params.set("insights", state.insights.toString());
+    if (state.showAll)
+        params.set("showAll", "1");
     const queryString = params.toString();
     return queryString ? `?${queryString}` : window.location.pathname;
 }
@@ -49,7 +56,8 @@ function getCurrentState() {
         event: currentEventCode || undefined,
         match: currentSelectedMatch ?? undefined,
         team: currentSelectedNotesTeam ?? undefined,
-        insights: currentInsightsTeam ?? undefined
+        insights: currentInsightsTeam ?? undefined,
+        showAll: showAllMatches || undefined
     };
 }
 function updateUrl(replace = false) {
@@ -69,7 +77,8 @@ function parseUrlState() {
         event: params.get("event") || undefined,
         match: params.has("match") ? parseInt(params.get("match"), 10) : undefined,
         team: params.has("team") ? parseInt(params.get("team"), 10) : undefined,
-        insights: params.has("insights") ? parseInt(params.get("insights"), 10) : undefined
+        insights: params.has("insights") ? parseInt(params.get("insights"), 10) : undefined,
+        showAll: params.get("showAll") === "1" || undefined
     };
 }
 async function assertAuthorized(response) {
@@ -358,10 +367,26 @@ async function loadScheduleWithStateRestore(eventCode, urlState) {
             const teamsData = await teamsRes.json();
             const scoresData = scoresRes.ok ? await scoresRes.json() : { matchScores: [] };
             currentMatches = scheduleData.schedule || [];
+            currentMatches.sort((a, b) => getMatchStartTimestamp(a) - getMatchStartTimestamp(b));
             currentRankings = rankingsData.rankings || [];
             currentTeams = teamsData.teams || [];
             currentScoreMatches = scoresData.matchScores || [];
             mergeScoresIntoScheduleMatches(currentMatches, currentScoreMatches);
+            // Restore or infer showAll state
+            if (urlState.showAll !== undefined) {
+                showAllMatches = urlState.showAll;
+            }
+            else if (urlState.match !== undefined) {
+                // Infer showAll if linked match doesn't include the team
+                const linkedMatch = currentMatches.find(m => m.matchNumber === urlState.match);
+                if (linkedMatch && !linkedMatch.teams.some(t => t.teamNumber === loggedInTeamId)) {
+                    showAllMatches = true;
+                }
+            }
+            const showAllCheckbox = document.getElementById("show-all-matches");
+            if (showAllCheckbox) {
+                showAllCheckbox.checked = showAllMatches;
+            }
             renderSchedule(currentMatches, currentRankings, currentTeams);
             renderRankings(currentRankings);
             // Restore match selection from URL
@@ -458,10 +483,15 @@ async function loadSchedule(eventCode) {
             const teamsData = await teamsRes.json();
             const scoresData = scoresRes.ok ? await scoresRes.json() : { matchScores: [] };
             currentMatches = scheduleData.schedule || [];
+            currentMatches.sort((a, b) => getMatchStartTimestamp(a) - getMatchStartTimestamp(b));
             currentRankings = rankingsData.rankings || [];
             currentTeams = teamsData.teams || [];
             currentScoreMatches = scoresData.matchScores || [];
             mergeScoresIntoScheduleMatches(currentMatches, currentScoreMatches);
+            const showAllCheckbox = document.getElementById("show-all-matches");
+            if (showAllCheckbox) {
+                showAllCheckbox.checked = showAllMatches;
+            }
             renderSchedule(currentMatches, currentRankings, currentTeams);
             renderRankings(currentRankings);
             if (activeViewId === "view-notes" && currentTeams.length > 0) {
@@ -486,6 +516,11 @@ function parseScore(value) {
         return Number.isNaN(parsed) ? null : parsed;
     }
     return null;
+}
+function getMatchStartTimestamp(match) {
+    const time = match.actualStartTime || match.startTime;
+    const timestamp = time ? new Date(time).getTime() : 0;
+    return Number.isNaN(timestamp) ? 0 : timestamp;
 }
 function buildMatchKey(match) {
     const level = match.tournamentLevel || "";
@@ -623,7 +658,8 @@ function renderSchedule(matches, rankings, teams) {
     if (queueInterval)
         clearInterval(queueInterval);
     listContainer.innerHTML = "";
-    matches.forEach((match, index) => {
+    const filteredMatches = showAllMatches ? matches : matches.filter(match => match.teams.some(team => team.teamNumber === loggedInTeamId));
+    filteredMatches.forEach((match, index) => {
         const item = document.createElement("div");
         item.className = "match-item";
         item.dataset.matchNumber = match.matchNumber.toString();
@@ -650,7 +686,8 @@ function renderSchedule(matches, rankings, teams) {
         const hasScores = match.scoreRedFinal !== undefined || match.scoreBlueFinal !== undefined;
         const isOld = matchStart < oneHourAgo;
         if (!hasScores && !isOld) {
-            const prevMatch = index > 0 ? matches[index - 1] : null;
+            const matchIndexInFull = currentMatches.indexOf(match);
+            const prevMatch = matchIndexInFull > 0 ? currentMatches[matchIndexInFull - 1] : null;
             let queueTime;
             if (prevMatch) {
                 queueTime = new Date(prevMatch.actualStartTime || prevMatch.startTime);
@@ -2324,6 +2361,17 @@ document.addEventListener("DOMContentLoaded", async () => {
             }
         }
     });
+    // Show All Matches checkbox initialization
+    const showAllCheckbox = document.getElementById("show-all-matches");
+    if (showAllCheckbox) {
+        showAllCheckbox.addEventListener("change", () => {
+            showAllMatches = showAllCheckbox.checked;
+            if (currentMatches.length > 0) {
+                renderSchedule(currentMatches, currentRankings, currentTeams);
+            }
+            updateUrl();
+        });
+    }
     // Insights initialization
     const analyzeBtn = document.getElementById("insights-analyze-btn");
     const teamInput = document.getElementById("insights-team-input");

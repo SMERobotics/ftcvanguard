@@ -365,8 +365,7 @@ def _api_v1_schedule():
     
     token = auth_header.split(" ")[1]
     try:
-        payload = jwt.decode(token, RSA_PUBLIC_KEY, algorithms=["RS256"])
-        team_id = payload.get("id")
+        jwt.decode(token, RSA_PUBLIC_KEY, algorithms=["RS256"])
     except jwt.ExpiredSignatureError:
         return {"status": "fuck", "error": "token expired"}, 401
     except:
@@ -379,18 +378,20 @@ def _api_v1_schedule():
     except:
         return {"status": "fuck", "error": "bad request"}, 400
 
-    # Allow overriding team number for insights analysis
-    team_param = request.args.get("teamNumber")
-    if team_param:
-        try:
-            team_id = int(team_param)
-        except ValueError:
-            return {"status": "fuck", "error": "teamNumber must be integer"}, 400
+    level = request.args.get("level") or "qual"
 
     now = datetime.now()
     year = now.year
     
-    r = s.get(f"{FTC_API_URL}/{year}/schedule/{event}?teamNumber={team_id}")
+    params = []
+    if level:
+        params.append(f"tournamentLevel={level}")
+
+    url = f"{FTC_API_URL}/{year}/schedule/{event}"
+    if params:
+        url = f"{url}?{'&'.join(params)}"
+
+    r = s.get(url)
     return r.json(), r.status_code
 
 @app.route("/api/v1/matches", methods=["GET"])

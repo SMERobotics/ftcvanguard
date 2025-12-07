@@ -1,3 +1,8 @@
+/*
+not functional but nice things to do:
+- [ ] integrate bearer auth directly into authFetch()
+*/
+
 interface Tab {
     buttonId: string;
     viewId: string;
@@ -132,6 +137,7 @@ let currentSelectedMatch: number | null = null;
 let currentSelectedNotesTeam: number | null = null;
 let currentInsightsTeam: number | null = null;
 let currentScoreMatches: ScoreMatch[] = [];
+let showAllMatches: boolean = false;
 const activeCharts: Record<string, any> = {};
 
 // URL State Management
@@ -141,6 +147,7 @@ interface AppState {
     match?: number;
     team?: number;
     insights?: number;
+    showAll?: boolean;
 }
 
 function getViewNameFromId(viewId: string): string {
@@ -158,6 +165,7 @@ function buildUrlFromState(state: AppState): string {
     if (state.match !== undefined && state.match !== null) params.set("match", state.match.toString());
     if (state.team !== undefined && state.team !== null) params.set("team", state.team.toString());
     if (state.insights !== undefined && state.insights !== null) params.set("insights", state.insights.toString());
+    if (state.showAll) params.set("showAll", "1");
     const queryString = params.toString();
     return queryString ? `?${queryString}` : window.location.pathname;
 }
@@ -168,7 +176,8 @@ function getCurrentState(): AppState {
         event: currentEventCode || undefined,
         match: currentSelectedMatch ?? undefined,
         team: currentSelectedNotesTeam ?? undefined,
-        insights: currentInsightsTeam ?? undefined
+        insights: currentInsightsTeam ?? undefined,
+        showAll: showAllMatches || undefined
     };
 }
 
@@ -189,7 +198,8 @@ function parseUrlState(): AppState {
         event: params.get("event") || undefined,
         match: params.has("match") ? parseInt(params.get("match")!, 10) : undefined,
         team: params.has("team") ? parseInt(params.get("team")!, 10) : undefined,
-        insights: params.has("insights") ? parseInt(params.get("insights")!, 10) : undefined
+        insights: params.has("insights") ? parseInt(params.get("insights")!, 10) : undefined,
+        showAll: params.get("showAll") === "1" || undefined
     };
 }
 
@@ -511,11 +521,28 @@ async function loadScheduleWithStateRestore(eventCode: string, urlState: AppStat
             const scoresData = scoresRes.ok ? await scoresRes.json() : { matchScores: [] };
             
             currentMatches = scheduleData.schedule || [];
+            currentMatches.sort((a, b) => getMatchStartTimestamp(a) - getMatchStartTimestamp(b));
             currentRankings = rankingsData.rankings || [];
             currentTeams = teamsData.teams || [];
             currentScoreMatches = scoresData.matchScores || [];
             mergeScoresIntoScheduleMatches(currentMatches, currentScoreMatches);
             
+            // Restore or infer showAll state
+            if (urlState.showAll !== undefined) {
+                showAllMatches = urlState.showAll;
+            } else if (urlState.match !== undefined) {
+                // Infer showAll if linked match doesn't include the team
+                const linkedMatch = currentMatches.find(m => m.matchNumber === urlState.match);
+                if (linkedMatch && !linkedMatch.teams.some(t => t.teamNumber === loggedInTeamId)) {
+                    showAllMatches = true;
+                }
+            }
+
+            const showAllCheckbox = document.getElementById("show-all-matches") as HTMLInputElement;
+            if (showAllCheckbox) {
+                showAllCheckbox.checked = showAllMatches;
+            }
+
             renderSchedule(currentMatches, currentRankings, currentTeams);
             renderRankings(currentRankings);
 
@@ -630,11 +657,17 @@ async function loadSchedule(eventCode: string) {
             const scoresData = scoresRes.ok ? await scoresRes.json() : { matchScores: [] };
             
             currentMatches = scheduleData.schedule || [];
+            currentMatches.sort((a, b) => getMatchStartTimestamp(a) - getMatchStartTimestamp(b));
             currentRankings = rankingsData.rankings || [];
             currentTeams = teamsData.teams || [];
             currentScoreMatches = scoresData.matchScores || [];
             mergeScoresIntoScheduleMatches(currentMatches, currentScoreMatches);
             
+            const showAllCheckbox = document.getElementById("show-all-matches") as HTMLInputElement;
+            if (showAllCheckbox) {
+                showAllCheckbox.checked = showAllMatches;
+            }
+
             renderSchedule(currentMatches, currentRankings, currentTeams);
             renderRankings(currentRankings);
 
@@ -670,6 +703,12 @@ function parseScore(value: unknown): number | null {
     }
 
     return null;
+}
+
+function getMatchStartTimestamp(match: Match): number {
+    const time = match.actualStartTime || match.startTime;
+    const timestamp = time ? new Date(time).getTime() : 0;
+    return Number.isNaN(timestamp) ? 0 : timestamp;
 }
 
 function buildMatchKey(match: Pick<Match, "matchNumber" | "series" | "tournamentLevel">): string {
@@ -833,7 +872,11 @@ function renderSchedule(matches: Match[], rankings: Ranking[], teams: TeamInfo[]
 
     listContainer.innerHTML = "";
 
-    matches.forEach((match, index) => {
+    const filteredMatches = showAllMatches ? matches : matches.filter(match => 
+        match.teams.some(team => team.teamNumber === loggedInTeamId)
+    );
+
+    filteredMatches.forEach((match, index) => {
         const item = document.createElement("div");
         item.className = "match-item";
         item.dataset.matchNumber = match.matchNumber.toString();
@@ -865,7 +908,8 @@ function renderSchedule(matches: Match[], rankings: Ranking[], teams: TeamInfo[]
         const isOld = matchStart < oneHourAgo;
         
         if (!hasScores && !isOld) {
-            const prevMatch = index > 0 ? matches[index - 1] : null;
+            const matchIndexInFull = currentMatches.indexOf(match);
+            const prevMatch = matchIndexInFull > 0 ? currentMatches[matchIndexInFull - 1] : null;
             
             let queueTime: Date;
             if (prevMatch) {
@@ -1213,7 +1257,7 @@ function renderScoreBreakdown(scoreMatch: ScoreMatch | undefined, chartJobs: Arr
 
     const classifier = renderClassifierSection(scoreMatch);
 
-    return `<div class="score-breakdown"><div class="score-breakdown-title">Match Breakdown</div>${cards}${classifier}</div>`;
+    return `<div class="score-breakdown"><div class="score-breakdown-title">Score Breakdown</div>${cards}${classifier}</div>`;
 }
 
 async function renderMatchDetails(match: Match, rankings: Ranking[], teams: TeamInfo[]) {
@@ -2732,6 +2776,18 @@ document.addEventListener("DOMContentLoaded", async () => {
             }
         }
     });
+
+    // Show All Matches checkbox initialization
+    const showAllCheckbox = document.getElementById("show-all-matches") as HTMLInputElement;
+    if (showAllCheckbox) {
+        showAllCheckbox.addEventListener("change", () => {
+            showAllMatches = showAllCheckbox.checked;
+            if (currentMatches.length > 0) {
+                renderSchedule(currentMatches, currentRankings, currentTeams);
+            }
+            updateUrl();
+        });
+    }
 
     // Insights initialization
     const analyzeBtn = document.getElementById("insights-analyze-btn");
