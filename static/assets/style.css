@@ -164,9 +164,36 @@ body {
 .schedule-checkbox-container input[type="checkbox"] {
     width: 16px;
     height: 16px;
+    min-width: 16px;
+    min-height: 16px;
     accent-color: #0078d4;
     cursor: pointer;
     margin: 0;
+    -webkit-appearance: none;
+    appearance: none;
+    background-color: #1f1f1f;
+    border: 2px solid #555555;
+    border-radius: 3px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    flex-shrink: 0;
+}
+
+.schedule-checkbox-container input[type="checkbox"]:checked {
+    background-color: #0078d4;
+    border-color: #0078d4;
+}
+
+.schedule-checkbox-container input[type="checkbox"]:checked::after {
+    content: "";
+    position: absolute;
+    width: 3px;
+    height: 7px;
+    border: solid white;
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg) translate(-1px, -1px);
 }
 
 #schedule-list {
@@ -2024,6 +2051,28 @@ textarea:focus-visible {
         padding: 16px;
         flex: 1;
         min-height: 0;
+    }
+
+    #schedule-controls {
+        padding: 14px 16px;
+    }
+
+    .schedule-checkbox-container {
+        gap: 10px;
+        font-size: 14px;
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    .schedule-checkbox-container input[type="checkbox"] {
+        width: 18px;
+        height: 18px;
+        min-width: 18px;
+        min-height: 18px;
+    }
+
+    .schedule-checkbox-container input[type="checkbox"]:checked::after {
+        width: 4px;
+        height: 8px;
     }
 
     /* Score Breakdown Mobile */
