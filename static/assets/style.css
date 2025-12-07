@@ -2058,7 +2058,7 @@ textarea:focus-visible {
         flex-wrap: wrap;
     }
 
-    /* .classifier-section {
+    .classifier-section {
         overflow-x: auto;
         padding: 10px;
     }
@@ -2072,7 +2072,7 @@ textarea:focus-visible {
     .classifier-cells {
         grid-template-columns: repeat(9, minmax(30px, 1fr));
         min-width: 300px;
-    } */
+    }
     
     .details-header {
         margin-bottom: 16px;
