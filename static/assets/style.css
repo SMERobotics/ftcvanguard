@@ -327,6 +327,13 @@ body {
     margin-bottom: 24px;
 }
 
+.score-breakdown-title {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 16px;
+    color: #cccccc;
+}
+
 .score-breakdown-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
@@ -479,7 +486,7 @@ body {
 .robot-pill.pill-off { background: rgba(255, 107, 107, 0.1); color: #ffb3b3; }
 .robot-pill.full { background: rgba(78, 201, 176, 0.15); border-color: #4ec9b0; color: #b4f0df; }
 .robot-pill.partial { background: rgba(255, 193, 7, 0.15); border-color: #f0ad4e; color: #ffd27f; }
-.robot-pill.none { background: rgba(255, 107, 107, 0.08); color: #ff6b6b; border-color: rgba(255, 107, 107, 0.6); }
+.robot-pill.none { background: rgba(255, 107, 107, 0.08); color: #ffb3b3; border-color: rgba(255, 107, 107, 0.6); }
 
 .penalty-section .metric-row { font-weight: 700; color: #ffd166; }
 
@@ -1767,7 +1774,7 @@ textarea:focus-visible {
 /* Mobile Responsive Styles */
 
 /* Tablet breakpoint */
-@media (max-width: 1024px) {
+@media (max-width: 1536px) {
     #schedule-list,
     #notes-list {
         width: 300px;
@@ -1785,6 +1792,63 @@ textarea:focus-visible {
     #rankings-table th,
     #rankings-table td {
         padding: 6px 8px;
+    }
+
+    /* Score Breakdown Tablet */
+    .score-breakdown {
+        padding: 14px;
+        margin-bottom: 20px;
+    }
+
+    .score-breakdown-grid {
+        grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+        gap: 14px;
+    }
+
+    .score-card {
+        padding: 12px;
+        gap: 10px;
+    }
+
+    .score-card-header {
+        gap: 10px;
+    }
+
+    .rp-line {
+        justify-content: flex-start;
+    }
+
+    .score-card-body {
+        grid-template-columns: 1fr;
+    }
+
+    .score-card-body > * {
+        width: min(100%, 360px);
+        margin: 0 auto;
+    }
+
+    .score-donut-block {
+        max-width: 360px;
+        min-height: 200px;
+    }
+
+    .score-donut-block canvas {
+        width: 100% !important;
+        height: auto !important;
+        max-width: 240px;
+    }
+
+    .score-details-grid {
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 10px;
+    }
+
+    .classifier-row {
+        grid-template-columns: 100px 1fr;
+    }
+
+    .classifier-cells {
+        grid-template-columns: repeat(9, minmax(28px, 1fr));
     }
 }
 
@@ -1926,6 +1990,89 @@ textarea:focus-visible {
         flex: 1;
         min-height: 0;
     }
+
+    /* Score Breakdown Mobile */
+    .score-breakdown {
+        padding: 12px;
+        margin-bottom: 16px;
+    }
+
+    .score-breakdown-grid {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+
+    .score-card {
+        padding: 12px;
+        gap: 10px;
+    }
+
+    .score-card-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .score-card-total {
+        font-size: 26px;
+    }
+
+    .rp-line {
+        justify-content: flex-start;
+    }
+
+    .score-card-body {
+        grid-template-columns: 1fr;
+    }
+
+    .score-card-body > * {
+        width: min(100%, 340px);
+        margin: 0 auto;
+    }
+
+    .score-donut-block {
+        width: 100%;
+        max-width: 340px;
+        margin: 0 auto;
+        min-height: 180px;
+    }
+
+    .score-donut-block canvas {
+        width: 100% !important;
+        height: auto !important;
+        max-width: 220px;
+    }
+
+    .donut-legend {
+        justify-content: center;
+    }
+
+    .score-details-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .metric-row {
+        align-items: flex-start;
+    }
+
+    .robot-badges {
+        flex-wrap: wrap;
+    }
+
+    /* .classifier-section {
+        overflow-x: auto;
+        padding: 10px;
+    }
+
+    .classifier-row {
+        grid-template-columns: 90px 1fr;
+        gap: 8px;
+        align-items: flex-start;
+    }
+
+    .classifier-cells {
+        grid-template-columns: repeat(9, minmax(30px, 1fr));
+        min-width: 300px;
+    } */
     
     .details-header {
         margin-bottom: 16px;

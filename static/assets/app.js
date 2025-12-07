@@ -779,7 +779,14 @@ function renderDonutChart(canvasId, values, labels, colors) {
         },
         options: {
             cutout: "58%",
-            plugins: { legend: { display: false }, tooltip: { enabled: true } },
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    enabled: true,
+                    titleFont: { family: "JetBrains Mono", size: 12 },
+                    bodyFont: { family: "JetBrains Mono", size: 12 }
+                }
+            },
             animation: { duration: 350 }
         }
     });
@@ -799,14 +806,32 @@ function renderAllianceBreakdown(scoreMatch, allianceColor, chartJobs) {
     if (!alliance) {
         return `<div class="score-card ${allianceColor}"><div class="score-card-empty">Scores unavailable</div></div>`;
     }
-    const autoPoints = alliance.autoPoints || 0;
-    const teleopPoints = alliance.teleopPoints || 0;
     const penaltyPointsEarned = opponent ? Math.max(opponent.foulPointsCommitted || 0, 0) : 0;
     const donutId = `score-donut-${allianceColor}-${scoreMatch.matchNumber}-${Date.now()}`;
+    const segmentLabels = [
+        "Auto Leave",
+        "Auto Artifact",
+        "Auto Pattern",
+        "Teleop Artifact",
+        "Teleop Depot",
+        "Teleop Pattern",
+        "Teleop Base",
+        "Penalties Awarded"
+    ];
+    const segmentValues = [
+        alliance.autoLeavePoints || 0,
+        alliance.autoArtifactPoints || 0,
+        alliance.autoPatternPoints || 0,
+        alliance.teleopArtifactPoints || 0,
+        alliance.teleopDepotPoints || 0,
+        alliance.teleopPatternPoints || 0,
+        alliance.teleopBasePoints || 0,
+        penaltyPointsEarned
+    ];
     const palette = allianceColor === "red"
-        ? ["#ffb38a", "#ff6b6b", "#707070"]
-        : ["#7cd0ff", "#4da6ff", "#707070"];
-    chartJobs.push(() => renderDonutChart(donutId, [autoPoints, teleopPoints, penaltyPointsEarned], ["Auto Points", "Teleop Points", "Penalties Earned"], palette));
+        ? ["#ffd6d6", "#ff9f9f", "#ff6b6b", "#ff4444", "#e52b2b", "#c81c1c", "#a30d0d", "#707070"]
+        : ["#d6e9ff", "#a9d0ff", "#7fb6ff", "#559cff", "#2f86ff", "#1f73e8", "#155bc1", "#707070"];
+    chartJobs.push(() => renderDonutChart(donutId, segmentValues, segmentLabels, palette));
     const autoSection = `
         <div class="score-section">
             <div class="section-title">Autonomous</div>
@@ -841,7 +866,7 @@ function renderAllianceBreakdown(scoreMatch, allianceColor, chartJobs) {
     `;
     const penaltySection = `
         <div class="score-section penalty-section">
-            ${renderMetricRow("Penalty Points Earned", penaltyPointsEarned)}
+            ${renderMetricRow("Penalties Awarded", penaltyPointsEarned)}
         </div>
     `;
     return `
@@ -857,9 +882,7 @@ function renderAllianceBreakdown(scoreMatch, allianceColor, chartJobs) {
                 <div class="score-donut-block">
                     <canvas id="${donutId}" width="180" height="180"></canvas>
                     <div class="donut-legend">
-                        <span><span class="legend-dot" style="background:${palette[0]}"></span>Auto</span>
-                        <span><span class="legend-dot" style="background:${palette[1]}"></span>Teleop</span>
-                        <span><span class="legend-dot" style="background:${palette[2]}"></span>Opponent Fouls</span>
+                        ${segmentLabels.map((label, idx) => `<span><span class="legend-dot" style="background:${palette[idx]}"></span>${label}</span>`).join("")}
                     </div>
                 </div>
                 <div class="score-details-grid">
@@ -940,7 +963,7 @@ function renderScoreBreakdown(scoreMatch, chartJobs) {
         </div>
     `;
     const classifier = renderClassifierSection(scoreMatch);
-    return `<div class="score-breakdown">${cards}${classifier}</div>`;
+    return `<div class="score-breakdown"><div class="score-breakdown-title">Score Breakdown</div>${cards}${classifier}</div>`;
 }
 async function renderMatchDetails(match, rankings, teams) {
     const detailsContainer = document.getElementById("schedule-details");
