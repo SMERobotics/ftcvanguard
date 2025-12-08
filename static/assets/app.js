@@ -1723,8 +1723,13 @@ async function analyzeTeam(teamNumber, updateHistory = true) {
             hideLoading();
             return;
         }
+        const sortedEvents = [...events].sort((a, b) => {
+            const aTime = a.dateStart ? new Date(a.dateStart).getTime() : 0;
+            const bTime = b.dateStart ? new Date(b.dateStart).getTime() : 0;
+            return aTime - bTime;
+        });
         const allScoreData = [];
-        for (const event of events) {
+        for (const event of sortedEvents) {
             try {
                 const [scoresRes, scheduleRes] = await Promise.all([
                     authFetch(`/api/v1/scores/${event.code}/qual`, {
@@ -1757,7 +1762,7 @@ async function analyzeTeam(teamNumber, updateHistory = true) {
                 console.warn(`Failed to fetch scores for ${event.code}`, e);
             }
         }
-        renderInsights(teamNumber, events, allScoreData);
+        renderInsights(teamNumber, sortedEvents, allScoreData);
     }
     catch (error) {
         console.error("Failed to analyze team:", error);

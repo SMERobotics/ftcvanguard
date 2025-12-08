@@ -2066,8 +2066,14 @@ async function analyzeTeam(teamNumber: number, updateHistory: boolean = true) {
             return;
         }
 
+        const sortedEvents = [...events].sort((a, b) => {
+            const aTime = a.dateStart ? new Date(a.dateStart).getTime() : 0;
+            const bTime = b.dateStart ? new Date(b.dateStart).getTime() : 0;
+            return aTime - bTime;
+        });
+
         const allScoreData: any[] = [];
-        for (const event of events) {
+        for (const event of sortedEvents) {
             try {
                 const [scoresRes, scheduleRes] = await Promise.all([
                     authFetch(`/api/v1/scores/${event.code}/qual`, {
@@ -2107,7 +2113,7 @@ async function analyzeTeam(teamNumber: number, updateHistory: boolean = true) {
             }
         }
 
-        renderInsights(teamNumber, events, allScoreData);
+        renderInsights(teamNumber, sortedEvents, allScoreData);
     } catch (error) {
         console.error("Failed to analyze team:", error);
         content.innerHTML = '<div class="insights-error">An error occurred while analyzing the team.</div>';
