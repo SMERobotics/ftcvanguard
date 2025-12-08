@@ -5,4 +5,4 @@ When writing code:
 - Always when possible, use double quotes instead of single quotes
 - Minimize comment usage. Keep short but maintain clarity and descriptiveness. Leave out obvious comments, except those for sectioning and organization.
 
-# Always compile TypeScript with `tsc` after each prompt.
+# Always compile TypeScript with `npx tsc` after each prompt.

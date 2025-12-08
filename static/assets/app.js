@@ -1513,7 +1513,186 @@ function findTeamMatches(teamNumber, schedule, matchScores) {
             });
         }
     }
-    return filteredScores;
+    return filteredScores.sort((a, b) => a.matchNumber - b.matchNumber);
+}
+function roundTo2(val) {
+    if (val === null || val === undefined)
+        return null;
+    return Math.round(val * 100) / 100;
+}
+function normalizeTournamentLevel(level) {
+    return (level || "").toLowerCase();
+}
+function isQualMatch(match) {
+    const level = normalizeTournamentLevel(match.tournamentLevel || match.matchLevel);
+    return level.includes("qual");
+}
+function isScoreComplete(matchScore) {
+    if (!matchScore || !matchScore.alliances || matchScore.alliances.length === 0)
+        return false;
+    return matchScore.alliances.every(alliance => alliance.totalPoints !== undefined && alliance.totalPoints !== null);
+}
+function getAllianceTeams(scheduleMatch, allianceName) {
+    return scheduleMatch.teams
+        .filter(team => team.station.toLowerCase().startsWith(allianceName.toLowerCase()))
+        .map(team => team.teamNumber);
+}
+function buildTeamList(schedule) {
+    const teams = new Set();
+    for (const match of schedule) {
+        for (const team of match.teams) {
+            teams.add(team.teamNumber);
+        }
+    }
+    return Array.from(teams).sort((a, b) => a - b);
+}
+function eventHasAllScores(schedule, matchScores) {
+    const scheduleMap = new Map();
+    schedule.forEach(match => scheduleMap.set(match.matchNumber, match));
+    for (const match of schedule) {
+        const score = matchScores.find(ms => ms.matchNumber === match.matchNumber);
+        if (!score || !isScoreComplete(score)) {
+            return false;
+        }
+    }
+    return true;
+}
+function buildLeastSquaresSolution(teamIds, equations) {
+    const teamIndex = new Map();
+    teamIds.forEach((id, idx) => teamIndex.set(id, idx));
+    const rows = equations.length;
+    const cols = teamIds.length;
+    if (rows === 0 || cols === 0) {
+        return new Map();
+    }
+    const ata = Array.from({ length: cols }, () => Array(cols).fill(0));
+    const atb = Array(cols).fill(0);
+    for (const eq of equations) {
+        const bVal = eq.value;
+        const indices = eq.teams.map(id => teamIndex.get(id)).filter(idx => idx !== undefined);
+        for (const i of indices) {
+            atb[i] += bVal;
+            for (const j of indices) {
+                ata[i][j] += 1;
+            }
+        }
+    }
+    // Augmented matrix for Gaussian elimination: ata | atb
+    const augmented = ata.map((row, i) => [...row, atb[i]]);
+    const n = cols;
+    for (let i = 0; i < n; i++) {
+        // Pivot selection
+        let maxRow = i;
+        for (let k = i + 1; k < n; k++) {
+            if (Math.abs(augmented[k][i]) > Math.abs(augmented[maxRow][i])) {
+                maxRow = k;
+            }
+        }
+        const pivot = augmented[maxRow][i];
+        if (Math.abs(pivot) < 1e-9) {
+            continue;
+        }
+        // Swap rows
+        [augmented[i], augmented[maxRow]] = [augmented[maxRow], augmented[i]];
+        // Normalize pivot row
+        for (let j = i; j <= n; j++) {
+            augmented[i][j] /= pivot;
+        }
+        // Eliminate column
+        for (let k = 0; k < n; k++) {
+            if (k === i)
+                continue;
+            const factor = augmented[k][i];
+            if (Math.abs(factor) < 1e-12)
+                continue;
+            for (let j = i; j <= n; j++) {
+                augmented[k][j] -= factor * augmented[i][j];
+            }
+        }
+    }
+    const solution = new Map();
+    for (let i = 0; i < n; i++) {
+        const value = Number.isFinite(augmented[i][n]) ? augmented[i][n] : 0;
+        solution.set(teamIds[i], value);
+    }
+    return solution;
+}
+function computeOprForEvent(teamNumber, schedule, matchScores) {
+    const qualSchedule = schedule.filter(isQualMatch).sort((a, b) => a.matchNumber - b.matchNumber);
+    const qualScores = matchScores.filter(isQualMatch).sort((a, b) => a.matchNumber - b.matchNumber);
+    const eventComplete = eventHasAllScores(qualSchedule, qualScores);
+    const teamMatches = findTeamMatches(teamNumber, qualSchedule, qualScores);
+    const teamList = buildTeamList(qualSchedule);
+    const matchLabels = teamMatches.map(match => `Q${match.matchNumber}`);
+    if (!eventComplete || teamList.length === 0 || teamMatches.length === 0) {
+        return {
+            eventComplete,
+            teamMatches,
+            matchLabels,
+            perMatchOpr: {
+                overall: teamMatches.map(() => null),
+                auto: teamMatches.map(() => null),
+                teleop: teamMatches.map(() => null),
+                autoArtifacts: teamMatches.map(() => null),
+                teleopArtifacts: teamMatches.map(() => null)
+            },
+            teamOpr: null
+        };
+    }
+    const scheduleMap = new Map();
+    qualSchedule.forEach(match => scheduleMap.set(match.matchNumber, match));
+    const buildEquations = (metric) => {
+        const equations = [];
+        for (const score of qualScores) {
+            if (!isScoreComplete(score))
+                continue;
+            const scheduleMatch = scheduleMap.get(score.matchNumber);
+            if (!scheduleMatch)
+                continue;
+            for (const alliance of score.alliances) {
+                const allianceTeams = getAllianceTeams(scheduleMatch, alliance.alliance);
+                if (!allianceTeams.length)
+                    continue;
+                equations.push({ teams: allianceTeams, value: metric(alliance) });
+            }
+        }
+        return equations;
+    };
+    const metricSelectors = {
+        overall: (alliance) => (alliance.autoPoints || 0) + (alliance.teleopPoints || 0),
+        auto: (alliance) => alliance.autoPoints || 0,
+        teleop: (alliance) => alliance.teleopPoints || 0,
+        autoArtifacts: (alliance) => (alliance.autoClassifiedArtifacts || 0) + (alliance.autoOverflowArtifacts || 0),
+        teleopArtifacts: (alliance) => (alliance.teleopClassifiedArtifacts || 0) + (alliance.teleopOverflowArtifacts || 0)
+    };
+    const solutions = {
+        overall: buildLeastSquaresSolution(teamList, buildEquations(metricSelectors.overall)),
+        auto: buildLeastSquaresSolution(teamList, buildEquations(metricSelectors.auto)),
+        teleop: buildLeastSquaresSolution(teamList, buildEquations(metricSelectors.teleop)),
+        autoArtifacts: buildLeastSquaresSolution(teamList, buildEquations(metricSelectors.autoArtifacts)),
+        teleopArtifacts: buildLeastSquaresSolution(teamList, buildEquations(metricSelectors.teleopArtifacts))
+    };
+    const teamOpr = {
+        overall: solutions.overall.get(teamNumber) || 0,
+        auto: solutions.auto.get(teamNumber) || 0,
+        teleop: solutions.teleop.get(teamNumber) || 0,
+        autoArtifacts: solutions.autoArtifacts.get(teamNumber) || 0,
+        teleopArtifacts: solutions.teleopArtifacts.get(teamNumber) || 0
+    };
+    const perMatchOpr = {
+        overall: teamMatches.map(() => teamOpr.overall),
+        auto: teamMatches.map(() => teamOpr.auto),
+        teleop: teamMatches.map(() => teamOpr.teleop),
+        autoArtifacts: teamMatches.map(() => teamOpr.autoArtifacts),
+        teleopArtifacts: teamMatches.map(() => teamOpr.teleopArtifacts)
+    };
+    return {
+        eventComplete,
+        teamMatches,
+        matchLabels,
+        perMatchOpr,
+        teamOpr
+    };
 }
 async function analyzeTeam(teamNumber, updateHistory = true) {
     const token = localStorage.getItem("token");
@@ -1551,7 +1730,7 @@ async function analyzeTeam(teamNumber, updateHistory = true) {
                     authFetch(`/api/v1/scores/${event.code}/qual`, {
                         headers: { "Authorization": `Bearer ${token}` }
                     }),
-                    authFetch(`/api/v1/schedule?event=${event.code}&teamNumber=${teamNumber}`, {
+                    authFetch(`/api/v1/schedule?event=${event.code}`, {
                         headers: { "Authorization": `Bearer ${token}` }
                     })
                 ]);
@@ -1559,9 +1738,17 @@ async function analyzeTeam(teamNumber, updateHistory = true) {
                     const scoresData = await scoresRes.json();
                     const scheduleData = await scheduleRes.json();
                     if (scoresData.matchScores && scheduleData.schedule) {
-                        const teamMatches = findTeamMatches(teamNumber, scheduleData.schedule, scoresData.matchScores);
+                        const { eventComplete, teamMatches, matchLabels, perMatchOpr, teamOpr } = computeOprForEvent(teamNumber, scheduleData.schedule, scoresData.matchScores);
                         if (teamMatches.length > 0) {
-                            allScoreData.push({ event: event.name, eventCode: event.code, scores: teamMatches });
+                            allScoreData.push({
+                                event: event.name,
+                                eventCode: event.code,
+                                scores: teamMatches,
+                                matchLabels,
+                                perMatchOpr,
+                                teamOpr,
+                                eventComplete
+                            });
                         }
                     }
                 }
@@ -1750,6 +1937,14 @@ function calculateTeamStatistics(teamNumber, scoreData) {
     const teleopPoints = [];
     const autoArtifactsCounts = [];
     const teleopArtifactsCounts = [];
+    const matchLabels = [];
+    const overallOprSeries = [];
+    const autoOprSeries = [];
+    const teleopOprSeries = [];
+    const autoArtifactOprSeries = [];
+    const teleopArtifactOprSeries = [];
+    let totalEventsAnalyzed = 0;
+    let eventsWithCompleteScores = 0;
     let autoLeaveTotal = 0;
     let autoArtifactPointsTotal = 0;
     let autoPatternPointsTotal = 0;
@@ -1764,12 +1959,28 @@ function calculateTeamStatistics(teamNumber, scoreData) {
     let minorFouls = 0;
     let cleanMatches = 0;
     for (const eventData of scoreData) {
-        for (const match of eventData.scores) {
+        if (!eventData || !Array.isArray(eventData.scores) || eventData.scores.length === 0) {
+            continue;
+        }
+        totalEventsAnalyzed++;
+        if (eventData.eventComplete) {
+            eventsWithCompleteScores++;
+        }
+        const perMatchOpr = eventData.perMatchOpr || {};
+        for (let idx = 0; idx < eventData.scores.length; idx++) {
+            const match = eventData.scores[idx];
             const teamAllianceName = match.teamAlliance;
             const alliance = match.alliances.find((a) => a.alliance === teamAllianceName);
             if (!alliance)
                 continue;
             totalMatches++;
+            const label = `Match ${matchLabels.length + 1}`;
+            matchLabels.push(label);
+            overallOprSeries.push(perMatchOpr.overall ? roundTo2(perMatchOpr.overall[idx]) : null);
+            autoOprSeries.push(perMatchOpr.auto ? roundTo2(perMatchOpr.auto[idx]) : null);
+            teleopOprSeries.push(perMatchOpr.teleop ? roundTo2(perMatchOpr.teleop[idx]) : null);
+            autoArtifactOprSeries.push(perMatchOpr.autoArtifacts ? roundTo2(perMatchOpr.autoArtifacts[idx]) : null);
+            teleopArtifactOprSeries.push(perMatchOpr.teleopArtifacts ? roundTo2(perMatchOpr.teleopArtifacts[idx]) : null);
             const scoreWithoutPenalty = (alliance.autoPoints || 0) + (alliance.teleopPoints || 0);
             scoresNoPenalty.push(scoreWithoutPenalty);
             autoPoints.push(alliance.autoPoints || 0);
@@ -1850,23 +2061,37 @@ function calculateTeamStatistics(teamNumber, scoreData) {
         autoPoints,
         teleopPoints,
         autoArtifactsCounts,
-        teleopArtifactsCounts
+        teleopArtifactsCounts,
+        matchLabels,
+        overallOprSeries,
+        autoOprSeries,
+        teleopOprSeries,
+        autoArtifactOprSeries,
+        teleopArtifactOprSeries,
+        eventsWithCompleteScores,
+        totalEventsAnalyzed
     };
 }
 function generateChartsHTML(stats) {
     const scores = stats.scoresNoPenalty || [];
     const maxScore = scores.length > 0 ? Math.max(...scores, 100) : 100;
-    const scoreChart = generateBarChart(scores, maxScore);
+    const matchLabels = stats.matchLabels || [];
+    const scoreChart = generateBarChart(scores, matchLabels, maxScore, "OPR (Overall)", stats.overallOprSeries, "#0f4c81");
     const autoMax = stats.autoPoints.length > 0 ? Math.max(...stats.autoPoints) : 50;
     const teleopMax = stats.teleopPoints.length > 0 ? Math.max(...stats.teleopPoints) : 50;
     const autoTeleopMax = Math.max(autoMax, teleopMax, 50);
-    const autoTeleopChart = generateComparisonChart(stats.autoPoints, stats.teleopPoints, autoTeleopMax);
+    const autoTeleopChart = generateComparisonChart(stats.autoPoints, stats.teleopPoints, matchLabels, autoTeleopMax, "Auto OPR", stats.autoOprSeries, "Teleop OPR", stats.teleopOprSeries);
     const autoArtifacts = stats.autoArtifactsCounts || [];
     const teleopArtifacts = stats.teleopArtifactsCounts || [];
     const maxArtifacts = Math.max(autoArtifacts.length > 0 ? Math.max(...autoArtifacts) : 10, teleopArtifacts.length > 0 ? Math.max(...teleopArtifacts) : 10, 10);
-    const artifactsLineChart = generateLineChart(autoArtifacts, teleopArtifacts, maxArtifacts);
+    const artifactsLineChart = generateLineChart(autoArtifacts, teleopArtifacts, matchLabels, maxArtifacts, "Auto Artifacts OPR", stats.autoArtifactOprSeries, "Teleop Artifacts OPR", stats.teleopArtifactOprSeries);
+    // const oprContext = stats.totalEventsAnalyzed > 0
+    //     ? `<div style="margin: 8px 0 4px; color: #9aa0ac; font-size: 12px;">OPR overlays shown for ${stats.eventsWithCompleteScores}/${stats.totalEventsAnalyzed} meets that are fully scored.</div>`
+    //     : "";
+    const oprContext = "";
     return `
         <div class="insights-charts-wrapper">
+            ${oprContext}
             <div class="insights-charts">
                 <div class="chart-container">
                     <h3>Score Progression</h3>
@@ -1890,58 +2115,11 @@ function generateChartsHTML(stats) {
         </div>
     `;
 }
-function generateBarChart(data, maxValue) {
+function generateBarChart(data, labels, maxValue, overlayLabel, overlayData, overlayColor = "#0f4c81") {
     if (data.length === 0) {
         return '<div class="bar-chart"><div class="chart-empty">No data available</div></div>';
     }
-    const bars = data.map((value, index) => {
-        const height = (value / maxValue) * 100;
-        return `
-            <div class="chart-bar-container">
-                <div class="chart-bar-value">${value}</div>
-                <div class="chart-bar" style="height: ${height}%" title="Match ${index + 1}: ${value}"></div>
-                <div class="chart-bar-index">${index + 1}</div>
-            </div>
-        `;
-    }).join("");
-    return `<div class="bar-chart">${bars}</div>`;
-}
-function generateComparisonChart(data1, data2, maxValue) {
-    if (data1.length === 0) {
-        return '<div class="comparison-chart"><div class="chart-empty">No data available</div></div>';
-    }
-    const bars = data1.map((value, index) => {
-        const height1 = (value / maxValue) * 100;
-        const height2 = ((data2[index] || 0) / maxValue) * 100;
-        return `
-            <div class="chart-group">
-                <div class="chart-group-bars">
-                    <div class="chart-bar-container">
-                        <div class="chart-bar-value">${value}</div>
-                        <div class="chart-bar auto" style="height: ${height1}%" title="Auto: ${value}"></div>
-                    </div>
-                    <div class="chart-bar-container">
-                        <div class="chart-bar-value">${data2[index] || 0}</div>
-                        <div class="chart-bar teleop" style="height: ${height2}%" title="Teleop: ${data2[index] || 0}"></div>
-                    </div>
-                </div>
-                <div class="chart-group-index">${index + 1}</div>
-            </div>
-        `;
-    }).join("");
-    return `<div class="comparison-chart">${bars}</div>`;
-}
-function generateLineChart(data1, data2, maxValue) {
-    if (data1.length === 0) {
-        return '<div class="line-chart"><div class="line-chart-container"><div class="chart-empty">No data available</div></div></div>';
-    }
-    const chartId = `line-chart-${Date.now()}`;
-    const xLabels = data1.map((_, i) => {
-        if (data1.length <= 15 || i % Math.ceil(data1.length / 15) === 0 || i === data1.length - 1) {
-            return `<span class="line-x-label">${i + 1}</span>`;
-        }
-        return "";
-    }).filter(l => l).join("");
+    const chartId = `bar-chart-${Date.now()}`;
     setTimeout(() => {
         const canvas = document.getElementById(chartId);
         if (!canvas)
@@ -1949,191 +2127,442 @@ function generateLineChart(data1, data2, maxValue) {
         const ctx = canvas.getContext("2d");
         if (!ctx)
             return;
-        const rect = canvas.getBoundingClientRect();
-        canvas.width = rect.width * 2;
-        canvas.height = rect.height * 2;
-        ctx.scale(2, 2);
-        const width = rect.width;
-        const height = rect.height;
-        const padding = 10;
-        const topPadding = 30;
-        const chartWidth = width - padding * 2;
-        const chartHeight = height - topPadding - padding;
-        const getX = (i) => padding + (i / (data1.length - 1 || 1)) * chartWidth;
-        const getY = (v) => topPadding + chartHeight - (v / maxValue) * chartHeight;
-        // Draw lines
-        ctx.lineWidth = 2;
-        ctx.lineCap = "round";
-        ctx.lineJoin = "round";
-        // Auto line (green)
-        ctx.strokeStyle = "#4ec9b0";
-        ctx.beginPath();
-        data1.forEach((v, i) => {
-            const x = getX(i);
-            const y = getY(v);
-            if (i === 0)
-                ctx.moveTo(x, y);
-            else
-                ctx.lineTo(x, y);
-        });
-        ctx.stroke();
-        // Teleop line (red)
-        ctx.strokeStyle = "#ff6b6b";
-        ctx.beginPath();
-        data2.forEach((v, i) => {
-            const x = getX(i);
-            const y = getY(v);
-            if (i === 0)
-                ctx.moveTo(x, y);
-            else
-                ctx.lineTo(x, y);
-        });
-        ctx.stroke();
-        // Draw dots
-        data1.forEach((v, i) => {
-            ctx.fillStyle = "#4ec9b0";
-            ctx.beginPath();
-            ctx.arc(getX(i), getY(v), 5, 0, Math.PI * 2);
-            ctx.fill();
-        });
-        data2.forEach((v, i) => {
-            ctx.fillStyle = "#ff6b6b";
-            ctx.beginPath();
-            ctx.arc(getX(i), getY(v), 5, 0, Math.PI * 2);
-            ctx.fill();
-        });
-        // Draw value labels above dots with improved overlap prevention
-        ctx.font = "11px 'JetBrains Mono', monospace";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "bottom";
-        // Track occupied label positions to prevent overlap
-        const labelPositions = [];
-        const minLabelSpacing = 2;
-        const textHeight = 11;
-        const drawLabel = (value, x, y, color) => {
-            ctx.fillStyle = color;
-            const text = value.toString();
-            const metrics = ctx.measureText(text);
-            const textWidth = metrics.width;
-            let labelY = y - 8;
-            let bestY = labelY;
-            let minOverlap = Infinity;
-            // Try positions above the dot, preferring closer positions
-            for (let offset = 0; offset <= 20; offset += 1) {
-                const tryY = y - 8 - offset;
-                if (tryY - textHeight < topPadding)
-                    break;
-                const bounds = {
-                    x: x - textWidth / 2 - minLabelSpacing,
-                    y: tryY - textHeight - minLabelSpacing,
-                    width: textWidth + minLabelSpacing * 2,
-                    height: textHeight + minLabelSpacing * 2
-                };
-                // Calculate overlap amount
-                let overlapAmount = 0;
-                for (const pos of labelPositions) {
-                    if (bounds.x < pos.x + pos.width &&
-                        bounds.x + bounds.width > pos.x &&
-                        bounds.y < pos.y + pos.height &&
-                        bounds.y + bounds.height > pos.y) {
-                        const xOverlap = Math.min(bounds.x + bounds.width, pos.x + pos.width) - Math.max(bounds.x, pos.x);
-                        const yOverlap = Math.min(bounds.y + bounds.height, pos.y + pos.height) - Math.max(bounds.y, pos.y);
-                        overlapAmount += xOverlap * yOverlap;
-                    }
-                }
-                if (overlapAmount === 0) {
-                    bestY = tryY;
-                    labelPositions.push(bounds);
-                    ctx.fillText(text, x, bestY);
-                    return;
-                }
-                if (overlapAmount < minOverlap) {
-                    minOverlap = overlapAmount;
-                    bestY = tryY;
-                }
+        const labelSet = labels && labels.length === data.length ? labels : data.map((_, i) => `Match ${i + 1}`);
+        const datasets = [
+            {
+                label: "Score",
+                data: data,
+                borderColor: "#0078d4",
+                backgroundColor: "#0078d4",
+                pointRadius: 5,
+                pointHoverRadius: 7,
+                tension: 0.2,
+                borderWidth: 2
             }
-            // Use best position found (minimal overlap)
-            const bounds = {
-                x: x - textWidth / 2 - minLabelSpacing,
-                y: bestY - textHeight - minLabelSpacing,
-                width: textWidth + minLabelSpacing * 2,
-                height: textHeight + minLabelSpacing * 2
-            };
-            labelPositions.push(bounds);
-            ctx.fillText(text, x, bestY);
-        };
-        // Collect all points to draw, sorted by y position (highest values first)
-        const allPoints = [];
-        for (let i = 0; i < data1.length; i++) {
-            allPoints.push({ value: data1[i], x: getX(i), y: getY(data1[i]), color: "#4ec9b0" });
+        ];
+        if (overlayData && overlayData.length === data.length && overlayData.some(v => v !== null && v !== undefined)) {
+            datasets.push({
+                label: overlayLabel || "OPR",
+                data: overlayData,
+                borderColor: overlayColor,
+                backgroundColor: overlayColor,
+                pointRadius: 4,
+                pointHoverRadius: 6,
+                tension: 0.2,
+                borderWidth: 2,
+                borderDash: [6, 4],
+                spanGaps: true
+            });
         }
-        for (let i = 0; i < data2.length; i++) {
-            allPoints.push({ value: data2[i], x: getX(i), y: getY(data2[i]), color: "#ff6b6b" });
-        }
-        // Sort by y position (lowest y = highest value = draw first to get best position)
-        allPoints.sort((a, b) => a.y - b.y);
-        // Draw labels in order
-        for (const point of allPoints) {
-            drawLabel(point.value, point.x, point.y, point.color);
-        }
-        // Handle hover
-        const tooltip = document.getElementById(`${chartId}-tooltip`);
-        canvas.addEventListener("mousemove", (e) => {
-            const canvasRect = canvas.getBoundingClientRect();
-            const mouseX = e.clientX - canvasRect.left;
-            const mouseY = e.clientY - canvasRect.top;
-            let found = false;
-            const checkPoint = (data, label, color) => {
-                for (let i = 0; i < data.length; i++) {
-                    const x = getX(i);
-                    const y = getY(data[i]);
-                    const dist = Math.sqrt((mouseX - x) ** 2 + (mouseY - y) ** 2);
-                    if (dist < 10) {
-                        if (tooltip) {
-                            tooltip.textContent = `${data[i]} artifact${data[i] !== 1 ? "s" : ""} (${label} @ Match ${i + 1})`;
-                            tooltip.style.display = "block";
-                            tooltip.style.borderColor = color;
-                            const tooltipRect = tooltip.getBoundingClientRect();
-                            let tooltipX = mouseX + 10;
-                            let tooltipY = mouseY - 25;
-                            if (tooltipX + tooltipRect.width > canvasRect.width) {
-                                tooltipX = mouseX - tooltipRect.width - 10;
-                            }
-                            if (tooltipY < 0) {
-                                tooltipY = mouseY + 15;
-                            }
-                            tooltip.style.left = `${tooltipX}px`;
-                            tooltip.style.top = `${tooltipY}px`;
+        new window.Chart(ctx, {
+            type: "line",
+            data: {
+                labels: labelSet,
+                datasets
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: true,
+                        labels: {
+                            color: "#e0e0e0",
+                            font: { family: "'JetBrains Mono', monospace", size: 11 }
                         }
-                        canvas.style.cursor = "pointer";
-                        found = true;
-                        return true;
+                    },
+                    tooltip: {
+                        enabled: true,
+                        backgroundColor: "rgba(24, 24, 24, 0.95)",
+                        titleColor: "#e0e0e0",
+                        bodyColor: "#e0e0e0",
+                        borderWidth: 2,
+                        borderColor: "#0078d4",
+                        padding: 10,
+                        displayColors: true,
+                        titleFont: {
+                            family: "'JetBrains Mono', monospace",
+                            size: 12
+                        },
+                        bodyFont: {
+                            family: "'JetBrains Mono', monospace",
+                            size: 12
+                        },
+                        callbacks: {
+                            label: function (context) {
+                                const value = context.parsed.y;
+                                const label = context.dataset.label || "Score";
+                                const display = typeof value === "number" ? value.toFixed(2) : value;
+                                return `${label}: ${display}`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: {
+                            color: "rgba(255, 255, 255, 0.1)"
+                        },
+                        ticks: {
+                            color: "#a0a0a0",
+                            font: {
+                                family: "'JetBrains Mono', monospace",
+                                size: 11
+                            },
+                            maxRotation: 45,
+                            minRotation: 0,
+                            autoSkip: true,
+                            maxTicksLimit: 18
+                        }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        suggestedMax: Math.max(maxValue, 100),
+                        grid: {
+                            color: "rgba(255, 255, 255, 0.1)"
+                        },
+                        ticks: {
+                            color: "#a0a0a0",
+                            font: {
+                                family: "'JetBrains Mono', monospace",
+                                size: 11
+                            },
+                            precision: 0
+                        }
                     }
                 }
-                return false;
-            };
-            if (!checkPoint(data1, "Auto", "#4ec9b0")) {
-                checkPoint(data2, "Teleop", "#ff6b6b");
-            }
-            if (!found) {
-                if (tooltip)
-                    tooltip.style.display = "none";
-                canvas.style.cursor = "default";
             }
         });
-        canvas.addEventListener("mouseleave", () => {
-            if (tooltip)
-                tooltip.style.display = "none";
-            canvas.style.cursor = "default";
+    }, 0);
+    return `
+        <div class="bar-chart" style="height: 360px;">
+            <canvas id="${chartId}"></canvas>
+        </div>
+    `;
+}
+function generateComparisonChart(data1, data2, labels, maxValue, overlay1Label, overlay1Data, overlay2Label, overlay2Data) {
+    if (data1.length === 0) {
+        return '<div class="comparison-chart"><div class="chart-empty">No data available</div></div>';
+    }
+    const chartId = `comparison-chart-${Date.now()}`;
+    setTimeout(() => {
+        const canvas = document.getElementById(chartId);
+        if (!canvas)
+            return;
+        const ctx = canvas.getContext("2d");
+        if (!ctx)
+            return;
+        const labelSet = labels && labels.length === data1.length ? labels : data1.map((_, i) => `Match ${i + 1}`);
+        const datasets = [
+            {
+                label: "Auto",
+                data: data1,
+                borderColor: "#4ec9b0",
+                backgroundColor: "#4ec9b0",
+                pointRadius: 5,
+                pointHoverRadius: 7,
+                tension: 0.2,
+                borderWidth: 2
+            },
+            {
+                label: "Teleop",
+                data: data2,
+                borderColor: "#ff6b6b",
+                backgroundColor: "#ff6b6b",
+                pointRadius: 5,
+                pointHoverRadius: 7,
+                tension: 0.2,
+                borderWidth: 2
+            }
+        ];
+        if (overlay1Data && overlay1Data.length === data1.length && overlay1Data.some(v => v !== null && v !== undefined)) {
+            datasets.push({
+                label: overlay1Label || "Auto OPR",
+                data: overlay1Data,
+                borderColor: "#0f766e",
+                backgroundColor: "#0f766e",
+                pointRadius: 4,
+                pointHoverRadius: 6,
+                tension: 0.2,
+                borderWidth: 2,
+                borderDash: [6, 4],
+                spanGaps: true
+            });
+        }
+        if (overlay2Data && overlay2Data.length === data2.length && overlay2Data.some(v => v !== null && v !== undefined)) {
+            datasets.push({
+                label: overlay2Label || "Teleop OPR",
+                data: overlay2Data,
+                borderColor: "#c53030",
+                backgroundColor: "#c53030",
+                pointRadius: 4,
+                pointHoverRadius: 6,
+                tension: 0.2,
+                borderWidth: 2,
+                borderDash: [6, 4],
+                spanGaps: true
+            });
+        }
+        new window.Chart(ctx, {
+            type: "line",
+            data: {
+                labels: labelSet,
+                datasets
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: true,
+                        labels: {
+                            color: "#e0e0e0",
+                            font: { family: "'JetBrains Mono', monospace", size: 11 }
+                        }
+                    },
+                    tooltip: {
+                        enabled: true,
+                        mode: "point",
+                        intersect: true,
+                        backgroundColor: "rgba(24, 24, 24, 0.95)",
+                        titleColor: "#e0e0e0",
+                        bodyColor: "#e0e0e0",
+                        borderWidth: 2,
+                        padding: 10,
+                        displayColors: true,
+                        titleFont: {
+                            family: "'JetBrains Mono', monospace",
+                            size: 12
+                        },
+                        bodyFont: {
+                            family: "'JetBrains Mono', monospace",
+                            size: 12
+                        },
+                        callbacks: {
+                            beforeTitle: function () {
+                                return "";
+                            },
+                            title: function (tooltipItems) {
+                                return tooltipItems[0].label;
+                            },
+                            label: function (context) {
+                                const label = context.dataset.label || "";
+                                const value = context.parsed.y;
+                                const display = typeof value === "number" ? value.toFixed(2) : value;
+                                return `${label}: ${display} pts`;
+                            }
+                        },
+                        borderColor: function (context) {
+                            if (context.tooltip && context.tooltip.dataPoints && context.tooltip.dataPoints.length > 0) {
+                                return context.tooltip.dataPoints[0].dataset.borderColor;
+                            }
+                            return "#4ec9b0";
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: {
+                            color: "rgba(255, 255, 255, 0.1)"
+                        },
+                        ticks: {
+                            color: "#a0a0a0",
+                            font: {
+                                family: "'JetBrains Mono', monospace",
+                                size: 11
+                            },
+                            maxRotation: 45,
+                            minRotation: 0,
+                            autoSkip: true,
+                            maxTicksLimit: 18
+                        }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        suggestedMax: Math.max(maxValue, 50),
+                        grid: {
+                            color: "rgba(255, 255, 255, 0.1)"
+                        },
+                        ticks: {
+                            color: "#a0a0a0",
+                            font: {
+                                family: "'JetBrains Mono', monospace",
+                                size: 11
+                            },
+                            precision: 0
+                        }
+                    }
+                }
+            }
+        });
+    }, 0);
+    return `
+        <div class="comparison-chart" style="height: 360px;">
+            <canvas id="${chartId}"></canvas>
+        </div>
+    `;
+}
+function generateLineChart(data1, data2, labels, maxValue, overlay1Label, overlay1Data, overlay2Label, overlay2Data) {
+    if (data1.length === 0) {
+        return '<div class="line-chart"><div class="line-chart-container"><div class="chart-empty">No data available</div></div></div>';
+    }
+    const chartId = `line-chart-${Date.now()}`;
+    setTimeout(() => {
+        const canvas = document.getElementById(chartId);
+        if (!canvas)
+            return;
+        const ctx = canvas.getContext("2d");
+        if (!ctx)
+            return;
+        const labelSet = labels && labels.length === data1.length ? labels : data1.map((_, i) => `Match ${i + 1}`);
+        const datasets = [
+            {
+                label: "Auto",
+                data: data1,
+                borderColor: "#4ec9b0",
+                backgroundColor: "#4ec9b0",
+                pointRadius: 5,
+                pointHoverRadius: 7,
+                tension: 0.2,
+                borderWidth: 2
+            },
+            {
+                label: "Teleop",
+                data: data2,
+                borderColor: "#ff6b6b",
+                backgroundColor: "#ff6b6b",
+                pointRadius: 5,
+                pointHoverRadius: 7,
+                tension: 0.2,
+                borderWidth: 2
+            }
+        ];
+        if (overlay1Data && overlay1Data.length === data1.length && overlay1Data.some(v => v !== null && v !== undefined)) {
+            datasets.push({
+                label: overlay1Label || "Auto Artifacts OPR",
+                data: overlay1Data,
+                borderColor: "#115e59",
+                backgroundColor: "#115e59",
+                pointRadius: 4,
+                pointHoverRadius: 6,
+                tension: 0.2,
+                borderWidth: 2,
+                borderDash: [6, 4],
+                spanGaps: true
+            });
+        }
+        if (overlay2Data && overlay2Data.length === data2.length && overlay2Data.some(v => v !== null && v !== undefined)) {
+            datasets.push({
+                label: overlay2Label || "Teleop Artifacts OPR",
+                data: overlay2Data,
+                borderColor: "#7f1d1d",
+                backgroundColor: "#7f1d1d",
+                pointRadius: 4,
+                pointHoverRadius: 6,
+                tension: 0.2,
+                borderWidth: 2,
+                borderDash: [6, 4],
+                spanGaps: true
+            });
+        }
+        new window.Chart(ctx, {
+            type: "line",
+            data: {
+                labels: labelSet,
+                datasets
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: true,
+                        labels: {
+                            color: "#e0e0e0",
+                            font: { family: "'JetBrains Mono', monospace", size: 11 }
+                        }
+                    },
+                    tooltip: {
+                        enabled: true,
+                        mode: "point",
+                        intersect: true,
+                        backgroundColor: "rgba(24, 24, 24, 0.95)",
+                        titleColor: "#e0e0e0",
+                        bodyColor: "#e0e0e0",
+                        borderWidth: 2,
+                        padding: 10,
+                        displayColors: true,
+                        titleFont: {
+                            family: "'JetBrains Mono', monospace",
+                            size: 12
+                        },
+                        bodyFont: {
+                            family: "'JetBrains Mono', monospace",
+                            size: 12
+                        },
+                        callbacks: {
+                            beforeTitle: function () {
+                                return "";
+                            },
+                            title: function (tooltipItems) {
+                                return tooltipItems[0].label;
+                            },
+                            label: function (context) {
+                                const label = context.dataset.label || "";
+                                const value = context.parsed.y;
+                                const display = typeof value === "number" ? value.toFixed(2) : value;
+                                return `${label}: ${display} artifact${value !== 1 ? "s" : ""}`;
+                            }
+                        },
+                        borderColor: function (context) {
+                            if (context.tooltip && context.tooltip.dataPoints && context.tooltip.dataPoints.length > 0) {
+                                return context.tooltip.dataPoints[0].dataset.borderColor;
+                            }
+                            return "#4ec9b0";
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: {
+                            color: "rgba(255, 255, 255, 0.1)"
+                        },
+                        ticks: {
+                            color: "#a0a0a0",
+                            font: {
+                                family: "'JetBrains Mono', monospace",
+                                size: 11
+                            },
+                            maxRotation: 45,
+                            minRotation: 0,
+                            autoSkip: true,
+                            maxTicksLimit: 18
+                        }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        suggestedMax: Math.max(maxValue, 10),
+                        grid: {
+                            color: "rgba(255, 255, 255, 0.1)"
+                        },
+                        ticks: {
+                            color: "#a0a0a0",
+                            font: {
+                                family: "'JetBrains Mono', monospace",
+                                size: 11
+                            },
+                            precision: 0
+                        }
+                    }
+                }
+            }
         });
     }, 0);
     return `
         <div class="line-chart">
-            <div class="line-chart-container">
+            <div class="line-chart-container" style="height: 360px;">
                 <canvas id="${chartId}"></canvas>
-                <div id="${chartId}-tooltip" class="line-chart-tooltip"></div>
             </div>
-            <div class="line-chart-x-axis">${xLabels}</div>
         </div>
     `;
 }

@@ -1764,6 +1764,14 @@ textarea:focus-visible {
     background-color: #ff6b6b;
 }
 
+.legend-color.auto-opr {
+    background-color: #2d8f7a;
+}
+
+.legend-color.teleop-opr {
+    background-color: #c74242;
+}
+
 .chart-info-icon {
     color: #868686;
     font-size: 12px;
