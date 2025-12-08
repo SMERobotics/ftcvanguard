@@ -2568,7 +2568,7 @@ function generateBarChart(
                 backgroundColor: "#0078d4",
                 pointRadius: 5,
                 pointHoverRadius: 7,
-                tension: 0.2,
+                tension: 0.4,
                 borderWidth: 2
             }
         ];
@@ -2581,7 +2581,7 @@ function generateBarChart(
                 backgroundColor: overlayColor,
                 pointRadius: 4,
                 pointHoverRadius: 6,
-                tension: 0.2,
+                tension: 0.4,
                 borderWidth: 2,
                 borderDash: [6, 4],
                 spanGaps: true
@@ -2709,7 +2709,7 @@ function generateComparisonChart(
                 backgroundColor: "#4ec9b0",
                 pointRadius: 5,
                 pointHoverRadius: 7,
-                tension: 0.2,
+                tension: 0.4,
                 borderWidth: 2
             },
             {
@@ -2719,7 +2719,7 @@ function generateComparisonChart(
                 backgroundColor: "#ff6b6b",
                 pointRadius: 5,
                 pointHoverRadius: 7,
-                tension: 0.2,
+                tension: 0.4,
                 borderWidth: 2
             }
         ];
@@ -2732,7 +2732,7 @@ function generateComparisonChart(
                 backgroundColor: "#0f766e",
                 pointRadius: 4,
                 pointHoverRadius: 6,
-                tension: 0.2,
+                tension: 0.4,
                 borderWidth: 2,
                 borderDash: [6, 4],
                 spanGaps: true
@@ -2747,7 +2747,7 @@ function generateComparisonChart(
                 backgroundColor: "#c53030",
                 pointRadius: 4,
                 pointHoverRadius: 6,
-                tension: 0.2,
+                tension: 0.4,
                 borderWidth: 2,
                 borderDash: [6, 4],
                 spanGaps: true
@@ -2888,7 +2888,7 @@ function generateLineChart(
                 backgroundColor: "#4ec9b0",
                 pointRadius: 5,
                 pointHoverRadius: 7,
-                tension: 0.2,
+                tension: 0.4,
                 borderWidth: 2
             },
             {
@@ -2898,7 +2898,7 @@ function generateLineChart(
                 backgroundColor: "#ff6b6b",
                 pointRadius: 5,
                 pointHoverRadius: 7,
-                tension: 0.2,
+                tension: 0.4,
                 borderWidth: 2
             }
         ];
@@ -2911,7 +2911,7 @@ function generateLineChart(
                 backgroundColor: "#115e59",
                 pointRadius: 4,
                 pointHoverRadius: 6,
-                tension: 0.2,
+                tension: 0.4,
                 borderWidth: 2,
                 borderDash: [6, 4],
                 spanGaps: true
@@ -2926,7 +2926,7 @@ function generateLineChart(
                 backgroundColor: "#7f1d1d",
                 pointRadius: 4,
                 pointHoverRadius: 6,
-                tension: 0.2,
+                tension: 0.4,
                 borderWidth: 2,
                 borderDash: [6, 4],
                 spanGaps: true

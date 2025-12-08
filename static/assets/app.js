@@ -2136,7 +2136,7 @@ function generateBarChart(data, labels, maxValue, overlayLabel, overlayData, ove
                 backgroundColor: "#0078d4",
                 pointRadius: 5,
                 pointHoverRadius: 7,
-                tension: 0.2,
+                tension: 0.4,
                 borderWidth: 2
             }
         ];
@@ -2148,7 +2148,7 @@ function generateBarChart(data, labels, maxValue, overlayLabel, overlayData, ove
                 backgroundColor: overlayColor,
                 pointRadius: 4,
                 pointHoverRadius: 6,
-                tension: 0.2,
+                tension: 0.4,
                 borderWidth: 2,
                 borderDash: [6, 4],
                 spanGaps: true
@@ -2261,7 +2261,7 @@ function generateComparisonChart(data1, data2, labels, maxValue, overlay1Label, 
                 backgroundColor: "#4ec9b0",
                 pointRadius: 5,
                 pointHoverRadius: 7,
-                tension: 0.2,
+                tension: 0.4,
                 borderWidth: 2
             },
             {
@@ -2271,7 +2271,7 @@ function generateComparisonChart(data1, data2, labels, maxValue, overlay1Label, 
                 backgroundColor: "#ff6b6b",
                 pointRadius: 5,
                 pointHoverRadius: 7,
-                tension: 0.2,
+                tension: 0.4,
                 borderWidth: 2
             }
         ];
@@ -2283,7 +2283,7 @@ function generateComparisonChart(data1, data2, labels, maxValue, overlay1Label, 
                 backgroundColor: "#0f766e",
                 pointRadius: 4,
                 pointHoverRadius: 6,
-                tension: 0.2,
+                tension: 0.4,
                 borderWidth: 2,
                 borderDash: [6, 4],
                 spanGaps: true
@@ -2297,7 +2297,7 @@ function generateComparisonChart(data1, data2, labels, maxValue, overlay1Label, 
                 backgroundColor: "#c53030",
                 pointRadius: 4,
                 pointHoverRadius: 6,
-                tension: 0.2,
+                tension: 0.4,
                 borderWidth: 2,
                 borderDash: [6, 4],
                 spanGaps: true
@@ -2423,7 +2423,7 @@ function generateLineChart(data1, data2, labels, maxValue, overlay1Label, overla
                 backgroundColor: "#4ec9b0",
                 pointRadius: 5,
                 pointHoverRadius: 7,
-                tension: 0.2,
+                tension: 0.4,
                 borderWidth: 2
             },
             {
@@ -2433,7 +2433,7 @@ function generateLineChart(data1, data2, labels, maxValue, overlay1Label, overla
                 backgroundColor: "#ff6b6b",
                 pointRadius: 5,
                 pointHoverRadius: 7,
-                tension: 0.2,
+                tension: 0.4,
                 borderWidth: 2
             }
         ];
@@ -2445,7 +2445,7 @@ function generateLineChart(data1, data2, labels, maxValue, overlay1Label, overla
                 backgroundColor: "#115e59",
                 pointRadius: 4,
                 pointHoverRadius: 6,
-                tension: 0.2,
+                tension: 0.4,
                 borderWidth: 2,
                 borderDash: [6, 4],
                 spanGaps: true
@@ -2459,7 +2459,7 @@ function generateLineChart(data1, data2, labels, maxValue, overlay1Label, overla
                 backgroundColor: "#7f1d1d",
                 pointRadius: 4,
                 pointHoverRadius: 6,
-                tension: 0.2,
+                tension: 0.4,
                 borderWidth: 2,
                 borderDash: [6, 4],
                 spanGaps: true
