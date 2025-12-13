@@ -2161,9 +2161,9 @@ function generateStatsHTML(stats: any) {
 
         <div class="insight-card">
             <h3>Ranking Points</h3>
-            <div class="stat-row"><span>Movement RP:</span><strong>${stats.movementRPRate.toFixed(1)}%</strong></div>
-            <div class="stat-row"><span>Goal RP:</span><strong>${stats.goalRPRate.toFixed(1)}%</strong></div>
-            <div class="stat-row"><span>Pattern RP:</span><strong>${stats.patternRPRate.toFixed(1)}%</strong></div>
+            <div class="stat-row"><span>Movement RP:</span><strong>${stats.movementRPRate.toFixed(1)}% (${(stats.movementRPRate * stats.totalMatches / 100).toFixed(0)})</strong></div>
+            <div class="stat-row"><span>Goal RP:</span><strong>${stats.goalRPRate.toFixed(1)}% (${(stats.goalRPRate * stats.totalMatches / 100).toFixed(0)})</strong></div>
+            <div class="stat-row"><span>Pattern RP:</span><strong>${stats.patternRPRate.toFixed(1)}% (${(stats.patternRPRate * stats.totalMatches / 100).toFixed(0)})</strong></div>
         </div>
 
         <div class="insight-card">
@@ -2171,7 +2171,7 @@ function generateStatsHTML(stats: any) {
             <div class="stat-row"><span>Avg Points Committed:</span><strong>${stats.avgPenaltyPoints.toFixed(1)}</strong></div>
             <div class="stat-row"><span>Major Fouls:</span><strong>${stats.totalMajorFouls}</strong></div>
             <div class="stat-row"><span>Minor Fouls:</span><strong>${stats.totalMinorFouls}</strong></div>
-            <div class="stat-row"><span>Clean Matches:</span><strong>${stats.cleanMatches}</strong></div>
+            <div class="stat-row"><span>Clean Matches:</span><strong>${(stats.cleanMatches / stats.totalMatches * 100).toFixed(1)}% (${stats.cleanMatches})</strong></div>
         </div>
     `;
 }
@@ -2189,7 +2189,7 @@ function renderInsights(teamNumber: number, events: any[], scoreData: any[]) {
     content.innerHTML = `
         <div class="insights-results">
             <div class="insights-team-header">
-                <h2>Team ${teamNumber} - Performance Analysis <span class="header-info-icon" title="Most statistics exclude penalty points">(i)</span></h2>
+                <h2>Team ${teamNumber} - Performance Analysis <span class="header-info-icon" title="All statistics exclude penalty points">(i)</span></h2>
                 <p>${playedEvents.length} events completed</p>
             </div>
 
@@ -2587,7 +2587,7 @@ function generateBarChart(
                 backgroundColor: overlayColor,
                 pointRadius: 4,
                 pointHoverRadius: 6,
-                tension: 0.4,
+                tension: 0,
                 borderWidth: 2,
                 borderDash: [6, 4],
                 spanGaps: true
@@ -2738,7 +2738,7 @@ function generateComparisonChart(
                 backgroundColor: "#0f766e",
                 pointRadius: 4,
                 pointHoverRadius: 6,
-                tension: 0.4,
+                tension: 0,
                 borderWidth: 2,
                 borderDash: [6, 4],
                 spanGaps: true
@@ -2753,7 +2753,7 @@ function generateComparisonChart(
                 backgroundColor: "#c53030",
                 pointRadius: 4,
                 pointHoverRadius: 6,
-                tension: 0.4,
+                tension: 0,
                 borderWidth: 2,
                 borderDash: [6, 4],
                 spanGaps: true
@@ -2917,7 +2917,7 @@ function generateLineChart(
                 backgroundColor: "#115e59",
                 pointRadius: 4,
                 pointHoverRadius: 6,
-                tension: 0.4,
+                tension: 0,
                 borderWidth: 2,
                 borderDash: [6, 4],
                 spanGaps: true
@@ -2932,7 +2932,7 @@ function generateLineChart(
                 backgroundColor: "#7f1d1d",
                 pointRadius: 4,
                 pointHoverRadius: 6,
-                tension: 0.4,
+                tension: 0,
                 borderWidth: 2,
                 borderDash: [6, 4],
                 spanGaps: true
