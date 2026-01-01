@@ -100,7 +100,7 @@ def send_notification(team_id: int, title: str, message: str, priority: int=3, c
         if r.status_code == 200:
             sent_at = int(datetime.now().timestamp())
             cursor.execute(
-                "INSERT INTO notifications (team_id, title, message, sent_at) VALUES (?, ?, ?, ?)",
+                "INSERT OR IGNORE INTO notifications (team_id, title, message, sent_at) VALUES (?, ?, ?, ?)",
                 (team_id, title, message, sent_at)
             )
             db.commit()
