@@ -26,7 +26,7 @@ VANGUARD_URL = os.getenv("VANGUARD_URL", "http://localhost:8080")
 get_db = lambda: sqlite3.connect("default.db", check_same_thread=True)
 
 def get_active_event(team_id: int) -> str | None:
-    now = datetime.now()
+    now = datetime.now() - timedelta(weeks=26)
     year = now.year
 
     r = s.get(f"{FTC_API_URL}/{year}/events?teamNumber={team_id}")
@@ -114,7 +114,7 @@ def send_notification(team_id: int, title: str, message: str, priority: int=3, c
         return False
 
 def notification_callback():
-    now = datetime.now()
+    now = datetime.now() - timedelta(weeks=26)
     year = now.year
 
     for team_id in NTFY_TEAMS:
@@ -324,7 +324,7 @@ def _api_v1_events():
     
     # fetch events from FTC API
 
-    now = datetime.now()
+    now = datetime.now() - timedelta(weeks=26)
     year = now.year
 
     r = s.get(f"{FTC_API_URL}/{year}/events?teamNumber={team_id}")
@@ -351,7 +351,7 @@ def _api_v1_event():
     except:
         return {"status": "fuck", "error": "bad request"}, 400
 
-    now = datetime.now()
+    now = datetime.now() - timedelta(weeks=26)
     year = now.year
 
     r = s.get(f"{FTC_API_URL}/{year}/events?eventCode={event}")
@@ -380,7 +380,7 @@ def _api_v1_schedule():
 
     level = request.args.get("level") or "qual"
 
-    now = datetime.now()
+    now = datetime.now() - timedelta(weeks=26)
     year = now.year
     
     params = []
@@ -417,7 +417,7 @@ def _api_v1_matches():
         return {"status": "fuck", "error": "missing event"}, 400
 
     level = request.args.get("level")
-    now = datetime.now()
+    now = datetime.now() - timedelta(weeks=26)
     year = now.year
 
     url = f"{FTC_API_URL}/{year}/matches/{event}"
@@ -444,7 +444,7 @@ def _api_v1_scores(event, level):
     except jwt.InvalidTokenError:
         return {"status": "fuck", "error": "invalid token"}, 401
 
-    now = datetime.now()
+    now = datetime.now() - timedelta(weeks=26)
     year = now.year
     
     r = s.get(f"{FTC_API_URL}/{year}/scores/{event}/{level}")
@@ -464,7 +464,7 @@ def _api_v1_team_events(team_number):
     except jwt.InvalidTokenError:
         return {"status": "fuck", "error": "invalid token"}, 401
 
-    now = datetime.now()
+    now = datetime.now() - timedelta(weeks=26)
     year = now.year
     
     r = s.get(f"{FTC_API_URL}/{year}/events?teamNumber={team_number}")
@@ -492,7 +492,7 @@ def _api_v1_rankings():
     except:
         return {"status": "fuck", "error": "bad request"}, 400
 
-    now = datetime.now()
+    now = datetime.now() - timedelta(weeks=26)
     year = now.year
     
     r = s.get(f"{FTC_API_URL}/{year}/leagues/rankings/{region}/{league}")
@@ -517,7 +517,7 @@ def _api_v1_teams():
     except:
         return {"status": "fuck", "error": "bad request"}, 400
     
-    now = datetime.now()
+    now = datetime.now() - timedelta(weeks=26)
     year = now.year
     
     r = s.get(f"{FTC_API_URL}/{year}/teams?eventCode={event}")
