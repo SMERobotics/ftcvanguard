@@ -10,6 +10,7 @@ wheels/
 .venv
 
 .env
+settings.toml
 default.db
 default.db-shm
 default.db-wal

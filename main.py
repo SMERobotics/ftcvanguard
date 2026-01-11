@@ -1,7 +1,6 @@
 import argon2
 from argon2 import PasswordHasher
 from datetime import datetime, timedelta
-from dotenv import load_dotenv
 from flask import Flask, request, send_from_directory
 import jwt
 import os
@@ -9,19 +8,22 @@ import requests
 import sqlite3
 import threading
 import time
+import tomllib
 
 FTC_API_URL = "https://ftc-api.firstinspires.org/v2.0"
 BLOCK_REGISTRATION = True
 RSA_PUBLIC_KEY = ""
 RSA_PRIVATE_KEY = ""
 
-load_dotenv()
-FTC_API_USERNAME = os.getenv("FTC_API_USERNAME")
-FTC_API_TOKEN = os.getenv("FTC_API_TOKEN")
-NTFY_SERVER_URL = os.getenv("NTFY_SERVER_URL", "https://ntfy.sh")
-NTFY_TOPIC = os.getenv("NTFY_TOPIC", "FTC_{}")
-NTFY_TEAMS = [int(t.strip()) for t in os.getenv("NTFY_TEAMS", "").split() if t.strip()]
-VANGUARD_URL = os.getenv("VANGUARD_URL", "http://localhost:8080")
+with open("settings.toml", "rb") as f:
+    settings = tomllib.load(f)
+
+FTC_API_USERNAME = settings["ftc_api"]["username"]
+FTC_API_TOKEN = settings["ftc_api"]["token"]
+NTFY_SERVER_URL = settings["notifications"]["ntfy_server_url"]
+NTFY_TOPIC = settings["notifications"]["ntfy_topic"]
+NTFY_TEAMS = settings["notifications"]["ntfy_teams"]
+VANGUARD_URL = settings["server"]["vanguard_url"]
 
 get_db = lambda: sqlite3.connect("default.db", check_same_thread=True)
 
