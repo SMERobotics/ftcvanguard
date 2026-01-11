@@ -9,7 +9,7 @@ unified ftc management infra. provide streamlined, real-time data, enabling rapi
 *   **mobile push notifs:** Built for the pits and the stands. A lightning-fast, app-like interface designed for rapid data access on any device.
 *   **secure team collab:** Unified team access with secure authentication ensures your strategic data stays private and accessible only to your alliance.
 
-## screenshots
+## gallery
 
 <img width="1920" height="1032" alt="image" src="https://github.com/user-attachments/assets/0a04e691-737e-42e8-ba25-3a23d60b99d6" />
 <table>
@@ -18,8 +18,8 @@ unified ftc management infra. provide streamlined, real-time data, enabling rapi
     <td><img src="https://github.com/user-attachments/assets/6a948849-22bd-404e-984e-35ec0fdc5a89" width="1920" /></td>
   </tr>
 </table>
-<img width="1920" height="1032" alt="image" src="https://github.com/user-attachments/assets/1909c5b3-5257-43fe-89b2-e615f897bc8e" />
-<img width="1920" height="1032" alt="image" src="https://github.com/user-attachments/assets/a608ffb2-f6d1-461c-aae7-d9e9d52e4169" />
+<img width="1920" height="1032" alt="image" src="https://github.com/user-attachments/assets/7270319c-e798-49c5-945e-bfcfd08972cd" />
+<img width="1920" height="1032" alt="image" src="https://github.com/user-attachments/assets/486487d8-2dec-48d7-91f9-55b0dcdc58bc" />
 
 ## setting up:
 *deleted all the instructions cuz ill just build a docker image <3*
