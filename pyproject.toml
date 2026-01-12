@@ -1,7 +1,7 @@
 [project]
 name = "ftcvanguard"
 version = "0.1.0"
-description = "Add your description here"
+description = "A real-time scouting app for FIRST Tech Challenge with advanced, real time insights."
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
