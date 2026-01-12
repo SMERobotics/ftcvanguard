@@ -65,20 +65,20 @@
             </div>
             <div class="view" id="view-rankings" style="display: none;">
                 <div id="rankings-container">
+                    <div id="rankings-controls">
+                        <label class="ranking-sort-label">
+                            <input type="radio" name="ranking-sort" value="rank" checked>
+                            <span>Sort by Rank</span>
+                        </label>
+                        <label class="ranking-sort-label">
+                            <input type="radio" name="ranking-sort" value="opr">
+                            <span>Sort by OPR</span>
+                            <span class="header-info-icon" title="A team's OPR will not update until conclusion of that respective team's current Event.">(i)</span>
+                        </label>
+                    </div>
                     <table class="stats-table" id="rankings-table">
                         <thead>
-                            <tr>
-                                <th>Rank</th>
-                                <th>Team</th>
-                                <th>Name</th>
-                                <th>Ranking Points</th>
-                                <th>Match Points</th>
-                                <th>Base Points</th>
-                                <th>Auto Points</th>
-                                <th>High Score</th>
-                                <th>W-L-T</th>
-                                <th>Played</th>
-                            </tr>
+                            <tr></tr>
                         </thead>
                         <tbody></tbody>
                     </table>

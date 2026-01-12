@@ -58,6 +58,11 @@ interface Ranking {
     sortOrder6: number;
 }
 
+interface TeamOPR {
+    teamNumber: number;
+    opr: number | null;
+}
+
 interface TeamInfo {
     teamNumber: number;
     nameShort: string;
@@ -126,6 +131,7 @@ const tabs: Tab[] = [
 let currentMatches: Match[] = [];
 let currentRankings: Ranking[] = [];
 let currentTeams: TeamInfo[] = [];
+let currentOPRData: TeamOPR[] = [];
 let currentEventCode: string = "";
 let currentNotesStatus: { [teamId: number]: number | undefined } = {};
 let loggedInTeamId: number | null = null;
@@ -138,6 +144,7 @@ let currentSelectedNotesTeam: number | null = null;
 let currentInsightsTeam: number | null = null;
 let currentScoreMatches: ScoreMatch[] = [];
 let showAllMatches: boolean = false;
+let rankingSortMode: "rank" | "opr" = "rank";
 const activeCharts: Record<string, any> = {};
 
 // URL State Management
@@ -476,6 +483,64 @@ async function populateMeetSelectorWithStateRestore(events: FTCEvent[], urlState
     updateUrl(true);
 }
 
+async function fetchOPRData(teamNumbers: number[]): Promise<TeamOPR[]> {
+    const season = 2025;
+    const oprData: TeamOPR[] = [];
+
+    const promises = teamNumbers.map(async (teamNumber) => {
+        try {
+            const response = await fetch("https://api.ftcscout.org/graphql", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    query: `
+                        query Opr($season: Int!, $number: Int!) {
+                            teamByNumber(number: $number) {
+                                events(season: $season) {
+                                    stats {
+                                        ... on TeamEventStats2025 {
+                                            opr {
+                                                totalPointsNp
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    `,
+                    variables: {
+                        season: season,
+                        number: teamNumber
+                    }
+                })
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                const events = data?.data?.teamByNumber?.events || [];
+
+                let latestOPR: number | null = null;
+                for (const event of events) {
+                    const opr = event?.stats?.opr?.totalPointsNp;
+                    if (opr !== undefined && opr !== null) {
+                        latestOPR = opr;
+                    }
+                }
+
+                return { teamNumber, opr: latestOPR };
+            }
+        } catch (error) {
+            console.error(`Failed to fetch OPR for team ${teamNumber}:`, error);
+        }
+        return { teamNumber, opr: null };
+    });
+
+    const results = await Promise.all(promises);
+    return results;
+}
+
 async function loadScheduleWithStateRestore(eventCode: string, urlState: AppState) {
     const token = localStorage.getItem("token");
     if (!token) return;
@@ -526,7 +591,10 @@ async function loadScheduleWithStateRestore(eventCode: string, urlState: AppStat
             currentTeams = teamsData.teams || [];
             currentScoreMatches = scoresData.matchScores || [];
             mergeScoresIntoScheduleMatches(currentMatches, currentScoreMatches);
-            
+
+            const teamNumbers = currentRankings.map(r => r.teamNumber);
+            currentOPRData = await fetchOPRData(teamNumbers);
+
             // Restore or infer showAll state
             if (urlState.showAll !== undefined) {
                 showAllMatches = urlState.showAll;
@@ -838,28 +906,96 @@ function getMatchResultIndicator(match: Match): MatchResultIndicator | null {
 
 function renderRankings(rankings: Ranking[]) {
     const tbody = document.querySelector("#rankings-table tbody");
-    if (!tbody) return;
+    const thead = document.querySelector("#rankings-table thead tr");
+    if (!tbody || !thead) return;
 
     tbody.innerHTML = "";
 
-    rankings.forEach((rank, index) => {
+    const oprData = currentOPRData.find(o => o.teamNumber === rankings[0]?.teamNumber);
+    const oprValue = (oprData?.opr !== null && oprData?.opr !== undefined)
+        ? oprData.opr.toFixed(2)
+        : "-";
+
+    if (rankingSortMode === "opr") {
+        thead.innerHTML = `
+            <th>Rank</th>
+            <th>Team</th>
+            <th>Name</th>
+            <th>OPR</th>
+            <th>Ranking Points</th>
+            <th>Match Points</th>
+            <th>Base Points</th>
+            <th>Auto Points</th>
+            <th>High Score</th>
+            <th>W-L-T</th>
+            <th>Played</th>
+        `;
+    } else {
+        thead.innerHTML = `
+            <th>Rank</th>
+            <th>Team</th>
+            <th>Name</th>
+            <th>Ranking Points</th>
+            <th>Match Points</th>
+            <th>Base Points</th>
+            <th>Auto Points</th>
+            <th>High Score</th>
+            <th>OPR</th>
+            <th>W-L-T</th>
+            <th>Played</th>
+        `;
+    }
+
+    let sortedRankings = [...rankings];
+    if (rankingSortMode === "opr") {
+        sortedRankings.sort((a, b) => {
+            const aOPR = currentOPRData.find(o => o.teamNumber === a.teamNumber)?.opr ?? -1;
+            const bOPR = currentOPRData.find(o => o.teamNumber === b.teamNumber)?.opr ?? -1;
+            return bOPR - aOPR;
+        });
+    }
+
+    sortedRankings.forEach((rank, index) => {
         const tr = document.createElement("tr");
         tr.style.animationDelay = `${index * 0.03}s`;
         if (loggedInTeamId && rank.teamNumber === loggedInTeamId) {
             tr.classList.add("current-team-rank");
         }
-        tr.innerHTML = `
-            <td>${rank.rank}</td>
-            <td>${rank.teamNumber}</td>
-            <td>${rank.teamName}</td>
-            <td>${rank.sortOrder1}</td>
-            <td>${rank.sortOrder2}</td>
-            <td>${rank.sortOrder3}</td>
-            <td>${rank.sortOrder4}</td>
-            <td>${Math.floor(rank.sortOrder6)}</td>
-            <td>${rank.wins}-${rank.losses}-${rank.ties}</td>
-            <td>${rank.matchesPlayed}</td>
-        `;
+
+        const teamOprData = currentOPRData.find(o => o.teamNumber === rank.teamNumber);
+        const teamOprValue = teamOprData?.opr !== null && teamOprData?.opr !== undefined
+            ? teamOprData.opr.toFixed(2)
+            : "-";
+
+        if (rankingSortMode === "opr") {
+            tr.innerHTML = `
+                <td>${rank.rank}</td>
+                <td>${rank.teamNumber}</td>
+                <td>${rank.teamName}</td>
+                <td>${teamOprValue}</td>
+                <td>${rank.sortOrder1}</td>
+                <td>${rank.sortOrder2}</td>
+                <td>${rank.sortOrder3}</td>
+                <td>${rank.sortOrder4}</td>
+                <td>${Math.floor(rank.sortOrder6)}</td>
+                <td>${rank.wins}-${rank.losses}-${rank.ties}</td>
+                <td>${rank.matchesPlayed}</td>
+            `;
+        } else {
+            tr.innerHTML = `
+                <td>${rank.rank}</td>
+                <td>${rank.teamNumber}</td>
+                <td>${rank.teamName}</td>
+                <td>${rank.sortOrder1}</td>
+                <td>${rank.sortOrder2}</td>
+                <td>${rank.sortOrder3}</td>
+                <td>${rank.sortOrder4}</td>
+                <td>${Math.floor(rank.sortOrder6)}</td>
+                <td>${teamOprValue}</td>
+                <td>${rank.wins}-${rank.losses}-${rank.ties}</td>
+                <td>${rank.matchesPlayed}</td>
+            `;
+        }
         tbody.appendChild(tr);
     });
 }
@@ -3299,6 +3435,17 @@ document.addEventListener("DOMContentLoaded", async () => {
             updateUrl();
         });
     }
+
+    // Ranking sort radio buttons initialization
+    const rankingSortRadios = document.querySelectorAll<HTMLInputElement>("input[name='ranking-sort']");
+    rankingSortRadios.forEach(radio => {
+        radio.addEventListener("change", () => {
+            if (radio.checked) {
+                rankingSortMode = radio.value as "rank" | "opr";
+                renderRankings(currentRankings);
+            }
+        });
+    });
 
     // Insights initialization
     const analyzeBtn = document.getElementById("insights-analyze-btn");
