@@ -676,6 +676,34 @@ body {
     -webkit-overflow-scrolling: touch;
 }
 
+#rankings-controls {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 16px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid #333333;
+}
+
+.ranking-sort-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #cccccc;
+    font-size: 13px;
+    cursor: pointer;
+    user-select: none;
+}
+
+.ranking-sort-label input[type="radio"] {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+}
+
+.ranking-sort-label span {
+    cursor: pointer;
+}
+
 #rankings-table {
     width: max-content;
     min-width: 100%;

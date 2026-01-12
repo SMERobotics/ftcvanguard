@@ -14,6 +14,7 @@ const tabs = [
 let currentMatches = [];
 let currentRankings = [];
 let currentTeams = [];
+let currentOPRData = [];
 let currentEventCode = "";
 let currentNotesStatus = {};
 let loggedInTeamId = null;
@@ -26,6 +27,7 @@ let currentSelectedNotesTeam = null;
 let currentInsightsTeam = null;
 let currentScoreMatches = [];
 let showAllMatches = false;
+let rankingSortMode = "rank";
 const activeCharts = {};
 function getViewNameFromId(viewId) {
     return viewId.replace("view-", "");
@@ -331,6 +333,59 @@ async function populateMeetSelectorWithStateRestore(events, urlState) {
     // Set initial URL state
     updateUrl(true);
 }
+async function fetchOPRData(teamNumbers) {
+    const season = 2025;
+    const oprData = [];
+    const promises = teamNumbers.map(async (teamNumber) => {
+        try {
+            const response = await fetch("https://api.ftcscout.org/graphql", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    query: `
+                        query Opr($season: Int!, $number: Int!) {
+                            teamByNumber(number: $number) {
+                                events(season: $season) {
+                                    stats {
+                                        ... on TeamEventStats2025 {
+                                            opr {
+                                                totalPointsNp
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    `,
+                    variables: {
+                        season: season,
+                        number: teamNumber
+                    }
+                })
+            });
+            if (response.ok) {
+                const data = await response.json();
+                const events = data?.data?.teamByNumber?.events || [];
+                let latestOPR = null;
+                for (const event of events) {
+                    const opr = event?.stats?.opr?.totalPointsNp;
+                    if (opr !== undefined && opr !== null) {
+                        latestOPR = opr;
+                    }
+                }
+                return { teamNumber, opr: latestOPR };
+            }
+        }
+        catch (error) {
+            console.error(`Failed to fetch OPR for team ${teamNumber}:`, error);
+        }
+        return { teamNumber, opr: null };
+    });
+    const results = await Promise.all(promises);
+    return results;
+}
 async function loadScheduleWithStateRestore(eventCode, urlState) {
     const token = localStorage.getItem("token");
     if (!token)
@@ -372,6 +427,8 @@ async function loadScheduleWithStateRestore(eventCode, urlState) {
             currentTeams = teamsData.teams || [];
             currentScoreMatches = scoresData.matchScores || [];
             mergeScoresIntoScheduleMatches(currentMatches, currentScoreMatches);
+            const teamNumbers = currentRankings.map(r => r.teamNumber);
+            currentOPRData = await fetchOPRData(teamNumbers);
             // Restore or infer showAll state
             if (urlState.showAll !== undefined) {
                 showAllMatches = urlState.showAll;
@@ -630,16 +687,29 @@ function renderRankings(rankings) {
     if (!tbody)
         return;
     tbody.innerHTML = "";
-    rankings.forEach((rank, index) => {
+    let sortedRankings = [...rankings];
+    if (rankingSortMode === "opr") {
+        sortedRankings.sort((a, b) => {
+            const aOPR = currentOPRData.find(o => o.teamNumber === a.teamNumber)?.opr ?? -1;
+            const bOPR = currentOPRData.find(o => o.teamNumber === b.teamNumber)?.opr ?? -1;
+            return bOPR - aOPR;
+        });
+    }
+    sortedRankings.forEach((rank, index) => {
         const tr = document.createElement("tr");
         tr.style.animationDelay = `${index * 0.03}s`;
         if (loggedInTeamId && rank.teamNumber === loggedInTeamId) {
             tr.classList.add("current-team-rank");
         }
+        const oprData = currentOPRData.find(o => o.teamNumber === rank.teamNumber);
+        const oprValue = oprData?.opr !== null && oprData?.opr !== undefined
+            ? oprData.opr.toFixed(2)
+            : "-";
         tr.innerHTML = `
             <td>${rank.rank}</td>
             <td>${rank.teamNumber}</td>
             <td>${rank.teamName}</td>
+            <td>${oprValue}</td>
             <td>${rank.sortOrder1}</td>
             <td>${rank.sortOrder2}</td>
             <td>${rank.sortOrder3}</td>
@@ -2806,6 +2876,16 @@ document.addEventListener("DOMContentLoaded", async () => {
             updateUrl();
         });
     }
+    // Ranking sort radio buttons initialization
+    const rankingSortRadios = document.querySelectorAll("input[name='ranking-sort']");
+    rankingSortRadios.forEach(radio => {
+        radio.addEventListener("change", () => {
+            if (radio.checked) {
+                rankingSortMode = radio.value;
+                renderRankings(currentRankings);
+            }
+        });
+    });
     // Insights initialization
     const analyzeBtn = document.getElementById("insights-analyze-btn");
     const teamInput = document.getElementById("insights-team-input");
