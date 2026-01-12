@@ -906,9 +906,45 @@ function getMatchResultIndicator(match: Match): MatchResultIndicator | null {
 
 function renderRankings(rankings: Ranking[]) {
     const tbody = document.querySelector("#rankings-table tbody");
-    if (!tbody) return;
+    const thead = document.querySelector("#rankings-table thead tr");
+    if (!tbody || !thead) return;
 
     tbody.innerHTML = "";
+
+    const oprData = currentOPRData.find(o => o.teamNumber === rankings[0]?.teamNumber);
+    const oprValue = (oprData?.opr !== null && oprData?.opr !== undefined)
+        ? oprData.opr.toFixed(2)
+        : "-";
+
+    if (rankingSortMode === "opr") {
+        thead.innerHTML = `
+            <th>Rank</th>
+            <th>Team</th>
+            <th>Name</th>
+            <th>OPR</th>
+            <th>Ranking Points</th>
+            <th>Match Points</th>
+            <th>Base Points</th>
+            <th>Auto Points</th>
+            <th>High Score</th>
+            <th>W-L-T</th>
+            <th>Played</th>
+        `;
+    } else {
+        thead.innerHTML = `
+            <th>Rank</th>
+            <th>Team</th>
+            <th>Name</th>
+            <th>Ranking Points</th>
+            <th>Match Points</th>
+            <th>Base Points</th>
+            <th>Auto Points</th>
+            <th>High Score</th>
+            <th>OPR</th>
+            <th>W-L-T</th>
+            <th>Played</th>
+        `;
+    }
 
     let sortedRankings = [...rankings];
     if (rankingSortMode === "opr") {
@@ -926,24 +962,40 @@ function renderRankings(rankings: Ranking[]) {
             tr.classList.add("current-team-rank");
         }
 
-        const oprData = currentOPRData.find(o => o.teamNumber === rank.teamNumber);
-        const oprValue = oprData?.opr !== null && oprData?.opr !== undefined
-            ? oprData.opr.toFixed(2)
+        const teamOprData = currentOPRData.find(o => o.teamNumber === rank.teamNumber);
+        const teamOprValue = teamOprData?.opr !== null && teamOprData?.opr !== undefined
+            ? teamOprData.opr.toFixed(2)
             : "-";
 
-        tr.innerHTML = `
-            <td>${rank.rank}</td>
-            <td>${rank.teamNumber}</td>
-            <td>${rank.teamName}</td>
-            <td>${oprValue}</td>
-            <td>${rank.sortOrder1}</td>
-            <td>${rank.sortOrder2}</td>
-            <td>${rank.sortOrder3}</td>
-            <td>${rank.sortOrder4}</td>
-            <td>${Math.floor(rank.sortOrder6)}</td>
-            <td>${rank.wins}-${rank.losses}-${rank.ties}</td>
-            <td>${rank.matchesPlayed}</td>
-        `;
+        if (rankingSortMode === "opr") {
+            tr.innerHTML = `
+                <td>${rank.rank}</td>
+                <td>${rank.teamNumber}</td>
+                <td>${rank.teamName}</td>
+                <td>${teamOprValue}</td>
+                <td>${rank.sortOrder1}</td>
+                <td>${rank.sortOrder2}</td>
+                <td>${rank.sortOrder3}</td>
+                <td>${rank.sortOrder4}</td>
+                <td>${Math.floor(rank.sortOrder6)}</td>
+                <td>${rank.wins}-${rank.losses}-${rank.ties}</td>
+                <td>${rank.matchesPlayed}</td>
+            `;
+        } else {
+            tr.innerHTML = `
+                <td>${rank.rank}</td>
+                <td>${rank.teamNumber}</td>
+                <td>${rank.teamName}</td>
+                <td>${rank.sortOrder1}</td>
+                <td>${rank.sortOrder2}</td>
+                <td>${rank.sortOrder3}</td>
+                <td>${rank.sortOrder4}</td>
+                <td>${Math.floor(rank.sortOrder6)}</td>
+                <td>${teamOprValue}</td>
+                <td>${rank.wins}-${rank.losses}-${rank.ties}</td>
+                <td>${rank.matchesPlayed}</td>
+            `;
+        }
         tbody.appendChild(tr);
     });
 }
