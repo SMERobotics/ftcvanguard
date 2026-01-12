@@ -1,0 +1,18 @@
+# FTC Api creds
+[ftc_api]
+username = "username"
+token = "api key"
+
+[notifications]
+ntfy_server_url = "https://ntfy.sh"
+ntfy_topic = "FTC-{}"
+ntfy_teams = [teams go here]
+
+[server]
+vanguard_url = "the deployed url here"
+
+[admin]
+password = "adminpasswordhere"
+max_failed_attempts = 5
+lockout_duration_minutes = 15
+
