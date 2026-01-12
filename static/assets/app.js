@@ -2985,3 +2985,17 @@ document.addEventListener("DOMContentLoaded", async () => {
         showLogin();
     }
 });
+// Easter egg: Click version number to reveal hidden message
+let clickCount = 0;
+const versionNumber = document.getElementById("version-number");
+const easterEgg = document.getElementById("easter-egg");
+if (versionNumber && easterEgg) {
+    versionNumber.addEventListener("click", () => {
+        clickCount++;
+        if (clickCount >= 3) {
+            easterEgg.style.opacity = "1";
+            easterEgg.style.transform = "translateY(0)";
+            clickCount = 0;
+        }
+    });
+}

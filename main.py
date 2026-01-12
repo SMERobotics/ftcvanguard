@@ -24,6 +24,13 @@ NTFY_SERVER_URL = settings["notifications"]["ntfy_server_url"]
 NTFY_TOPIC = settings["notifications"]["ntfy_topic"]
 NTFY_TEAMS = settings["notifications"]["ntfy_teams"]
 VANGUARD_URL = settings["server"]["vanguard_url"]
+ADMIN_PASSWORD = settings["admin"]["password"]
+MAX_FAILED_ATTEMPTS = settings["admin"]["max_failed_attempts"]
+LOCKOUT_DURATION_MINUTES = settings["admin"]["lockout_duration_minutes"]
+
+# Admin session storage (in production, use Redis or database)
+admin_sessions = {}
+failed_attempts = {}  # ip -> (count, lockout_until)
 
 get_db = lambda: sqlite3.connect("default.db", check_same_thread=True)
 
@@ -212,6 +219,13 @@ cursor.execute("""CREATE TABLE IF NOT EXISTS notifications (
     message TEXT NOT NULL,
     sent_at INTEGER NOT NULL,
     UNIQUE(team_id, title, message)
+)""")
+cursor.execute("""CREATE TABLE IF NOT EXISTS admin_login_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    ip_address TEXT NOT NULL,
+    user_agent TEXT,
+    login_time INTEGER NOT NULL,
+    success INTEGER NOT NULL
 )""")
 db.commit()
 db.close()
@@ -667,6 +681,524 @@ def _api_v1_notes_list():
             notes_status[row[0]] = row[1]
         
         return {"status": "success", "notesStatus": notes_status}, 200
+    except Exception as e:
+        print(e)
+        return {"status": "fuck", "error": "idk"}, 500
+
+# Admin Authentication Functions
+def get_client_ip():
+    """Get the real client IP address"""
+    if request.headers.get('X-Forwarded-For'):
+        return request.headers.get('X-Forwarded-For').split(',')[0].strip()
+    return request.remote_addr
+
+def log_admin_login(ip_address, success):
+    """Log admin login attempts to database"""
+    try:
+        db = get_db()
+        cursor = db.cursor()
+        user_agent = request.headers.get('User-Agent', 'Unknown')
+        timestamp = int(time.time())
+        cursor.execute(
+            "INSERT INTO admin_login_logs (ip_address, user_agent, login_time, success) VALUES (?, ?, ?, ?)",
+            (ip_address, user_agent, timestamp, 1 if success else 0)
+        )
+        db.commit()
+        cursor.close()
+        db.close()
+    except Exception as e:
+        print(f"Failed to log admin login: {e}")
+
+def is_ip_locked_out(ip_address):
+    """Check if IP is currently locked out"""
+    if ip_address in failed_attempts:
+        count, lockout_until = failed_attempts[ip_address]
+        if lockout_until and time.time() < lockout_until:
+            return True, lockout_until
+        # Lockout expired, clear it
+        if lockout_until and time.time() >= lockout_until:
+            failed_attempts[ip_address] = (0, None)
+    return False, None
+
+def record_failed_attempt(ip_address):
+    """Record a failed login attempt and potentially lock out the IP"""
+    if ip_address not in failed_attempts:
+        failed_attempts[ip_address] = (1, None)
+    else:
+        count, _ = failed_attempts[ip_address]
+        count += 1
+        if count >= MAX_FAILED_ATTEMPTS:
+            lockout_until = time.time() + (LOCKOUT_DURATION_MINUTES * 60)
+            failed_attempts[ip_address] = (count, lockout_until)
+        else:
+            failed_attempts[ip_address] = (count, None)
+
+def clear_failed_attempts(ip_address):
+    """Clear failed attempts for an IP on successful login"""
+    if ip_address in failed_attempts:
+        failed_attempts[ip_address] = (0, None)
+
+def verify_admin_session():
+    """Verify admin session token"""
+    token = request.headers.get('X-Admin-Token') or request.cookies.get('admin_token')
+    if not token or token not in admin_sessions:
+        return False
+    # Check if session is still valid (24 hour expiry)
+    session_data = admin_sessions[token]
+    if time.time() > session_data['expires']:
+        del admin_sessions[token]
+        return False
+    return True
+
+def require_admin_auth(f):
+    """Decorator to require admin authentication"""
+    from functools import wraps
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not verify_admin_session():
+            return {"status": "fuck", "error": "unauthorized"}, 401
+        return f(*args, **kwargs)
+    return decorated_function
+
+@app.route("/admin", methods=["GET"])
+def _admin():
+    return send_from_directory("static", "admin.html")
+
+# Admin Authentication Endpoints
+@app.route("/api/v1/admin/auth/login", methods=["POST"])
+def _api_v1_admin_login():
+    ip_address = get_client_ip()
+
+    # Check if IP is locked out
+    locked, lockout_until = is_ip_locked_out(ip_address)
+    if locked:
+        remaining = int((lockout_until - time.time()) / 60)
+        log_admin_login(ip_address, False)
+        return {
+            "status": "fuck",
+            "error": f"Too many failed attempts. Locked out for {remaining} more minutes."
+        }, 429
+
+    data = request.json
+    password = data.get("password")
+
+    if not password:
+        return {"status": "fuck", "error": "password required"}, 400
+
+    if password == ADMIN_PASSWORD:
+        # Generate session token
+        import secrets
+        token = secrets.token_urlsafe(32)
+        admin_sessions[token] = {
+            'ip': ip_address,
+            'created': time.time(),
+            'expires': time.time() + (24 * 60 * 60)  # 24 hours
+        }
+
+        # Clear failed attempts and log success
+        clear_failed_attempts(ip_address)
+        log_admin_login(ip_address, True)
+
+        return {
+            "status": "success",
+            "token": token
+        }, 200
+    else:
+        # Record failed attempt and log
+        record_failed_attempt(ip_address)
+        log_admin_login(ip_address, False)
+
+        # Check if this failed attempt triggered a lockout
+        locked, lockout_until = is_ip_locked_out(ip_address)
+        if locked:
+            remaining = int((lockout_until - time.time()) / 60)
+            return {
+                "status": "fuck",
+                "error": f"Too many failed attempts. Locked out for {remaining} minutes."
+            }, 429
+
+        # Show how many attempts remain
+        count, _ = failed_attempts.get(ip_address, (0, None))
+        remaining_attempts = MAX_FAILED_ATTEMPTS - count
+        return {
+            "status": "fuck",
+            "error": f"Invalid password. {remaining_attempts} attempts remaining."
+        }, 401
+
+@app.route("/api/v1/admin/auth/logout", methods=["POST"])
+def _api_v1_admin_logout():
+    token = request.headers.get('X-Admin-Token') or request.cookies.get('admin_token')
+    if token and token in admin_sessions:
+        del admin_sessions[token]
+    return {"status": "success"}, 200
+
+@app.route("/api/v1/admin/auth/verify", methods=["GET"])
+def _api_v1_admin_verify():
+    if verify_admin_session():
+        return {"status": "success", "authenticated": True}, 200
+    return {"status": "success", "authenticated": False}, 200
+
+@app.route("/api/v1/admin/auth/logs", methods=["GET"])
+@require_admin_auth
+def _api_v1_admin_auth_logs():
+    try:
+        db = get_db()
+        cursor = db.cursor()
+        cursor.execute(
+            """SELECT ip_address, user_agent, login_time, success
+               FROM admin_login_logs
+               ORDER BY login_time DESC
+               LIMIT 100"""
+        )
+        rows = cursor.fetchall()
+        cursor.close()
+        db.close()
+
+        logs = [{
+            "ip_address": row[0],
+            "user_agent": row[1],
+            "login_time": row[2],
+            "success": bool(row[3])
+        } for row in rows]
+
+        return {"status": "success", "logs": logs}, 200
+    except Exception as e:
+        print(e)
+        return {"status": "fuck", "error": "idk"}, 500
+
+# Admin API endpoints (all require authentication)
+@app.route("/api/v1/admin/stats", methods=["GET"])
+@require_admin_auth
+def _api_v1_admin_stats():
+    try:
+        db = get_db()
+        cursor = db.cursor()
+
+        # Count users
+        cursor.execute("SELECT COUNT(*) FROM users")
+        total_users = cursor.fetchone()[0]
+
+        # Count notes
+        cursor.execute("SELECT COUNT(*) FROM notes")
+        total_notes = cursor.fetchone()[0]
+
+        # Count notifications
+        cursor.execute("SELECT COUNT(*) FROM notifications")
+        total_notifications = cursor.fetchone()[0]
+
+        # Get database size
+        cursor.execute("SELECT page_count * page_size as size FROM pragma_page_count(), pragma_page_size()")
+        db_size_bytes = cursor.fetchone()[0]
+        db_size = f"{db_size_bytes / 1024 / 1024:.2f} MB"
+
+        cursor.close()
+        db.close()
+
+        return {
+            "status": "success",
+            "stats": {
+                "totalUsers": total_users,
+                "totalNotes": total_notes,
+                "totalNotifications": total_notifications,
+                "dbSize": db_size
+            }
+        }, 200
+    except Exception as e:
+        print(e)
+        return {"status": "fuck", "error": "idk"}, 500
+
+@app.route("/api/v1/admin/users", methods=["GET"])
+@require_admin_auth
+def _api_v1_admin_users_list():
+    try:
+        db = get_db()
+        cursor = db.cursor()
+        cursor.execute("SELECT id FROM users ORDER BY id")
+        rows = cursor.fetchall()
+        cursor.close()
+        db.close()
+
+        users = [{"id": row[0]} for row in rows]
+        return {"status": "success", "users": users}, 200
+    except Exception as e:
+        print(e)
+        return {"status": "fuck", "error": "idk"}, 500
+
+@app.route("/api/v1/admin/teams", methods=["GET"])
+@require_admin_auth
+def _api_v1_admin_teams():
+    try:
+        db = get_db()
+        cursor = db.cursor()
+        cursor.execute("SELECT id FROM users ORDER BY id")
+        rows = cursor.fetchall()
+        cursor.close()
+        db.close()
+
+        if not rows:
+            return {"status": "success", "teams": []}, 200
+
+        # Fetch team details from FTC API
+        now = datetime.now() - timedelta(weeks=26)
+        year = now.year
+        teams = []
+
+        for row in rows:
+            team_id = row[0]
+            try:
+                r = s.get(f"{FTC_API_URL}/{year}/teams?teamNumber={team_id}")
+                if r.status_code == 200:
+                    data = r.json()
+                    if data.get("teams") and len(data["teams"]) > 0:
+                        team_info = data["teams"][0]
+                        teams.append({
+                            "teamNumber": team_info.get("teamNumber"),
+                            "nameShort": team_info.get("nameShort"),
+                            "nameFull": team_info.get("nameFull"),
+                            "schoolName": team_info.get("schoolName"),
+                            "city": team_info.get("city"),
+                            "stateProv": team_info.get("stateProv"),
+                            "country": team_info.get("country")
+                        })
+                    else:
+                        teams.append({
+                            "teamNumber": team_id,
+                            "nameShort": "Unknown",
+                            "nameFull": "Unknown",
+                            "schoolName": "Unknown",
+                            "city": "Unknown",
+                            "stateProv": "Unknown",
+                            "country": "Unknown"
+                        })
+            except Exception as e:
+                print(f"Error fetching team {team_id}: {e}")
+                teams.append({
+                    "teamNumber": team_id,
+                    "nameShort": "Error",
+                    "nameFull": "Error",
+                    "schoolName": "Error",
+                    "city": "Error",
+                    "stateProv": "Error",
+                    "country": "Error"
+                })
+
+        return {"status": "success", "teams": teams}, 200
+    except Exception as e:
+        print(e)
+        return {"status": "fuck", "error": "idk"}, 500
+
+@app.route("/api/v1/admin/users", methods=["POST"])
+@require_admin_auth
+def _api_v1_admin_users_create():
+    data = request.json
+    id = data.get("id")
+
+    try:
+        team_id = int(id)
+    except ValueError:
+        return {"status": "fuck", "error": "id must be int"}, 400
+
+    password = data.get("password")
+    hash = ph.hash(password)
+
+    try:
+        db = get_db()
+        cursor = db.cursor()
+        cursor.execute("SELECT id FROM users WHERE id = ?", (team_id,))
+        if cursor.fetchone() is not None:
+            cursor.close()
+            db.close()
+            return {"status": "fuck", "error": "user already exists"}, 409
+
+        cursor.execute("INSERT INTO users (id, password) VALUES (?, ?)", (team_id, hash))
+        db.commit()
+        cursor.close()
+        db.close()
+        return {"status": "success"}, 201
+    except Exception as e:
+        print(e)
+        return {"status": "fuck", "error": "idk"}, 500
+
+@app.route("/api/v1/admin/users/<int:user_id>", methods=["DELETE"])
+@require_admin_auth
+def _api_v1_admin_users_delete(user_id):
+    try:
+        db = get_db()
+        cursor = db.cursor()
+        cursor.execute("DELETE FROM users WHERE id = ?", (user_id,))
+        db.commit()
+
+        # Also delete all notes created by this user
+        cursor.execute("DELETE FROM notes WHERE team_id = ?", (user_id,))
+        db.commit()
+
+        cursor.close()
+        db.close()
+        return {"status": "success"}, 200
+    except Exception as e:
+        print(e)
+        return {"status": "fuck", "error": "idk"}, 500
+
+@app.route("/api/v1/admin/users/<int:user_id>/password", methods=["PUT"])
+@require_admin_auth
+def _api_v1_admin_users_password(user_id):
+    data = request.json
+    password = data.get("password")
+
+    if not password:
+        return {"status": "fuck", "error": "password required"}, 400
+
+    hash = ph.hash(password)
+
+    try:
+        db = get_db()
+        cursor = db.cursor()
+        cursor.execute("UPDATE users SET password = ? WHERE id = ?", (hash, user_id))
+        db.commit()
+        cursor.close()
+        db.close()
+        return {"status": "success"}, 200
+    except Exception as e:
+        print(e)
+        return {"status": "fuck", "error": "idk"}, 500
+
+@app.route("/api/v1/admin/notes/<int:team_id>", methods=["GET"])
+@require_admin_auth
+def _api_v1_admin_notes_get(team_id):
+    try:
+        db = get_db()
+        cursor = db.cursor()
+        cursor.execute(
+            """SELECT subject_team_id, auto_performance, teleop_performance, general_notes, updated_at
+               FROM notes WHERE team_id = ? ORDER BY subject_team_id""",
+            (team_id,)
+        )
+        rows = cursor.fetchall()
+        cursor.close()
+        db.close()
+
+        notes = [{
+            "subject_team_id": row[0],
+            "auto_performance": row[1],
+            "teleop_performance": row[2],
+            "general_notes": row[3],
+            "updated_at": row[4]
+        } for row in rows]
+
+        return {"status": "success", "notes": notes}, 200
+    except Exception as e:
+        print(e)
+        return {"status": "fuck", "error": "idk"}, 500
+
+@app.route("/api/v1/admin/notes/<int:team_id>", methods=["DELETE"])
+@require_admin_auth
+def _api_v1_admin_notes_delete(team_id):
+    try:
+        db = get_db()
+        cursor = db.cursor()
+        cursor.execute("DELETE FROM notes WHERE team_id = ?", (team_id,))
+        db.commit()
+        cursor.close()
+        db.close()
+        return {"status": "success"}, 200
+    except Exception as e:
+        print(e)
+        return {"status": "fuck", "error": "idk"}, 500
+
+@app.route("/api/v1/admin/notifications", methods=["GET"])
+@require_admin_auth
+def _api_v1_admin_notifications_get():
+    try:
+        db = get_db()
+        cursor = db.cursor()
+        cursor.execute(
+            "SELECT team_id, title, message, sent_at FROM notifications ORDER BY sent_at DESC LIMIT 100"
+        )
+        rows = cursor.fetchall()
+        cursor.close()
+        db.close()
+
+        notifications = [{
+            "team_id": row[0],
+            "title": row[1],
+            "message": row[2],
+            "sent_at": row[3]
+        } for row in rows]
+
+        return {"status": "success", "notifications": notifications}, 200
+    except Exception as e:
+        print(e)
+        return {"status": "fuck", "error": "idk"}, 500
+
+@app.route("/api/v1/admin/notifications", methods=["POST"])
+@require_admin_auth
+def _api_v1_admin_notifications_send():
+    data = request.json
+    team_id = data.get("teamId")
+    title = data.get("title")
+    message = data.get("message")
+
+    if not title or not message:
+        return {"status": "fuck", "error": "title and message required"}, 400
+
+    try:
+        if team_id:
+            # Send to specific team
+            success = send_notification(team_id, title, message, priority=4, click=VANGUARD_URL)
+            if success:
+                return {"status": "success"}, 200
+            else:
+                return {"status": "fuck", "error": "failed to send"}, 500
+        else:
+            # Send to all monitored teams
+            sent_count = 0
+            for tid in NTFY_TEAMS:
+                if send_notification(tid, title, message, priority=4, click=VANGUARD_URL):
+                    sent_count += 1
+            return {"status": "success", "sent": sent_count}, 200
+    except Exception as e:
+        print(e)
+        return {"status": "fuck", "error": "idk"}, 500
+
+@app.route("/api/v1/admin/notifications", methods=["DELETE"])
+@require_admin_auth
+def _api_v1_admin_notifications_clear():
+    try:
+        db = get_db()
+        cursor = db.cursor()
+        cursor.execute("DELETE FROM notifications")
+        db.commit()
+        cursor.close()
+        db.close()
+        return {"status": "success"}, 200
+    except Exception as e:
+        print(e)
+        return {"status": "fuck", "error": "idk"}, 500
+
+@app.route("/api/v1/admin/database/backup", methods=["POST"])
+@require_admin_auth
+def _api_v1_admin_database_backup():
+    try:
+        import shutil
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"default_backup_{timestamp}.db"
+        shutil.copy2("default.db", filename)
+        return {"status": "success", "filename": filename}, 200
+    except Exception as e:
+        print(e)
+        return {"status": "fuck", "error": str(e)}, 500
+
+@app.route("/api/v1/admin/database/vacuum", methods=["POST"])
+@require_admin_auth
+def _api_v1_admin_database_vacuum():
+    try:
+        db = get_db()
+        cursor = db.cursor()
+        cursor.execute("VACUUM")
+        db.commit()
+        cursor.close()
+        db.close()
+        return {"status": "success"}, 200
     except Exception as e:
         print(e)
         return {"status": "fuck", "error": "idk"}, 500
