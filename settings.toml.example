@@ -1,18 +1,19 @@
 # FTC Api creds
 [ftc_api]
 username = "username"
-token = "api key"
+token = "apikey"
 
 [notifications]
 ntfy_server_url = "https://ntfy.sh"
 ntfy_topic = "FTC-{}"
-ntfy_teams = [teams go here]
+# Put teams you want to recieve notifications here
+ntfy_teams = [6547, 26855]
 
 [server]
-vanguard_url = "the deployed url here"
+vanguard_url = "https://example.com"
 
 [admin]
-password = "adminpasswordhere"
+password = "password"
 max_failed_attempts = 5
 lockout_duration_minutes = 15
 
