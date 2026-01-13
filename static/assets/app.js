@@ -28,6 +28,7 @@ let currentInsightsTeam = null;
 let currentScoreMatches = [];
 let showAllMatches = false;
 let rankingSortMode = "rank";
+let rankingScopeMode = "league";
 const activeCharts = {};
 function getViewNameFromId(viewId) {
     return viewId.replace("view-", "");
@@ -688,7 +689,13 @@ function renderRankings(rankings) {
     if (!tbody || !thead)
         return;
     tbody.innerHTML = "";
-    const oprData = currentOPRData.find(o => o.teamNumber === rankings[0]?.teamNumber);
+    // Filter rankings based on scope mode
+    let filteredRankings = rankings;
+    if (rankingScopeMode === "event" && currentTeams.length > 0) {
+        const eventTeamNumbers = new Set(currentTeams.map(t => t.teamNumber));
+        filteredRankings = rankings.filter(r => eventTeamNumbers.has(r.teamNumber));
+    }
+    const oprData = currentOPRData.find(o => o.teamNumber === filteredRankings[0]?.teamNumber);
     const oprValue = (oprData?.opr !== null && oprData?.opr !== undefined)
         ? oprData.opr.toFixed(2)
         : "-";
@@ -722,7 +729,7 @@ function renderRankings(rankings) {
             <th>Played</th>
         `;
     }
-    let sortedRankings = [...rankings];
+    let sortedRankings = [...filteredRankings];
     if (rankingSortMode === "opr") {
         sortedRankings.sort((a, b) => {
             const aOPR = currentOPRData.find(o => o.teamNumber === a.teamNumber)?.opr ?? -1;
@@ -2934,6 +2941,16 @@ document.addEventListener("DOMContentLoaded", async () => {
         radio.addEventListener("change", () => {
             if (radio.checked) {
                 rankingSortMode = radio.value;
+                renderRankings(currentRankings);
+            }
+        });
+    });
+    // Ranking scope radio buttons initialization
+    const rankingScopeRadios = document.querySelectorAll("input[name='ranking-scope']");
+    rankingScopeRadios.forEach(radio => {
+        radio.addEventListener("change", () => {
+            if (radio.checked) {
+                rankingScopeMode = radio.value;
                 renderRankings(currentRankings);
             }
         });

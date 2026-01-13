@@ -678,12 +678,24 @@ body {
 
 #rankings-controls {
     display: flex;
-    gap: 16px;
+    flex-direction: column;
+    gap: 12px;
     margin-bottom: 16px;
     padding-bottom: 16px;
     border-bottom: 1px solid #333333;
 }
 
+.rankings-scope-control {
+    display: flex;
+    gap: 16px;
+}
+
+.rankings-sort-control {
+    display: flex;
+    gap: 16px;
+}
+
+.ranking-scope-label,
 .ranking-sort-label {
     display: flex;
     align-items: center;
@@ -694,12 +706,14 @@ body {
     user-select: none;
 }
 
+.ranking-scope-label input[type="radio"],
 .ranking-sort-label input[type="radio"] {
     width: 16px;
     height: 16px;
     cursor: pointer;
 }
 
+.ranking-scope-label span,
 .ranking-sort-label span {
     cursor: pointer;
 }

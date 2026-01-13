@@ -66,15 +66,27 @@
             <div class="view" id="view-rankings" style="display: none;">
                 <div id="rankings-container">
                     <div id="rankings-controls">
-                        <label class="ranking-sort-label">
-                            <input type="radio" name="ranking-sort" value="rank" checked>
-                            <span>Sort by Rank</span>
-                        </label>
-                        <label class="ranking-sort-label">
-                            <input type="radio" name="ranking-sort" value="opr">
-                            <span>Sort by OPR</span>
-                            <span class="header-info-icon" title="A team's OPR will not update until conclusion of that respective team's current Event.">(i)</span>
-                        </label>
+                        <div class="rankings-scope-control">
+                            <label class="ranking-scope-label">
+                                <input type="radio" name="ranking-scope" value="league" checked>
+                                <span>League Rankings</span>
+                            </label>
+                            <label class="ranking-scope-label">
+                                <input type="radio" name="ranking-scope" value="event">
+                                <span>Event Rankings</span>
+                            </label>
+                        </div>
+                        <div class="rankings-sort-control">
+                            <label class="ranking-sort-label">
+                                <input type="radio" name="ranking-sort" value="rank" checked>
+                                <span>Sort by Rank</span>
+                            </label>
+                            <label class="ranking-sort-label">
+                                <input type="radio" name="ranking-sort" value="opr">
+                                <span>Sort by OPR</span>
+                                <span class="header-info-icon" title="A team's OPR will not update until conclusion of that respective team's current Event.">(i)</span>
+                            </label>
+                        </div>
                     </div>
                     <table class="stats-table" id="rankings-table">
                         <thead>
