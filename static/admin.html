@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vanguard Admin</title>
+    <link rel="stylesheet" href="/assets/style.css">
+    <style>
+        body {
+            display: block;
+            padding: 20px;
+            overflow-y: auto;
+            background-color: #181818;
+        }
+
+        .admin-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            color: #cccccc;
+        }
+
+        .admin-container h1 {
+            color: #ffffff;
+            margin-bottom: 30px;
+        }
+
+        .admin-section {
+            background-color: #252526;
+            border: 1px solid #3e3e42;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .admin-section h2 {
+            color: #ffffff;
+            margin-top: 0;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: #cccccc;
+            font-size: 14px;
+        }
+
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            background-color: #1e1e1e;
+            color: #cccccc;
+            border: 1px solid #3e3e42;
+            border-radius: 4px;
+            padding: 8px;
+            font-family: "JetBrains Mono", monospace;
+            font-size: 14px;
+            outline: none;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus {
+            border-color: #0078d4;
+        }
+
+        .btn {
+            background-color: #0078d4;
+            color: #ffffff;
+            border: none;
+            border-radius: 4px;
+            padding: 10px 20px;
+            font-family: "JetBrains Mono", monospace;
+            font-size: 14px;
+            cursor: pointer;
+            margin-right: 10px;
+            margin-top: 10px;
+        }
+
+        .btn:hover {
+            background-color: #005a9e;
+        }
+
+        .btn-danger {
+            background-color: #e81123;
+        }
+
+        .btn-danger:hover {
+            background-color: #c50f1f;
+        }
+
+        .btn-success {
+            background-color: #10893e;
+        }
+
+        .btn-success:hover {
+            background-color: #0e7c36;
+        }
+
+        .users-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+
+        .users-table th,
+        .users-table td {
+            padding: 10px;
+            text-align: left;
+            border-bottom: 1px solid #3e3e42;
+        }
+
+        .users-table th {
+            color: #ffffff;
+            font-weight: 600;
+        }
+
+        .users-table tr:hover {
+            background-color: #2a2a2a;
+        }
+
+        .status-message {
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            display: none;
+        }
+
+        .status-message.success {
+            background-color: #10893e33;
+            border: 1px solid #10893e;
+            color: #10893e;
+        }
+
+        .status-message.error {
+            background-color: #e8112333;
+            border: 1px solid #e81123;
+            color: #e81123;
+        }
+
+        .status-message.info {
+            background-color: #0078d433;
+            border: 1px solid #0078d4;
+            color: #0078d4;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background-color: #1e1e1e;
+            border: 1px solid #3e3e42;
+            border-radius: 6px;
+            padding: 15px;
+        }
+
+        .stat-card h3 {
+            margin: 0 0 10px 0;
+            font-size: 14px;
+            color: #cccccc;
+        }
+
+        .stat-card .stat-value {
+            font-size: 28px;
+            font-weight: bold;
+            color: #ffffff;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+        }
+
+        .inline-form {
+            display: flex;
+            gap: 10px;
+            align-items: flex-end;
+            flex-wrap: wrap;
+        }
+
+        .inline-form .form-group {
+            flex: 1;
+            min-width: 200px;
+            margin-bottom: 0;
+        }
+
+        .log-viewer {
+            background-color: #1e1e1e;
+            border: 1px solid #3e3e42;
+            border-radius: 4px;
+            padding: 10px;
+            max-height: 300px;
+            overflow-y: auto;
+            font-size: 12px;
+            color: #cccccc;
+            font-family: "JetBrains Mono", monospace;
+        }
+
+        .log-entry {
+            margin-bottom: 5px;
+            padding: 5px;
+            border-bottom: 1px solid #2a2a2a;
+        }
+
+        .log-entry.error {
+            color: #f48771;
+        }
+
+        .log-entry.info {
+            color: #9cdcfe;
+        }
+
+        .log-entry.success {
+            color: #4ec9b0;
+        }
+    </style>
+</head>
+<body>
+<!-- Login Screen -->
+<div id="login-screen" class="admin-container" style="display: flex; justify-content: center; align-items: center; min-height: 100vh;">
+    <div class="admin-section" style="max-width: 400px; width: 100%;">
+        <h2 style="text-align: center; margin-bottom: 20px;">Admin Login</h2>
+        <div id="login-status" class="status-message"></div>
+        <div class="form-group">
+            <label for="admin-password">Password</label>
+            <input type="password" id="admin-password" placeholder="Enter admin password" autocomplete="current-password">
+        </div>
+        <button class="btn" onclick="adminLogin()" style="width: 100%;">Login</button>
+        <div id="lockout-info" style="margin-top: 15px; text-align: center; color: #f48771; display: none;"></div>
+    </div>
+</div>
+
+<!-- Main Admin Panel (hidden until logged in) -->
+<div class="admin-container" id="admin-panel" style="display: none;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
+        <h1>Vanguard Admin Panel</h1>
+        <button class="btn btn-danger" onclick="adminLogout()">Logout</button>
+    </div>
+
+    <!-- Server Stats -->
+    <div class="admin-section">
+        <h2>Server Statistics</h2>
+        <div class="stats-grid">
+            <div class="stat-card">
+                <h3>Total Users</h3>
+                <div class="stat-value" id="stat-users">0</div>
+            </div>
+            <div class="stat-card">
+                <h3>Total Notes</h3>
+                <div class="stat-value" id="stat-notes">0</div>
+            </div>
+            <div class="stat-card">
+                <h3>Notifications Sent</h3>
+                <div class="stat-value" id="stat-notifications">0</div>
+            </div>
+            <div class="stat-card">
+                <h3>Database Size</h3>
+                <div class="stat-value" id="stat-db-size">0.00 MB</div>
+            </div>
+        </div>
+        <button class="btn" onclick="loadStats()">Refresh Stats</button>
+    </div>
+
+    <!-- Registered Teams -->
+    <div class="admin-section">
+        <h2>Registered Teams</h2>
+        <div id="teams-status" class="status-message"></div>
+
+        <button class="btn" onclick="loadRegisteredTeams()">Refresh Teams</button>
+
+        <table class="users-table">
+            <thead>
+                <tr>
+                    <th>Team Number</th>
+                    <th>Team Name</th>
+                    <th>Organization</th>
+                    <th>City/State</th>
+                </tr>
+            </thead>
+            <tbody id="teams-tbody">
+                <tr>
+                    <td colspan="4" style="text-align: center;">Loading...</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- User Management -->
+    <div class="admin-section">
+        <h2>User Management</h2>
+        <div id="user-status" class="status-message"></div>
+
+        <div class="inline-form">
+            <div class="form-group">
+                <label for="new-team-id">Team Number</label>
+                <input type="number" id="new-team-id" placeholder="Enter team number">
+            </div>
+            <div class="form-group">
+                <label for="new-team-password">Password</label>
+                <input type="password" id="new-team-password" placeholder="Enter password">
+            </div>
+            <button class="btn btn-success" onclick="createUser()">Create User</button>
+        </div>
+
+        <table class="users-table">
+            <thead>
+                <tr>
+                    <th>Team ID</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="users-tbody">
+                <tr>
+                    <td colspan="2" style="text-align: center;">Loading...</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Notes Management -->
+    <div class="admin-section">
+        <h2>Notes Management</h2>
+        <div id="notes-status" class="status-message"></div>
+
+        <div class="inline-form">
+            <div class="form-group">
+                <label for="notes-team-id">Team ID</label>
+                <input type="number" id="notes-team-id" placeholder="Team number">
+            </div>
+            <button class="btn" onclick="viewTeamNotes()">View Notes</button>
+            <button class="btn btn-danger" onclick="deleteTeamNotes()">Delete All Notes</button>
+        </div>
+
+        <div id="notes-display" style="margin-top: 15px;"></div>
+    </div>
+
+    <!-- Notification Management -->
+    <div class="admin-section">
+        <h2>Notification Management</h2>
+        <div id="notif-status" class="status-message"></div>
+
+        <div class="form-group">
+            <label for="notif-team-id">Team ID (leave empty for all monitored teams)</label>
+            <input type="number" id="notif-team-id" placeholder="Optional: specific team number">
+        </div>
+        <div class="form-group">
+            <label for="notif-title">Notification Title</label>
+            <input type="text" id="notif-title" placeholder="Enter notification title">
+        </div>
+        <div class="form-group">
+            <label for="notif-message">Notification Message</label>
+            <input type="text" id="notif-message" placeholder="Enter notification message">
+        </div>
+        <button class="btn btn-success" onclick="sendNotification()">Send Notification</button>
+        <button class="btn" onclick="viewNotificationHistory()">View History</button>
+        <button class="btn btn-danger" onclick="clearNotificationHistory()">Clear History</button>
+    </div>
+
+    <!-- Database Management -->
+    <div class="admin-section">
+        <h2>Database Management</h2>
+        <div id="db-status" class="status-message"></div>
+
+        <div class="action-buttons">
+            <button class="btn" onclick="backupDatabase()">Backup Database</button>
+            <button class="btn btn-danger" onclick="vacuumDatabase()">Vacuum Database</button>
+        </div>
+    </div>
+
+    <!-- System Logs -->
+    <div class="admin-section">
+        <h2>System Activity Log</h2>
+        <div class="log-viewer" id="activity-log">
+            <div class="log-entry info">Admin panel loaded</div>
+        </div>
+        <button class="btn" onclick="clearLog()">Clear Log</button>
+    </div>
+
+    <!-- Admin Login Logs -->
+    <div class="admin-section">
+        <h2>Admin Login History</h2>
+        <button class="btn" onclick="loadLoginLogs()">Refresh Logs</button>
+        <table class="users-table">
+            <thead>
+                <tr>
+                    <th>IP Address</th>
+                    <th>User Agent</th>
+                    <th>Time</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody id="login-logs-tbody">
+                <tr>
+                    <td colspan="4" style="text-align: center;">Loading...</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script src="/assets/admin.js"></script>
+</body>
+</html>
