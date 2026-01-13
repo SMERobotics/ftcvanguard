@@ -486,6 +486,26 @@ def _api_v1_team_events(team_number):
     r = s.get(f"{FTC_API_URL}/{year}/events?teamNumber={team_number}")
     return r.json(), r.status_code
 
+@app.route("/api/v1/team/<int:team_number>/info", methods=["GET"])
+def _api_v1_team_info(team_number):
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return {"status": "fuck", "error": "no auth"}, 401
+
+    token = auth_header.split(" ")[1]
+    try:
+        jwt.decode(token, RSA_PUBLIC_KEY, algorithms=["RS256"])
+    except jwt.ExpiredSignatureError:
+        return {"status": "fuck", "error": "token expired"}, 401
+    except jwt.InvalidTokenError:
+        return {"status": "fuck", "error": "invalid token"}, 401
+
+    now = datetime.now() - timedelta(weeks=26)
+    year = now.year
+
+    r = s.get(f"{FTC_API_URL}/{year}/teams?teamNumber={team_number}")
+    return r.json(), r.status_code
+
 @app.route("/api/v1/rankings", methods=["GET"])
 def _api_v1_rankings():
     auth_header = request.headers.get("Authorization")

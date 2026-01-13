@@ -1837,9 +1837,15 @@ async function analyzeTeam(teamNumber, updateHistory = true) {
     content.innerHTML = '<div class="insights-loading">Loading team data...</div>';
     showLoading();
     try {
-        const eventsRes = await authFetch(`/api/v1/team/${teamNumber}/events`, {
-            headers: { "Authorization": `Bearer ${token}` }
-        });
+        // Fetch team info and events in parallel
+        const [teamInfoRes, eventsRes] = await Promise.all([
+            authFetch(`/api/v1/team/${teamNumber}/info`, {
+                headers: { "Authorization": `Bearer ${token}` }
+            }),
+            authFetch(`/api/v1/team/${teamNumber}/events`, {
+                headers: { "Authorization": `Bearer ${token}` }
+            })
+        ]);
         if (!eventsRes.ok) {
             content.innerHTML = '<div class="insights-error">Failed to load team events. Please check the team number.</div>';
             hideLoading();
@@ -1847,6 +1853,14 @@ async function analyzeTeam(teamNumber, updateHistory = true) {
         }
         const eventsData = await eventsRes.json();
         const events = eventsData.events || [];
+        // Get team info
+        let teamInfo = null;
+        if (teamInfoRes.ok) {
+            const teamInfoData = await teamInfoRes.json();
+            if (teamInfoData.teams && teamInfoData.teams.length > 0) {
+                teamInfo = teamInfoData.teams[0];
+            }
+        }
         if (events.length === 0) {
             content.innerHTML = '<div class="insights-error">No events found for this team.</div>';
             hideLoading();
@@ -1891,7 +1905,7 @@ async function analyzeTeam(teamNumber, updateHistory = true) {
                 console.warn(`Failed to fetch scores for ${event.code}`, e);
             }
         }
-        renderInsights(teamNumber, sortedEvents, allScoreData);
+        renderInsights(teamNumber, teamInfo, sortedEvents, allScoreData);
     }
     catch (error) {
         console.error("Failed to analyze team:", error);
@@ -1954,7 +1968,7 @@ function generateStatsHTML(stats) {
         </div>
     `;
 }
-function renderInsights(teamNumber, events, scoreData) {
+function renderInsights(teamNumber, teamInfo, events, scoreData) {
     const content = document.getElementById("insights-content");
     if (!content)
         return;
@@ -1962,10 +1976,34 @@ function renderInsights(teamNumber, events, scoreData) {
     const playedEvents = events.filter(e => eventCodes.has(e.code));
     const stats = calculateTeamStatistics(teamNumber, scoreData);
     const charts = generateChartsHTML(stats);
+    // Build team info HTML
+    let teamInfoHTML = '';
+    if (teamInfo) {
+        const location = [teamInfo.city, teamInfo.stateProv, teamInfo.country]
+            .filter(Boolean)
+            .join(', ');
+        teamInfoHTML = `
+            <div class="team-info-card">
+                <div class="team-info-header">
+                    <h2>${teamNumber}${teamInfo.nameShort ? ` - ${teamInfo.nameShort}` : ''}</h2>
+                </div>
+                <div class="team-info-details">
+                    ${teamInfo.nameFull ? `<div class="team-info-row"><span class="team-info-label">Full Name:</span><span>${teamInfo.nameFull}</span></div>` : ''}
+                    ${teamInfo.schoolName ? `<div class="team-info-row"><span class="team-info-label">School:</span><span>${teamInfo.schoolName}</span></div>` : ''}
+                    ${location ? `<div class="team-info-row"><span class="team-info-label">Location:</span><span>${location}</span></div>` : ''}
+                    ${teamInfo.rookieYear ? `<div class="team-info-row"><span class="team-info-label">Rookie Year:</span><span>${teamInfo.rookieYear}</span></div>` : ''}
+                    ${teamInfo.website ? `<div class="team-info-row"><span class="team-info-label">Website:</span><a href="${teamInfo.website}" target="_blank" rel="noopener noreferrer">${teamInfo.website}</a></div>` : ''}
+                    ${teamInfo.robotName ? `<div class="team-info-row"><span class="team-info-label">Robot Name:</span><span>${teamInfo.robotName}</span></div>` : ''}
+                </div>
+            </div>
+        `;
+    }
     content.innerHTML = `
         <div class="insights-results">
+            ${teamInfoHTML}
+            
             <div class="insights-team-header">
-                <h2>Team ${teamNumber} - Performance Analysis <span class="header-info-icon" title="All statistics exclude penalty points">(i)</span></h2>
+                <h2>Performance Analysis <span class="header-info-icon" title="All statistics exclude penalty points">(i)</span></h2>
                 <p>${playedEvents.length} events completed</p>
             </div>
 
