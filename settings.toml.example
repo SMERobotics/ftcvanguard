@@ -11,6 +11,7 @@ ntfy_teams = [26855, 6547]
 vanguard_url = "https://ftc.technodot.org"
 
 [admin]
+admin_teams = [26855, 6547]
 password = "sixseven"
 max_failed_attempts = 5
 lockout_duration_minutes = 15
