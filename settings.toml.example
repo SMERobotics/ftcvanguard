@@ -1,0 +1,16 @@
+[ftc_api]
+username = "GraciousProfessionalism"
+token = "67676767-6767-6767-6767-676767676767"
+
+[notifications]
+ntfy_server_url = "https://ntfy.sh"
+ntfy_topic = "FTC-{}"
+ntfy_teams = [26855, 6547]
+
+[server]
+vanguard_url = "https://ftc.technodot.org"
+
+[admin]
+password = "sixseven"
+max_failed_attempts = 5
+lockout_duration_minutes = 15

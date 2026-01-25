@@ -504,27 +504,26 @@ async function loadScheduleWithStateRestore(eventCode: string, urlState: AppStat
 
         currentEventStartTimestamp = event.dateStart ? new Date(event.dateStart).getTime() : null;
 
-        const regionCode = event.regionCode;
-        const leagueCode = event.leagueCode;
-
-        const [scheduleRes, rankingsRes, teamsRes, scoresRes] = await Promise.all([
+        const [scheduleRes, rankingsRes, teamsRes, qualScoresRes, playoffScoresRes] = await Promise.all([
             authFetch(`/api/v1/schedule?event=${eventCode}`, { headers: { "Authorization": `Bearer ${token}` } }),
-            authFetch(`/api/v1/rankings?event=${eventCode}&region=${regionCode}&league=${leagueCode}`, { headers: { "Authorization": `Bearer ${token}` } }),
+            authFetch(`/api/v1/rankings?event=${eventCode}`, { headers: { "Authorization": `Bearer ${token}` } }),
             authFetch(`/api/v1/teams?event=${eventCode}`, { headers: { "Authorization": `Bearer ${token}` } }),
-            authFetch(`/api/v1/scores/${eventCode}/qual`, { headers: { "Authorization": `Bearer ${token}` } })
+            authFetch(`/api/v1/scores/${eventCode}/qual`, { headers: { "Authorization": `Bearer ${token}` } }),
+            authFetch(`/api/v1/scores/${eventCode}/playoff`, { headers: { "Authorization": `Bearer ${token}` } })
         ]);
 
-        if (scheduleRes.ok && rankingsRes.ok && teamsRes.ok) {
+        if (scheduleRes.ok && teamsRes.ok) {
             const scheduleData = await scheduleRes.json();
-            const rankingsData = await rankingsRes.json();
+            const rankingsData = rankingsRes.ok ? await rankingsRes.json() : { rankings: [] };
             const teamsData = await teamsRes.json();
-            const scoresData = scoresRes.ok ? await scoresRes.json() : { matchScores: [] };
+            const qualScoresData = qualScoresRes.ok ? await qualScoresRes.json() : { matchScores: [] };
+            const playoffScoresData = playoffScoresRes.ok ? await playoffScoresRes.json() : { matchScores: [] };
             
             currentMatches = scheduleData.schedule || [];
             currentMatches.sort((a, b) => getMatchStartTimestamp(a) - getMatchStartTimestamp(b));
             currentRankings = rankingsData.rankings || [];
             currentTeams = teamsData.teams || [];
-            currentScoreMatches = scoresData.matchScores || [];
+            currentScoreMatches = [...(qualScoresData.matchScores || []), ...(playoffScoresData.matchScores || [])];
             mergeScoresIntoScheduleMatches(currentMatches, currentScoreMatches);
             
             // Restore or infer showAll state
@@ -622,7 +621,7 @@ async function loadSchedule(eventCode: string) {
 
     showLoading();
     try {
-        // First, fetch event details to get regionCode and leagueCode
+        // First, fetch event details
         const eventRes = await authFetch(`/api/v1/event?event=${eventCode}`, { headers: { "Authorization": `Bearer ${token}` } });
         
         if (!eventRes.ok) {
@@ -640,27 +639,26 @@ async function loadSchedule(eventCode: string) {
 
         currentEventStartTimestamp = event.dateStart ? new Date(event.dateStart).getTime() : null;
 
-        const regionCode = event.regionCode;
-        const leagueCode = event.leagueCode;
-
-        const [scheduleRes, rankingsRes, teamsRes, scoresRes] = await Promise.all([
+        const [scheduleRes, rankingsRes, teamsRes, qualScoresRes, playoffScoresRes] = await Promise.all([
             authFetch(`/api/v1/schedule?event=${eventCode}`, { headers: { "Authorization": `Bearer ${token}` } }),
-            authFetch(`/api/v1/rankings?event=${eventCode}&region=${regionCode}&league=${leagueCode}`, { headers: { "Authorization": `Bearer ${token}` } }),
+            authFetch(`/api/v1/rankings?event=${eventCode}`, { headers: { "Authorization": `Bearer ${token}` } }),
             authFetch(`/api/v1/teams?event=${eventCode}`, { headers: { "Authorization": `Bearer ${token}` } }),
-            authFetch(`/api/v1/scores/${eventCode}/qual`, { headers: { "Authorization": `Bearer ${token}` } })
+            authFetch(`/api/v1/scores/${eventCode}/qual`, { headers: { "Authorization": `Bearer ${token}` } }),
+            authFetch(`/api/v1/scores/${eventCode}/playoff`, { headers: { "Authorization": `Bearer ${token}` } })
         ]);
 
-        if (scheduleRes.ok && rankingsRes.ok && teamsRes.ok) {
+        if (scheduleRes.ok && teamsRes.ok) {
             const scheduleData = await scheduleRes.json();
-            const rankingsData = await rankingsRes.json();
+            const rankingsData = rankingsRes.ok ? await rankingsRes.json() : { rankings: [] };
             const teamsData = await teamsRes.json();
-            const scoresData = scoresRes.ok ? await scoresRes.json() : { matchScores: [] };
+            const qualScoresData = qualScoresRes.ok ? await qualScoresRes.json() : { matchScores: [] };
+            const playoffScoresData = playoffScoresRes.ok ? await playoffScoresRes.json() : { matchScores: [] };
             
             currentMatches = scheduleData.schedule || [];
             currentMatches.sort((a, b) => getMatchStartTimestamp(a) - getMatchStartTimestamp(b));
             currentRankings = rankingsData.rankings || [];
             currentTeams = teamsData.teams || [];
-            currentScoreMatches = scoresData.matchScores || [];
+            currentScoreMatches = [...(qualScoresData.matchScores || []), ...(playoffScoresData.matchScores || [])];
             mergeScoresIntoScheduleMatches(currentMatches, currentScoreMatches);
             
             const showAllCheckbox = document.getElementById("show-all-matches") as HTMLInputElement;
@@ -880,6 +878,7 @@ function renderSchedule(matches: Match[], rankings: Ranking[], teams: TeamInfo[]
         const item = document.createElement("div");
         item.className = "match-item";
         item.dataset.matchNumber = match.matchNumber.toString();
+        item.dataset.tournamentLevel = match.tournamentLevel || "";
         item.style.animationDelay = `${index * 0.03}s`;
         item.onclick = () => {
             document.querySelectorAll(".match-item").forEach(el => el.classList.remove("active"));
@@ -892,8 +891,10 @@ function renderSchedule(matches: Match[], rankings: Ranking[], teams: TeamInfo[]
         const redTeams = match.teams.filter(t => t.station.startsWith("Red")).map(t => t.teamNumber);
         const blueTeams = match.teams.filter(t => t.station.startsWith("Blue")).map(t => t.teamNumber);
 
-        const formatTeamNumbers = (teams: number[], colorClass: string) => {
-            return teams.join(", ");
+        const formatTeamNumbers = (teamNums: number[], colorClass: string) => {
+            const validTeams = teamNums.filter(t => t && t > 0);
+            if (validTeams.length === 0) return "TBD";
+            return validTeams.join(", ");
         };
 
         // Queue logic
@@ -1269,11 +1270,22 @@ async function renderMatchDetails(match: Match, rankings: Ranking[], teams: Team
     const redTeams = match.teams.filter(t => t.station.startsWith("Red"));
     const blueTeams = match.teams.filter(t => t.station.startsWith("Blue"));
     const allTeams = [...redTeams, ...blueTeams];
+    const validTeams = allTeams.filter(t => t.teamNumber && t.teamNumber > 0);
     const scoreMatch = findScoreMatchForScheduleMatch(match);
     const chartJobs: Array<() => void> = [];
     const scoreBreakdownHtml = renderScoreBreakdown(scoreMatch, chartJobs);
 
     const getTeamRow = (team: Team, colorClass: string) => {
+        // Handle missing/invalid team data (common in incomplete playoff matches)
+        if (!team.teamNumber || team.teamNumber <= 0) {
+            return `
+                <div class="team-row">
+                    <span class="${colorClass}">TBD</span>
+                    <span class="team-rank">-</span>
+                </div>
+            `;
+        }
+
         const rank = rankings.find(r => r.teamNumber === team.teamNumber);
         const teamInfo = teams.find(t => t.teamNumber === team.teamNumber);
         
@@ -1294,7 +1306,7 @@ async function renderMatchDetails(match: Match, rankings: Ranking[], teams: Team
         `;
     };
 
-    const statsTableRows = allTeams.map(team => {
+    const statsTableRows = validTeams.map(team => {
         const rank = rankings.find(r => r.teamNumber === team.teamNumber);
         
         const rankText = rank ? `#${rank.rank}` : "-";
@@ -1355,7 +1367,7 @@ async function renderMatchDetails(match: Match, rankings: Ranking[], teams: Team
     const redAllianceTitle = `Red Alliance${redScoreText}`;
     const blueAllianceTitle = `Blue Alliance${blueScoreText}`;
     
-    const notesLoadingSection = allTeams.length > 0 ? `
+    const notesLoadingSection = validTeams.length > 0 ? `
         <div class="notes-display-container" id="notes-section">
             <div class="notes-display-title">Scouting Notes</div>
             <div class="notes-loading">Loading notes...</div>
@@ -1390,8 +1402,8 @@ async function renderMatchDetails(match: Match, rankings: Ranking[], teams: Team
 
     chartJobs.forEach(job => job());
 
-    if (allTeams.length > 0) {
-        const teamNumbers = allTeams.map(t => t.teamNumber);
+    if (validTeams.length > 0) {
+        const teamNumbers = validTeams.map(t => t.teamNumber);
         const notesMap = await loadNotesForTeams(teamNumbers);
         
         const notesSection = document.getElementById("notes-section");
@@ -1408,7 +1420,7 @@ async function renderMatchDetails(match: Match, rankings: Ranking[], teams: Team
 
             notesSection.innerHTML = `
                 <div class="notes-display-title">Scouting Notes</div>
-                ${allTeams.map(team => {
+                ${validTeams.map(team => {
                     const notes = notesMap.get(team.teamNumber);
                     const teamInfo = teams.find(t => t.teamNumber === team.teamNumber);
                     const teamName = teamInfo ? (teamInfo.nameShort || teamInfo.nameFull) : `Team ${team.teamNumber}`;
@@ -1799,15 +1811,22 @@ async function initializeNotesView(eventCode: string) {
 }
 
 function findTeamMatches(teamNumber: number, schedule: Match[], matchScores: any[]): any[] {
-    const teamMatchNumbers = new Set<number>();
-    const teamAlliances = new Map<number, string>();
+    // Use composite key of level + series + matchNumber to handle both qual and playoff matches
+    const teamMatchKeys = new Set<string>();
+    const teamAlliances = new Map<string, string>();
 
     for (const match of schedule) {
+        // Skip matches with incomplete team data
+        if (!match.teams.every(t => t.teamNumber && t.teamNumber > 0)) continue;
+        
         for (const team of match.teams) {
             if (team.teamNumber === teamNumber) {
-                teamMatchNumbers.add(match.matchNumber);
+                const level = normalizeLevel(match.tournamentLevel);
+                const series = typeof match.series === "number" ? match.series : 0;
+                const key = `${level}-${series}-${match.matchNumber}`;
+                teamMatchKeys.add(key);
                 const alliance = team.station.startsWith("Red") ? "Red" : "Blue";
-                teamAlliances.set(match.matchNumber, alliance);
+                teamAlliances.set(key, alliance);
                 break;
             }
         }
@@ -1815,8 +1834,11 @@ function findTeamMatches(teamNumber: number, schedule: Match[], matchScores: any
 
     const filteredScores: any[] = [];
     for (const matchScore of matchScores) {
-        if (teamMatchNumbers.has(matchScore.matchNumber)) {
-            const teamAllianceName = teamAlliances.get(matchScore.matchNumber);
+        const level = normalizeLevel(matchScore.matchLevel);
+        const series = typeof matchScore.matchSeries === "number" ? matchScore.matchSeries : 0;
+        const key = `${level}-${series}-${matchScore.matchNumber}`;
+        if (teamMatchKeys.has(key)) {
+            const teamAllianceName = teamAlliances.get(key);
             
             filteredScores.push({
                 ...matchScore,
@@ -1825,7 +1847,15 @@ function findTeamMatches(teamNumber: number, schedule: Match[], matchScores: any
         }
     }
 
-    return filteredScores.sort((a, b) => a.matchNumber - b.matchNumber);
+    // Sort by level (qual first, then playoff) then by match number
+    return filteredScores.sort((a, b) => {
+        const aLevel = normalizeLevel(a.matchLevel);
+        const bLevel = normalizeLevel(b.matchLevel);
+        if (aLevel !== bLevel) {
+            return aLevel.includes("qual") ? -1 : 1;
+        }
+        return a.matchNumber - b.matchNumber;
+    });
 }
 
 function roundTo2(val: number | null | undefined): number | null {
@@ -1857,7 +1887,9 @@ function buildTeamList(schedule: Match[]): number[] {
     const teams = new Set<number>();
     for (const match of schedule) {
         for (const team of match.teams) {
-            teams.add(team.teamNumber);
+            if (team.teamNumber && team.teamNumber > 0) {
+                teams.add(team.teamNumber);
+            }
         }
     }
     return Array.from(teams).sort((a, b) => a - b);
@@ -1869,6 +1901,24 @@ function eventHasAllScores(schedule: Match[], matchScores: ScoreMatch[]): boolea
 
     for (const match of schedule) {
         const score = matchScores.find(ms => ms.matchNumber === match.matchNumber);
+        if (!score || !isScoreComplete(score)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+function eventHasAllScoresForMatches(schedule: Match[], matchScores: ScoreMatch[]): boolean {
+    for (const match of schedule) {
+        const level = normalizeLevel(match.tournamentLevel);
+        const series = typeof match.series === "number" ? match.series : 0;
+        const score = matchScores.find(ms => {
+            const scoreLevel = normalizeLevel(ms.matchLevel);
+            const scoreSeries = typeof ms.matchSeries === "number" ? ms.matchSeries : 0;
+            return ms.matchNumber === match.matchNumber && 
+                   scoreLevel === level &&
+                   scoreSeries === series;
+        });
         if (!score || !isScoreComplete(score)) {
             return false;
         }
@@ -1947,14 +1997,39 @@ function buildLeastSquaresSolution(teamIds: number[], equations: { teams: number
 }
 
 function computeOprForEvent(teamNumber: number, schedule: Match[], matchScores: ScoreMatch[]) {
-    const qualSchedule = schedule.filter(isQualMatch).sort((a, b) => a.matchNumber - b.matchNumber);
-    const qualScores = matchScores.filter(isQualMatch).sort((a, b) => a.matchNumber - b.matchNumber);
+    // Filter schedule to only include matches with valid team data
+    const validSchedule = schedule.filter(match => 
+        match.teams.every(t => t.teamNumber && t.teamNumber > 0)
+    ).sort((a, b) => {
+        const aLevel = normalizeLevel(a.tournamentLevel);
+        const bLevel = normalizeLevel(b.tournamentLevel);
+        if (aLevel !== bLevel) return aLevel.includes("QUAL") ? -1 : 1;
+        return a.matchNumber - b.matchNumber;
+    });
+    
+    const validScores = matchScores.filter(isScoreComplete).sort((a, b) => {
+        const aLevel = normalizeLevel(a.matchLevel);
+        const bLevel = normalizeLevel(b.matchLevel);
+        if (aLevel !== bLevel) return aLevel.includes("QUAL") ? -1 : 1;
+        return a.matchNumber - b.matchNumber;
+    });
 
-    const eventComplete = eventHasAllScores(qualSchedule, qualScores);
-    const teamMatches = findTeamMatches(teamNumber, qualSchedule, qualScores);
+    // OPR is calculated ONLY from qualification matches
+    const qualSchedule = validSchedule.filter(isQualMatch);
+    const qualScores = validScores.filter(isQualMatch);
+
+    const eventComplete = eventHasAllScoresForMatches(qualSchedule, qualScores);
+    // Get all team matches (qual + playoff) for display
+    const teamMatches = findTeamMatches(teamNumber, validSchedule, validScores);
+    // Build team list only from qual matches for OPR calculation
     const teamList = buildTeamList(qualSchedule);
 
-    const matchLabels = teamMatches.map(match => `Q${match.matchNumber}`);
+    // Generate labels based on match level
+    const matchLabels = teamMatches.map(match => {
+        const level = normalizeLevel(match.matchLevel);
+        const prefix = level.includes("QUAL") ? "Q" : "P";
+        return `${prefix}${match.matchNumber}`;
+    });
 
     if (!eventComplete || teamList.length === 0 || teamMatches.length === 0) {
         return {
@@ -1972,14 +2047,24 @@ function computeOprForEvent(teamNumber: number, schedule: Match[], matchScores: 
         };
     }
 
-    const scheduleMap = new Map<number, Match>();
-    qualSchedule.forEach(match => scheduleMap.set(match.matchNumber, match));
+    // Build schedule map ONLY from qual matches for OPR
+    const qualScheduleMap = new Map<string, Match>();
+    qualSchedule.forEach(match => {
+        const level = normalizeLevel(match.tournamentLevel);
+        const series = typeof match.series === "number" ? match.series : 0;
+        const key = `${level}-${series}-${match.matchNumber}`;
+        qualScheduleMap.set(key, match);
+    });
 
+    // Build equations ONLY from qual scores
     const buildEquations = (metric: (alliance: ScoreAlliance) => number) => {
         const equations: { teams: number[]; value: number; }[] = [];
         for (const score of qualScores) {
             if (!isScoreComplete(score)) continue;
-            const scheduleMatch = scheduleMap.get(score.matchNumber);
+            const level = normalizeLevel(score.matchLevel);
+            const series = typeof score.matchSeries === "number" ? score.matchSeries : 0;
+            const key = `${level}-${series}-${score.matchNumber}`;
+            const scheduleMatch = qualScheduleMap.get(key);
             if (!scheduleMatch) continue;
             for (const alliance of score.alliances) {
                 const allianceTeams = getAllianceTeams(scheduleMatch, alliance.alliance);
@@ -2014,12 +2099,13 @@ function computeOprForEvent(teamNumber: number, schedule: Match[], matchScores: 
         teleopArtifacts: solutions.teleopArtifacts.get(teamNumber) || 0
     };
 
+    // OPR is only shown for qual matches, null for playoff matches
     const perMatchOpr = {
-        overall: teamMatches.map(() => teamOpr.overall),
-        auto: teamMatches.map(() => teamOpr.auto),
-        teleop: teamMatches.map(() => teamOpr.teleop),
-        autoArtifacts: teamMatches.map(() => teamOpr.autoArtifacts),
-        teleopArtifacts: teamMatches.map(() => teamOpr.teleopArtifacts)
+        overall: teamMatches.map(match => isQualMatch(match) ? teamOpr.overall : null),
+        auto: teamMatches.map(match => isQualMatch(match) ? teamOpr.auto : null),
+        teleop: teamMatches.map(match => isQualMatch(match) ? teamOpr.teleop : null),
+        autoArtifacts: teamMatches.map(match => isQualMatch(match) ? teamOpr.autoArtifacts : null),
+        teleopArtifacts: teamMatches.map(match => isQualMatch(match) ? teamOpr.teleopArtifacts : null)
     };
 
     return {
@@ -2075,8 +2161,11 @@ async function analyzeTeam(teamNumber: number, updateHistory: boolean = true) {
         const allScoreData: any[] = [];
         for (const event of sortedEvents) {
             try {
-                const [scoresRes, scheduleRes] = await Promise.all([
+                const [qualScoresRes, playoffScoresRes, scheduleRes] = await Promise.all([
                     authFetch(`/api/v1/scores/${event.code}/qual`, {
+                        headers: { "Authorization": `Bearer ${token}` }
+                    }),
+                    authFetch(`/api/v1/scores/${event.code}/playoff`, {
                         headers: { "Authorization": `Bearer ${token}` }
                     }),
                     authFetch(`/api/v1/schedule?event=${event.code}`, {
@@ -2084,15 +2173,37 @@ async function analyzeTeam(teamNumber: number, updateHistory: boolean = true) {
                     })
                 ]);
 
-                if (scoresRes.ok && scheduleRes.ok) {
-                    const scoresData = await scoresRes.json();
+                if (scheduleRes.ok) {
+                    const qualScoresData = qualScoresRes.ok ? await qualScoresRes.json() : { matchScores: [] };
+                    const playoffScoresData = playoffScoresRes.ok ? await playoffScoresRes.json() : { matchScores: [] };
                     const scheduleData = await scheduleRes.json();
                     
-                    if (scoresData.matchScores && scheduleData.schedule) {
+                    const qualScores = qualScoresData.matchScores || [];
+                    const playoffScores = playoffScoresData.matchScores || [];
+                    
+                    // Filter playoff scores to only include complete matches with valid team data
+                    const validPlayoffScores = playoffScores.filter((score: ScoreMatch) => {
+                        if (!isScoreComplete(score)) return false;
+                        // Check if the corresponding schedule match has valid teams (matching level, series, and matchNumber)
+                        const scoreSeries = typeof score.matchSeries === "number" ? score.matchSeries : 0;
+                        const scheduleMatch = (scheduleData.schedule || []).find((m: Match) => {
+                            const matchSeries = typeof m.series === "number" ? m.series : 0;
+                            return m.matchNumber === score.matchNumber && 
+                                   normalizeLevel(m.tournamentLevel) === normalizeLevel(score.matchLevel) &&
+                                   matchSeries === scoreSeries;
+                        });
+                        if (!scheduleMatch) return false;
+                        // Ensure all teams have valid team numbers
+                        return scheduleMatch.teams.every((t: Team) => t.teamNumber && t.teamNumber > 0);
+                    });
+                    
+                    const allScores = [...qualScores, ...validPlayoffScores];
+                    
+                    if (allScores.length > 0 && scheduleData.schedule) {
                         const { eventComplete, teamMatches, matchLabels, perMatchOpr, teamOpr } = computeOprForEvent(
                             teamNumber,
                             scheduleData.schedule,
-                            scoresData.matchScores
+                            allScores
                         );
 
                         if (teamMatches.length > 0) {
@@ -2590,7 +2701,7 @@ function generateBarChart(
                 tension: 0,
                 borderWidth: 2,
                 borderDash: [6, 4],
-                spanGaps: true
+                spanGaps: false
             });
         }
 
@@ -2741,7 +2852,7 @@ function generateComparisonChart(
                 tension: 0,
                 borderWidth: 2,
                 borderDash: [6, 4],
-                spanGaps: true
+                spanGaps: false
             });
         }
 
@@ -2756,7 +2867,7 @@ function generateComparisonChart(
                 tension: 0,
                 borderWidth: 2,
                 borderDash: [6, 4],
-                spanGaps: true
+                spanGaps: false
             });
         }
 
@@ -2920,7 +3031,7 @@ function generateLineChart(
                 tension: 0,
                 borderWidth: 2,
                 borderDash: [6, 4],
-                spanGaps: true
+                spanGaps: false
             });
         }
 
@@ -2935,7 +3046,7 @@ function generateLineChart(
                 tension: 0,
                 borderWidth: 2,
                 borderDash: [6, 4],
-                spanGaps: true
+                spanGaps: false
             });
         }
 

@@ -28,7 +28,7 @@ VANGUARD_URL = settings["server"]["vanguard_url"]
 get_db = lambda: sqlite3.connect("default.db", check_same_thread=True)
 
 def get_active_event(team_id: int) -> str | None:
-    now = datetime.now() - timedelta(weeks=26)
+    now = datetime.now() - timedelta(weeks=34)
     year = now.year
 
     r = s.get(f"{FTC_API_URL}/{year}/events?teamNumber={team_id}")
@@ -116,7 +116,7 @@ def send_notification(team_id: int, title: str, message: str, priority: int=3, c
         return False
 
 def notification_callback():
-    now = datetime.now() - timedelta(weeks=26)
+    now = datetime.now() - timedelta(weeks=34)
     year = now.year
 
     for team_id in NTFY_TEAMS:
@@ -326,7 +326,7 @@ def _api_v1_events():
     
     # fetch events from FTC API
 
-    now = datetime.now() - timedelta(weeks=26)
+    now = datetime.now() - timedelta(weeks=34)
     year = now.year
 
     r = s.get(f"{FTC_API_URL}/{year}/events?teamNumber={team_id}")
@@ -353,7 +353,7 @@ def _api_v1_event():
     except:
         return {"status": "fuck", "error": "bad request"}, 400
 
-    now = datetime.now() - timedelta(weeks=26)
+    now = datetime.now() - timedelta(weeks=34)
     year = now.year
 
     r = s.get(f"{FTC_API_URL}/{year}/events?eventCode={event}")
@@ -380,21 +380,30 @@ def _api_v1_schedule():
     except:
         return {"status": "fuck", "error": "bad request"}, 400
 
-    level = request.args.get("level") or "qual"
-
-    now = datetime.now() - timedelta(weeks=26)
+    now = datetime.now() - timedelta(weeks=34)
     year = now.year
-    
-    params = []
-    if level:
-        params.append(f"tournamentLevel={level}")
 
-    url = f"{FTC_API_URL}/{year}/schedule/{event}"
-    if params:
-        url = f"{url}?{'&'.join(params)}"
+    # Fetch both qual and playoff schedules and merge them
+    qual_url = f"{FTC_API_URL}/{year}/schedule/{event}?tournamentLevel=qual"
+    playoff_url = f"{FTC_API_URL}/{year}/schedule/{event}?tournamentLevel=playoff"
 
-    r = s.get(url)
-    return r.json(), r.status_code
+    qual_res = s.get(qual_url)
+    playoff_res = s.get(playoff_url)
+
+    qual_schedule = []
+    playoff_schedule = []
+
+    if qual_res.status_code == 200:
+        qual_data = qual_res.json()
+        qual_schedule = qual_data.get("schedule", [])
+
+    if playoff_res.status_code == 200:
+        playoff_data = playoff_res.json()
+        playoff_schedule = playoff_data.get("schedule", [])
+
+    merged_schedule = qual_schedule + playoff_schedule
+
+    return {"schedule": merged_schedule}, 200
 
 @app.route("/api/v1/matches", methods=["GET"])
 def _api_v1_matches():
@@ -419,7 +428,7 @@ def _api_v1_matches():
         return {"status": "fuck", "error": "missing event"}, 400
 
     level = request.args.get("level")
-    now = datetime.now() - timedelta(weeks=26)
+    now = datetime.now() - timedelta(weeks=34)
     year = now.year
 
     url = f"{FTC_API_URL}/{year}/matches/{event}"
@@ -446,7 +455,7 @@ def _api_v1_scores(event, level):
     except jwt.InvalidTokenError:
         return {"status": "fuck", "error": "invalid token"}, 401
 
-    now = datetime.now() - timedelta(weeks=26)
+    now = datetime.now() - timedelta(weeks=34)
     year = now.year
     
     r = s.get(f"{FTC_API_URL}/{year}/scores/{event}/{level}")
@@ -466,7 +475,7 @@ def _api_v1_team_events(team_number):
     except jwt.InvalidTokenError:
         return {"status": "fuck", "error": "invalid token"}, 401
 
-    now = datetime.now() - timedelta(weeks=26)
+    now = datetime.now() - timedelta(weeks=34)
     year = now.year
     
     r = s.get(f"{FTC_API_URL}/{year}/events?teamNumber={team_number}")
@@ -486,18 +495,20 @@ def _api_v1_rankings():
     except:
         return {"status": "fuck", "error": "invalid token"}, 401
     
-    # fetch rankings from FTC API
+    # fetch rankings from FTC API using event rankings
 
     try:
-        region = request.args.get("region")
-        league = request.args.get("league")
+        event = request.args.get("event")
     except:
         return {"status": "fuck", "error": "bad request"}, 400
 
-    now = datetime.now() - timedelta(weeks=26)
+    if not event:
+        return {"status": "fuck", "error": "missing event"}, 400
+
+    now = datetime.now() - timedelta(weeks=34)
     year = now.year
     
-    r = s.get(f"{FTC_API_URL}/{year}/leagues/rankings/{region}/{league}")
+    r = s.get(f"{FTC_API_URL}/{year}/rankings/{event}")
     return r.json(), r.status_code
 
 @app.route("/api/v1/teams", methods=["GET"])
@@ -519,7 +530,7 @@ def _api_v1_teams():
     except:
         return {"status": "fuck", "error": "bad request"}, 400
     
-    now = datetime.now() - timedelta(weeks=26)
+    now = datetime.now() - timedelta(weeks=34)
     year = now.year
     
     r = s.get(f"{FTC_API_URL}/{year}/teams?eventCode={event}")

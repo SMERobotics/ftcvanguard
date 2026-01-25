@@ -11,15 +11,15 @@ unified ftc management infra. provide streamlined, real-time data, enabling rapi
 
 ## gallery
 
-<img width="1920" height="1032" alt="image" src="https://github.com/user-attachments/assets/0a04e691-737e-42e8-ba25-3a23d60b99d6" />
+<img width="1920" height="1032" alt="image" src="https://github.com/user-attachments/assets/bf083187-b846-4d1e-8c04-ea05e409cca5" />
 <table>
   <tr>
     <td><img src="https://github.com/user-attachments/assets/18934e8c-0413-448e-9c28-e5cf33ccfadc" width="756" /></td>
     <td><img src="https://github.com/user-attachments/assets/6a948849-22bd-404e-984e-35ec0fdc5a89" width="1920" /></td>
   </tr>
 </table>
-<img width="1920" height="1032" alt="image" src="https://github.com/user-attachments/assets/7270319c-e798-49c5-945e-bfcfd08972cd" />
-<img width="1920" height="1032" alt="image" src="https://github.com/user-attachments/assets/486487d8-2dec-48d7-91f9-55b0dcdc58bc" />
+<img width="1920" height="1032" alt="image" src="https://github.com/user-attachments/assets/1d84212a-6ebf-4d69-91b4-b7af4d145255" />
+<img width="1920" height="1032" alt="image" src="https://github.com/user-attachments/assets/8a74ac29-2b67-4778-a063-950109a543d0" />
 
 ## setting up:
 *deleted all the instructions cuz ill just build a docker image <3*
