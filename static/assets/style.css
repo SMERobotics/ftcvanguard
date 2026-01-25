@@ -372,8 +372,13 @@ body {
 
 .team-row:last-child { border-bottom: none; }
 
-.team-row .team-number-link {
+.team-number-link {
     cursor: pointer;
+    transition: opacity 0.15s ease;
+}
+
+.team-number-link:hover {
+    opacity: 0.8;
 }
 
 .team-rank {

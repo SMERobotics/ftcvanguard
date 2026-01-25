@@ -26,7 +26,9 @@ let currentSelectedNotesTeam = null;
 let currentInsightsTeam = null;
 let currentScoreMatches = [];
 let showAllMatches = false;
+let queueInterval;
 const activeCharts = {};
+let currentOPRData = new Map();
 function getViewNameFromId(viewId) {
     return viewId.replace("view-", "");
 }
@@ -389,6 +391,14 @@ async function loadScheduleWithStateRestore(eventCode, urlState) {
             }
             renderSchedule(currentMatches, currentRankings, currentTeams);
             renderRankings(currentRankings);
+            // Fetch OPR data for all ranked teams
+            const rankedTeamNumbers = currentRankings.map(r => r.teamNumber);
+            if (rankedTeamNumbers.length > 0) {
+                fetchOPRData(rankedTeamNumbers).then(oprResults => {
+                    currentOPRData = new Map(oprResults.map(r => [r.teamNumber, r.opr]));
+                    renderRankings(currentRankings);
+                });
+            }
             // Restore match selection from URL
             if (urlState.match !== undefined) {
                 currentSelectedMatch = urlState.match;
@@ -445,6 +455,63 @@ function populateMeetSelector(events) {
         updateUrl();
     });
 }
+async function fetchOPRData(teamNumbers) {
+    const now = new Date();
+    const seasonDate = new Date(now.getTime() - 34 * 7 * 24 * 60 * 60 * 1000); // 34 weeks ago b/c season starts ~beginning of September
+    const season = seasonDate.getFullYear();
+    const seasonStatsName = `TeamEventStats${season}`;
+    const promises = teamNumbers.map(async (teamNumber) => {
+        try {
+            const response = await fetch("https://api.ftcscout.org/graphql", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    query: `
+                        query OPR_totalPointsNp($season: Int!, $number: Int!) {
+                            teamByNumber(number: $number) {
+                                events(season: $season) {
+                                    stats {
+                                        ... on ${seasonStatsName} {
+                                            opr {
+                                                totalPointsNp
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    `,
+                    variables: {
+                        season: season,
+                        number: teamNumber
+                    }
+                })
+            });
+            if (response.ok) {
+                const data = await response.json();
+                const events = data?.data?.teamByNumber?.events || [];
+                let highestOPR = null;
+                for (const event of events) {
+                    const opr = event?.stats?.opr?.totalPointsNp;
+                    if (opr !== undefined && opr !== null) {
+                        if (highestOPR === null || opr > highestOPR) {
+                            highestOPR = opr;
+                        }
+                    }
+                }
+                return { teamNumber, opr: highestOPR };
+            }
+        }
+        catch (error) {
+            console.error(`Failed to fetch OPR for team ${teamNumber}:`, error);
+        }
+        return { teamNumber, opr: null };
+    });
+    const results = await Promise.all(promises);
+    return results;
+}
 async function loadSchedule(eventCode) {
     const token = localStorage.getItem("token");
     if (!token)
@@ -494,6 +561,14 @@ async function loadSchedule(eventCode) {
             }
             renderSchedule(currentMatches, currentRankings, currentTeams);
             renderRankings(currentRankings);
+            // Fetch OPR data for all ranked teams
+            const rankedTeamNumbers = currentRankings.map(r => r.teamNumber);
+            if (rankedTeamNumbers.length > 0) {
+                fetchOPRData(rankedTeamNumbers).then(oprResults => {
+                    currentOPRData = new Map(oprResults.map(r => [r.teamNumber, r.opr]));
+                    renderRankings(currentRankings);
+                });
+            }
             if (activeViewId === "view-notes" && currentTeams.length > 0) {
                 await initializeNotesView(eventCode);
             }
@@ -506,7 +581,6 @@ async function loadSchedule(eventCode) {
         hideLoading();
     }
 }
-let queueInterval;
 function parseScore(value) {
     if (typeof value === "number") {
         return value;
@@ -636,11 +710,14 @@ function renderRankings(rankings) {
         if (loggedInTeamId && rank.teamNumber === loggedInTeamId) {
             tr.classList.add("current-team-rank");
         }
+        const oprValue = currentOPRData.get(rank.teamNumber);
+        const oprDisplay = oprValue !== null && oprValue !== undefined ? oprValue.toFixed(1) : "–";
         tr.innerHTML = `
             <td>${rank.rank}</td>
-            <td>${rank.teamNumber}</td>
+            <td><span class="team-number-link" data-team="${rank.teamNumber}">${rank.teamNumber}</span></td>
             <td>${rank.teamName}</td>
             <td>${rank.sortOrder1}</td>
+            <td>${oprDisplay}</td>
             <td>${rank.sortOrder2}</td>
             <td>${rank.sortOrder3}</td>
             <td>${rank.sortOrder4}</td>
@@ -1078,7 +1155,7 @@ async function renderMatchDetails(match, rankings, teams) {
                     <tr>
                         <th>Team</th>
                         <th>Rank</th>
-                        <th>Ranking Points</th>
+                        <th>Ranking Score</th>
                         <th>Match Points</th>
                         <th>Base Points</th>
                         <th>Auto Points</th>
@@ -2963,6 +3040,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 });
 // nothing
+// ts obfuscator was BUNS
 var _0xf5ab = (496071 ^ 496071) + (575947 ^ 575938);
 let a = 466676 ^ 466676;
 _0xf5ab = (668349 ^ 668351) + (763093 ^ 763088);

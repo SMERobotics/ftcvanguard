@@ -8,19 +8,13 @@ interface Tab {
     viewId: string;
 }
 
-interface FTCEvent {
+interface Event {
     code: string;
     name: string;
     dateStart: string;
     dateEnd: string;
     regionCode?: string;
     leagueCode?: string;
-}
-
-interface Team {
-    teamNumber: number;
-    station: string;
-    surrogate: boolean;
 }
 
 interface Match {
@@ -38,6 +32,23 @@ interface Match {
     actualStartTime?: string;
     startTime: string;
     field?: string;
+}
+
+interface Team {
+    teamNumber: number;
+    station: string;
+    surrogate: boolean;
+}
+
+interface TeamInfo {
+    teamNumber: number;
+    nameShort: string;
+    nameFull: string;
+}
+
+interface TeamOPR {
+    teamNumber: number;
+    opr: number | null;
 }
 
 interface Ranking {
@@ -58,13 +69,7 @@ interface Ranking {
     sortOrder6: number;
 }
 
-interface TeamInfo {
-    teamNumber: number;
-    nameShort: string;
-    nameFull: string;
-}
-
-interface Notes {
+interface Note {
     autoPerformance: string;
     teleopPerformance: string;
     generalNotes: string;
@@ -112,6 +117,24 @@ interface ScoreMatch {
     alliances: ScoreAlliance[];
 }
 
+type MatchResult = "win" | "loss" | "tie";
+
+interface MatchResultIndicator {
+    label: string;
+    variant: MatchResult;
+    tooltip: string;
+}
+
+// URL State Management
+interface AppState {
+    view?: string;
+    event?: string;
+    match?: number;
+    team?: number;
+    insights?: number;
+    showAll?: boolean;
+}
+
 declare const Chart: any;
 
 const tabs: Tab[] = [
@@ -138,17 +161,9 @@ let currentSelectedNotesTeam: number | null = null;
 let currentInsightsTeam: number | null = null;
 let currentScoreMatches: ScoreMatch[] = [];
 let showAllMatches: boolean = false;
+let queueInterval: number;
 const activeCharts: Record<string, any> = {};
-
-// URL State Management
-interface AppState {
-    view?: string;
-    event?: string;
-    match?: number;
-    team?: number;
-    insights?: number;
-    showAll?: boolean;
-}
+let currentOPRData: Map<number, number | null> = new Map();
 
 function getViewNameFromId(viewId: string): string {
     return viewId.replace("view-", "");
@@ -360,7 +375,7 @@ async function loadEvents() {
         if (!response.ok) return;
 
         const data = await response.json();
-        const events: FTCEvent[] = data.events || [];
+        const events: Event[] = data.events || [];
         populateMeetSelector(events);
 
     } catch (error) {
@@ -385,7 +400,7 @@ async function loadEventsWithStateRestore() {
         if (!response.ok) return;
 
         const data = await response.json();
-        const events: FTCEvent[] = data.events || [];
+        const events: Event[] = data.events || [];
         await populateMeetSelectorWithStateRestore(events, urlState);
 
     } catch (error) {
@@ -395,7 +410,7 @@ async function loadEventsWithStateRestore() {
     }
 }
 
-async function populateMeetSelectorWithStateRestore(events: FTCEvent[], urlState: AppState) {
+async function populateMeetSelectorWithStateRestore(events: Event[], urlState: AppState) {
     const selector = document.getElementById("meet-selector") as HTMLSelectElement;
     if (!selector) return;
 
@@ -412,7 +427,7 @@ async function populateMeetSelectorWithStateRestore(events: FTCEvent[], urlState
         selector.appendChild(option);
     });
 
-    let defaultEvent: FTCEvent | undefined;
+    let defaultEvent: Event | undefined;
 
     // Check if URL has an event specified
     if (urlState.event) {
@@ -545,6 +560,15 @@ async function loadScheduleWithStateRestore(eventCode: string, urlState: AppStat
             renderSchedule(currentMatches, currentRankings, currentTeams);
             renderRankings(currentRankings);
 
+            // Fetch OPR data for all ranked teams
+            const rankedTeamNumbers = currentRankings.map(r => r.teamNumber);
+            if (rankedTeamNumbers.length > 0) {
+                fetchOPRData(rankedTeamNumbers).then(oprResults => {
+                    currentOPRData = new Map(oprResults.map(r => [r.teamNumber, r.opr]));
+                    renderRankings(currentRankings);
+                });
+            }
+
             // Restore match selection from URL
             if (urlState.match !== undefined) {
                 currentSelectedMatch = urlState.match;
@@ -558,7 +582,7 @@ async function loadScheduleWithStateRestore(eventCode: string, urlState: AppStat
     }
 }
 
-function populateMeetSelector(events: FTCEvent[]) {
+function populateMeetSelector(events: Event[]) {
     const selector = document.getElementById("meet-selector") as HTMLSelectElement;
     if (!selector) return;
 
@@ -576,7 +600,7 @@ function populateMeetSelector(events: FTCEvent[]) {
         selector.appendChild(option);
     });
 
-    let defaultEvent: FTCEvent | undefined;
+    let defaultEvent: Event | undefined;
 
     // Default to the most recent meet that has already begun
     // Iterate backwards to find the latest event with start date <= now
@@ -607,6 +631,68 @@ function populateMeetSelector(events: FTCEvent[]) {
         loadSchedule(selector.value);
         updateUrl();
     });
+}
+
+async function fetchOPRData(teamNumbers: number[]): Promise<TeamOPR[]> {
+    const now = new Date();
+    const seasonDate = new Date(now.getTime() - 34 * 7 * 24 * 60 * 60 * 1000); // 34 weeks ago b/c season starts ~beginning of September
+    const season = seasonDate.getFullYear();
+    const seasonStatsName = `TeamEventStats${season}`;
+
+    const promises = teamNumbers.map(async (teamNumber) => {
+        try {
+            const response = await fetch("https://api.ftcscout.org/graphql", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    query: `
+                        query OPR_totalPointsNp($season: Int!, $number: Int!) {
+                            teamByNumber(number: $number) {
+                                events(season: $season) {
+                                    stats {
+                                        ... on ${seasonStatsName} {
+                                            opr {
+                                                totalPointsNp
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    `,
+                    variables: {
+                        season: season,
+                        number: teamNumber
+                    }
+                })
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                const events = data?.data?.teamByNumber?.events || [];
+
+                let highestOPR: number | null = null;
+                for (const event of events) {
+                    const opr = event?.stats?.opr?.totalPointsNp;
+                    if (opr !== undefined && opr !== null) {
+                        if (highestOPR === null || opr > highestOPR) {
+                            highestOPR = opr;
+                        }
+                    }
+                }
+
+                return { teamNumber, opr: highestOPR };
+            }
+        } catch (error) {
+            console.error(`Failed to fetch OPR for team ${teamNumber}:`, error);
+        }
+        return { teamNumber, opr: null };
+    });
+
+    const results = await Promise.all(promises);
+    return results;
 }
 
 async function loadSchedule(eventCode: string) {
@@ -669,6 +755,15 @@ async function loadSchedule(eventCode: string) {
             renderSchedule(currentMatches, currentRankings, currentTeams);
             renderRankings(currentRankings);
 
+            // Fetch OPR data for all ranked teams
+            const rankedTeamNumbers = currentRankings.map(r => r.teamNumber);
+            if (rankedTeamNumbers.length > 0) {
+                fetchOPRData(rankedTeamNumbers).then(oprResults => {
+                    currentOPRData = new Map(oprResults.map(r => [r.teamNumber, r.opr]));
+                    renderRankings(currentRankings);
+                });
+            }
+
             if (activeViewId === "view-notes" && currentTeams.length > 0) {
                 await initializeNotesView(eventCode);
             }
@@ -678,16 +773,6 @@ async function loadSchedule(eventCode: string) {
     } finally {
         hideLoading();
     }
-}
-
-let queueInterval: number;
-
-type MatchResultVariant = "win" | "loss" | "tie";
-
-interface MatchResultIndicator {
-    label: string;
-    variant: MatchResultVariant;
-    tooltip: string;
 }
 
 function parseScore(value: unknown): number | null {
@@ -846,11 +931,14 @@ function renderRankings(rankings: Ranking[]) {
         if (loggedInTeamId && rank.teamNumber === loggedInTeamId) {
             tr.classList.add("current-team-rank");
         }
+        const oprValue = currentOPRData.get(rank.teamNumber);
+        const oprDisplay = oprValue !== null && oprValue !== undefined ? oprValue.toFixed(1) : "–";
         tr.innerHTML = `
             <td>${rank.rank}</td>
-            <td>${rank.teamNumber}</td>
+            <td><span class="team-number-link" data-team="${rank.teamNumber}">${rank.teamNumber}</span></td>
             <td>${rank.teamName}</td>
             <td>${rank.sortOrder1}</td>
+            <td>${oprDisplay}</td>
             <td>${rank.sortOrder2}</td>
             <td>${rank.sortOrder3}</td>
             <td>${rank.sortOrder4}</td>
@@ -1343,7 +1431,7 @@ async function renderMatchDetails(match: Match, rankings: Ranking[], teams: Team
                     <tr>
                         <th>Team</th>
                         <th>Rank</th>
-                        <th>Ranking Points</th>
+                        <th>Ranking Score</th>
                         <th>Match Points</th>
                         <th>Base Points</th>
                         <th>Auto Points</th>
@@ -1571,9 +1659,9 @@ async function loadNotesStatus() {
     }
 }
 
-async function loadNotesForTeams(teamIds: number[]): Promise<Map<number, Notes>> {
+async function loadNotesForTeams(teamIds: number[]): Promise<Map<number, Note>> {
     const token = localStorage.getItem("token");
-    const notesMap = new Map<number, Notes>();
+    const notesMap = new Map<number, Note>();
     
     if (!token) return notesMap;
 
@@ -1597,7 +1685,7 @@ async function loadNotesForTeams(teamIds: number[]): Promise<Map<number, Notes>>
     return notesMap;
 }
 
-async function loadNotes(teamId: number): Promise<Notes> {
+async function loadNotes(teamId: number): Promise<Note> {
     const token = localStorage.getItem("token");
     if (!token) return { autoPerformance: "", teleopPerformance: "", generalNotes: "", updatedAt: null };
 
@@ -1650,7 +1738,7 @@ function updateTeamNoteStatus(teamId: number) {
     }
 }
 
-async function saveNotes(teamId: number, notes: Notes) {
+async function saveNotes(teamId: number, notes: Note) {
     const token = localStorage.getItem("token");
     if (!token) return;
 
@@ -1788,7 +1876,7 @@ async function renderNotesEditor(team: TeamInfo, eventCode: string) {
         }
         
         notesAutoSaveTimeout = window.setTimeout(() => {
-            const updatedNotes: Notes = {
+            const updatedNotes: Note = {
                 autoPerformance: autoTextarea.value,
                 teleopPerformance: teleopTextarea.value,
                 generalNotes: generalTextarea.value,

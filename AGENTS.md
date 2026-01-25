@@ -1,4 +1,4 @@
-ftcvanguard is a Python Flask app with HTML, CSS, and TypeScript. It is a centralized First Tech Challenge Robotics management web app. Its goal is provide streamlined, realtime data, enabling rapid strategic insights.
+ftcvanguard is a Python Flask app with HTML, CSS, and TypeScript. It is a centralized First Tech Challenge Robotics management web app. Its goal is to provide streamlined, realtime data, enabling rapid strategic insights.
 
 When writing code:
 - Keep code as simple as possible!
