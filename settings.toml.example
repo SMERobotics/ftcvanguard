@@ -1,5 +1,5 @@
 [ftc_api]
-username = "GraciousProfessionalism"
+username = "GraciousProfessionalist"
 token = "67676767-6767-6767-6767-676767676767"
 
 [notifications]
@@ -12,6 +12,4 @@ vanguard_url = "https://ftc.technodot.org"
 
 [admin]
 admin_teams = [26855, 6547]
-password = "sixseven"
-max_failed_attempts = 5
-lockout_duration_minutes = 15
+admin_secret = "67676767676767676767676767676767"

@@ -925,6 +925,121 @@ body {
     border: 1px solid rgba(255, 77, 77, 0.3);
 }
 
+/* Admin Login Styles */
+#admin-login {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100%;
+    padding: 20px;
+}
+
+.admin-login-container {
+    background-color: #1e1e1e;
+    padding: 40px 40px 24px 40px;
+    border-radius: 12px;
+    border: 1px solid #333333;
+    width: 380px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    animation: fadeInUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.3);
+}
+
+.admin-login-container span {
+    margin: 0;
+    text-align: center;
+    color: #ffffff;
+    font-size: 20px;
+    font-weight: 500;
+}
+
+.admin-login-subtitle {
+    margin-top: -12px;
+    margin-bottom: 6px;
+    text-align: center;
+    color: #cccccc;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+#admin-login-form {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 32px;
+    width: 100%;
+}
+
+#admin-otp {
+    font-size: 28px;
+    letter-spacing: 8px;
+    font-weight: 500;
+    width: 167px;
+    padding: 12px;
+    padding-right: 4px; /* compensate for last letter spacing */
+    background-color: #252526;
+    border: 1px solid #3c3c3c;
+    border-radius: 6px;
+    color: #ffffff;
+    transition: all 0.2s ease;
+}
+
+#admin-otp:focus {
+    border-color: #0078d4;
+    background-color: #2d2d2d;
+    box-shadow: 0 0 0 2px rgba(0, 120, 212, 0.2);
+    outline: none;
+}
+
+#admin-login-button {
+    background-color: #0078d4;
+    color: #ffffff;
+    border: none;
+    border-radius: 6px;
+    padding: 10px 16px;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    width: 100%;
+    height: 36px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+#admin-login-button:hover {
+    background-color: #0063b1;
+}
+
+#admin-login-button:active {
+    transform: scale(0.98);
+}
+
+#admin-login-button:disabled {
+    background-color: #3e3e42;
+    cursor: not-allowed;
+}
+
+#admin-login-error {
+    color: #ff4d4d;
+    font-size: 13px;
+    margin: 0;
+    text-align: center;
+    display: none;
+    padding: 12px;
+    background-color: rgba(255, 77, 77, 0.1);
+    border-radius: 6px;
+    border: 1px solid rgba(255, 77, 77, 0.3);
+}
+
+#admin-container {
+    padding: 20px;
+}
+
 /* Animations */
 @keyframes fadeInUp {
     from { opacity: 0; transform: translateY(10px); }

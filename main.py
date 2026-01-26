@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 from flask import Flask, request, send_from_directory
 import jwt
 import os
+import pyotp
 import requests
 import sqlite3
 import threading
@@ -24,8 +25,11 @@ NTFY_SERVER_URL = settings["notifications"]["ntfy_server_url"]
 NTFY_TOPIC = settings["notifications"]["ntfy_topic"]
 NTFY_TEAMS = settings["notifications"]["ntfy_teams"]
 VANGUARD_URL = settings["server"]["vanguard_url"]
+ADMIN_TEAMS = settings["admin"]["admin_teams"]
+ADMIN_SECRET = settings["admin"]["admin_secret"]
 
 get_db = lambda: sqlite3.connect("default.db", check_same_thread=True)
+get_totp = lambda: pyotp.TOTP(ADMIN_SECRET)
 
 def get_active_event(team_id: int) -> str | None:
     now = datetime.now() - timedelta(weeks=34)
@@ -284,7 +288,7 @@ def _api_v1_login():
         stored_hash = row[0]
         ph.verify(stored_hash, password)
 
-        token = jwt.encode({"id": team_id, "exp": int((datetime.now() + timedelta(hours=24)).timestamp())}, RSA_PRIVATE_KEY, algorithm="RS256")
+        token = jwt.encode({"id": team_id, "scope": ["user"], "exp": int((datetime.now() + timedelta(hours=24)).timestamp())}, RSA_PRIVATE_KEY, algorithm="RS256")
         cursor.close()
         db.close()
         return {"status": "success!", "token": token}, 200
@@ -303,7 +307,7 @@ def _api_v1_verify():
     token = auth_header.split(" ")[1]
     try:
         payload = jwt.decode(token, RSA_PUBLIC_KEY, algorithms=["RS256"])
-        return {"status": "success!", "id": payload.get("id")}, 200
+        return {"status": "success!", "scope": payload.get("scope"), "id": payload.get("id")}, 200
     except jwt.ExpiredSignatureError:
         return {"status": "fuck", "error": "token expired"}, 401
     except:
@@ -681,6 +685,59 @@ def _api_v1_notes_list():
     except Exception as e:
         print(e)
         return {"status": "fuck", "error": "idk"}, 500
+
+@app.route("/api/v1/admin/self", methods=["GET"])
+def _api_v1_admin_teams():
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return {"status": "fuck", "error": "no auth"}, 401
+    
+    token = auth_header.split(" ")[1]
+    try:
+        payload = jwt.decode(token, RSA_PUBLIC_KEY, algorithms=["RS256"])
+        team_id = payload.get("id")
+    except jwt.ExpiredSignatureError:
+        return {"status": "fuck", "error": "token expired"}, 401
+    except jwt.InvalidTokenError:
+        return {"status": "fuck", "error": "invalid token"}, 401
+    
+    if team_id in ADMIN_TEAMS:
+        return {"status": "success", "message": "you're chill"}, 200
+    
+    return {"status": "fuck", "error": "unauthorized"}, 403
+
+@app.route("/api/v1/admin/login", methods=["GET"])
+def _api_v1_admin_login():
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return {"status": "fuck", "error": "no auth"}, 401
+    
+    token = auth_header.split(" ")[1]
+    try:
+        payload = jwt.decode(token, RSA_PUBLIC_KEY, algorithms=["RS256"])
+        team_id = payload.get("id")
+    except jwt.ExpiredSignatureError:
+        return {"status": "fuck", "error": "token expired"}, 401
+    except jwt.InvalidTokenError:
+        return {"status": "fuck", "error": "invalid token"}, 401
+    
+    if team_id not in ADMIN_TEAMS:
+        return {"status": "fuck", "error": "unauthorized"}, 403
+    
+    try:
+        otp = int(request.args.get("otp"))
+
+        if otp < 0 or otp > 999999:
+            raise ValueError("OTP must be a 6-digit number")
+    except:
+        return {"status": "fuck", "error": "bad request"}, 400
+    
+    totp = get_totp()
+    if not totp.verify(otp, valid_window=1):
+        return {"status": "fuck", "error": "unauthorized"}, 403
+    
+    token = jwt.encode({"id": team_id, "scope": ["user", "admin"], "exp": int((datetime.now() + timedelta(hours=24)).timestamp())}, RSA_PRIVATE_KEY, algorithm="RS256")
+    return {"status": "success!", "token": token}, 200
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8080)

@@ -8,8 +8,10 @@ const tabs = [
     { buttonId: "button-rankings", viewId: "view-rankings" },
     { buttonId: "button-notes", viewId: "view-notes" },
     { buttonId: "button-insights", viewId: "view-insights" },
+    { buttonId: "button-compare", viewId: "view-compare" },
     { buttonId: "button-settings", viewId: "view-settings" },
     { buttonId: "button-about", viewId: "view-about" },
+    { buttonId: "button-admin", viewId: "view-admin" },
 ];
 let currentMatches = [];
 let currentRankings = [];
@@ -29,6 +31,8 @@ let showAllMatches = false;
 let queueInterval;
 const activeCharts = {};
 let currentOPRData = new Map();
+let isAdminAuthenticated = false;
+let currentUserScopes = [];
 function getViewNameFromId(viewId) {
     return viewId.replace("view-", "");
 }
@@ -1268,6 +1272,8 @@ async function verifyToken(token) {
         if (response.ok) {
             const data = await response.json();
             loggedInTeamId = data.id;
+            currentUserScopes = Array.isArray(data.scope) ? data.scope : [];
+            isAdminAuthenticated = currentUserScopes.includes("admin");
             return true;
         }
         return false;
@@ -1275,6 +1281,102 @@ async function verifyToken(token) {
     catch (error) {
         console.error("Token verification failed:", error);
         return false;
+    }
+}
+async function checkAdminStatus() {
+    const adminButton = document.getElementById("button-admin");
+    if (!adminButton)
+        return;
+    if (currentUserScopes.includes("admin")) {
+        adminButton.style.display = "";
+        return;
+    }
+    const token = localStorage.getItem("token");
+    if (!token)
+        return;
+    try {
+        const response = await authFetch("/api/v1/admin/self", {
+            method: "GET",
+            headers: {
+                "Authorization": `Bearer ${token}`
+            }
+        });
+        if (response.status === 200) {
+            adminButton.style.display = "";
+        }
+    }
+    catch (error) {
+        console.log("Admin check failed:", error);
+    }
+}
+function updateAdminViewState() {
+    const adminLogin = document.getElementById("admin-login");
+    const adminContainer = document.getElementById("admin-container");
+    if (isAdminAuthenticated) {
+        if (adminLogin)
+            adminLogin.style.display = "none";
+        if (adminContainer)
+            adminContainer.style.display = "";
+    }
+    else {
+        if (adminLogin)
+            adminLogin.style.display = "";
+        if (adminContainer)
+            adminContainer.style.display = "none";
+    }
+}
+async function handleAdminLogin(event) {
+    event.preventDefault();
+    const otpInput = document.getElementById("admin-otp");
+    const errorElement = document.getElementById("admin-login-error");
+    const submitButton = document.getElementById("admin-login-button");
+    if (!otpInput || !errorElement || !submitButton)
+        return;
+    const otp = otpInput.value.trim();
+    if (!/^\d{6}$/.test(otp)) {
+        errorElement.textContent = "Please enter a valid 6-digit code";
+        errorElement.style.display = "block";
+        return;
+    }
+    submitButton.textContent = "Authenticating...";
+    submitButton.disabled = true;
+    errorElement.style.display = "none";
+    try {
+        const token = localStorage.getItem("token");
+        if (!token) {
+            throw new Error("No token found");
+        }
+        const response = await authFetch(`/api/v1/admin/login?otp=${otp}`, {
+            method: "GET",
+            headers: {
+                "Authorization": `Bearer ${token}`
+            }
+        });
+        if (response.status === 200) {
+            const data = await response.json();
+            localStorage.setItem("token", data.token);
+            currentUserScopes = ["user", "admin"];
+            isAdminAuthenticated = true;
+            updateAdminViewState();
+            otpInput.value = "";
+        }
+        else if (response.status === 403) {
+            errorElement.textContent = "Invalid or expired code";
+            errorElement.style.display = "block";
+        }
+        else {
+            errorElement.textContent = "Authentication failed";
+            errorElement.style.display = "block";
+        }
+    }
+    catch (error) {
+        console.error("Admin login error:", error);
+        errorElement.textContent = "Authentication failed";
+        errorElement.style.display = "block";
+    }
+    finally {
+        submitButton.textContent = "Authenticate";
+        submitButton.disabled = false;
     }
 }
 function showLogin() {
@@ -1312,7 +1414,11 @@ async function handleLogin(event) {
         if (response.ok) {
             localStorage.setItem("token", data.token);
             loggedInTeamId = id;
+            currentUserScopes = ["user"];
+            isAdminAuthenticated = false;
             hideLogin();
+            await checkAdminStatus();
+            updateAdminViewState();
             loadEvents();
             if (tabs.length > 0) {
                 switchTab(tabs[0]);
@@ -3016,6 +3122,22 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (loginForm) {
         loginForm.addEventListener("submit", handleLogin);
     }
+    // Admin login initialization
+    const adminLoginForm = document.getElementById("admin-login-form");
+    const adminOtpInput = document.getElementById("admin-otp");
+    if (adminLoginForm) {
+        adminLoginForm.addEventListener("submit", handleAdminLogin);
+    }
+    if (adminOtpInput) {
+        adminOtpInput.addEventListener("input", () => {
+            const value = adminOtpInput.value.replace(/\D/g, "");
+            adminOtpInput.value = value;
+            if (value.length === 6) {
+                adminOtpInput?.blur();
+                adminLoginForm?.dispatchEvent(new Event("submit", { cancelable: true }));
+            }
+        });
+    }
     // Logout initialization
     const logoutBtn = document.getElementById("button-logout");
     if (logoutBtn) {
@@ -3027,6 +3149,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         const isValid = await verifyToken(token);
         if (isValid) {
             hideLogin();
+            await checkAdminStatus();
+            updateAdminViewState();
             await restoreStateFromUrl();
             await loadEventsWithStateRestore();
         }
