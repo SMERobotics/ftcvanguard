@@ -872,7 +872,7 @@ body {
 
 .login-container {
     background-color: #181818;
-    padding: 40px;
+    padding: 40px 40px 24px 40px;
     border-radius: 12px;
     border: 1px solid #333333;
     width: 320px;
@@ -978,7 +978,7 @@ body {
 }
 
 .admin-login-container {
-    background-color: #1e1e1e;
+    background-color: #181818;
     padding: 40px 40px 24px 40px;
     border-radius: 12px;
     border: 1px solid #333333;
