@@ -33,6 +33,8 @@ const activeCharts = {};
 let currentOPRData = new Map();
 let isAdminAuthenticated = false;
 let currentUserScopes = [];
+let currentRankingSortColumn = "rankingScore";
+let currentRankingSortDirection = "desc";
 function getViewNameFromId(viewId) {
     return viewId.replace("view-", "");
 }
@@ -707,30 +709,104 @@ function renderRankings(rankings) {
     const tbody = document.querySelector("#rankings-table tbody");
     if (!tbody)
         return;
-    tbody.innerHTML = "";
-    rankings.forEach((rank, index) => {
-        const tr = document.createElement("tr");
-        tr.style.animationDelay = `${index * 0.03}s`;
-        if (loggedInTeamId && rank.teamNumber === loggedInTeamId) {
-            tr.classList.add("current-team-rank");
+    tbody.style.opacity = "0";
+    setTimeout(() => {
+        tbody.innerHTML = "";
+        rankings.forEach((rank, index) => {
+            const tr = document.createElement("tr");
+            tr.style.animationDelay = `${index * 0.02}s`;
+            if (loggedInTeamId && rank.teamNumber === loggedInTeamId) {
+                tr.classList.add("current-team-rank");
+            }
+            const oprValue = currentOPRData.get(rank.teamNumber);
+            const oprDisplay = oprValue !== null && oprValue !== undefined ? oprValue.toFixed(1) : "–";
+            tr.innerHTML = `
+                <td>${rank.rank}</td>
+                <td><span class="team-number-link" data-team="${rank.teamNumber}">${rank.teamNumber}</span></td>
+                <td>${rank.teamName}</td>
+                <td>${rank.sortOrder1}</td>
+                <td>${oprDisplay}</td>
+                <td>${rank.sortOrder2}</td>
+                <td>${rank.sortOrder3}</td>
+                <td>${rank.sortOrder4}</td>
+                <td>${Math.floor(rank.sortOrder6)}</td>
+                <td>${rank.wins}-${rank.losses}-${rank.ties}</td>
+                <td>${rank.matchesPlayed}</td>
+            `;
+            tbody.appendChild(tr);
+        });
+        tbody.style.opacity = "1";
+    }, 100);
+}
+function getRankingValue(rank, column) {
+    switch (column) {
+        case "rankingScore": return rank.sortOrder1;
+        case "opr": return currentOPRData.get(rank.teamNumber) ?? -Infinity;
+        case "matchPoints": return rank.sortOrder2;
+        case "basePoints": return rank.sortOrder3;
+        case "autoPoints": return rank.sortOrder4;
+        case "highScore": return Math.floor(rank.sortOrder6);
+        case "wlt": return rank.wins * 10000 + rank.ties * 100 - rank.losses;
+        case "played": return rank.matchesPlayed;
+        default: return 0;
+    }
+}
+function getTiebreakerValue(rank, column) {
+    const order = ["rankingScore", "matchPoints", "basePoints", "autoPoints", "highScore", "opr"];
+    const filtered = order.filter(c => c !== column);
+    return filtered.map(c => getRankingValue(rank, c));
+}
+function compareRankings(a, b, column, direction) {
+    const multiplier = direction === "desc" ? -1 : 1;
+    const aVal = getRankingValue(a, column);
+    const bVal = getRankingValue(b, column);
+    if (aVal !== bVal)
+        return (aVal - bVal) * multiplier;
+    const aTiebreakers = getTiebreakerValue(a, column);
+    const bTiebreakers = getTiebreakerValue(b, column);
+    for (let i = 0; i < aTiebreakers.length; i++) {
+        if (aTiebreakers[i] !== bTiebreakers[i]) {
+            return (bTiebreakers[i] - aTiebreakers[i]);
         }
-        const oprValue = currentOPRData.get(rank.teamNumber);
-        const oprDisplay = oprValue !== null && oprValue !== undefined ? oprValue.toFixed(1) : "–";
-        tr.innerHTML = `
-            <td>${rank.rank}</td>
-            <td><span class="team-number-link" data-team="${rank.teamNumber}">${rank.teamNumber}</span></td>
-            <td>${rank.teamName}</td>
-            <td>${rank.sortOrder1}</td>
-            <td>${oprDisplay}</td>
-            <td>${rank.sortOrder2}</td>
-            <td>${rank.sortOrder3}</td>
-            <td>${rank.sortOrder4}</td>
-            <td>${Math.floor(rank.sortOrder6)}</td>
-            <td>${rank.wins}-${rank.losses}-${rank.ties}</td>
-            <td>${rank.matchesPlayed}</td>
-        `;
-        tbody.appendChild(tr);
+    }
+    return 0;
+}
+function sortRankings(rankings, column, direction) {
+    if (!column)
+        return rankings;
+    return [...rankings].sort((a, b) => compareRankings(a, b, column, direction));
+}
+function updateSortIndicators(activeColumn, direction) {
+    const headers = document.querySelectorAll("#rankings-table thead th.sortable");
+    headers.forEach(th => {
+        th.classList.remove("sort-asc", "sort-desc");
+        const sortKey = th.dataset.sort;
+        if (sortKey === activeColumn) {
+            th.classList.add(direction === "asc" ? "sort-asc" : "sort-desc");
+        }
     });
+}
+function handleRankingHeaderClick(column) {
+    if (currentRankingSortColumn === column) {
+        currentRankingSortDirection = currentRankingSortDirection === "desc" ? "asc" : "desc";
+    }
+    else {
+        currentRankingSortColumn = column;
+        currentRankingSortDirection = "desc";
+    }
+    updateSortIndicators(currentRankingSortColumn, currentRankingSortDirection);
+    const sorted = sortRankings(currentRankings, currentRankingSortColumn, currentRankingSortDirection);
+    renderRankings(sorted);
+}
+function initRankingSortHandlers() {
+    const headers = document.querySelectorAll("#rankings-table thead th.sortable");
+    headers.forEach(th => {
+        th.addEventListener("click", () => {
+            const sortKey = th.dataset.sort;
+            handleRankingHeaderClick(sortKey);
+        });
+    });
+    updateSortIndicators(currentRankingSortColumn, currentRankingSortDirection);
 }
 function renderSchedule(matches, rankings, teams) {
     const listContainer = document.getElementById("schedule-list");
@@ -3062,6 +3138,8 @@ document.addEventListener("DOMContentLoaded", async () => {
             });
         }
     });
+    // Rankings sort initialization
+    initRankingSortHandlers();
     // Keyboard shortcuts for navigation
     document.addEventListener("keydown", (e) => {
         // Only trigger if not typing in an input field

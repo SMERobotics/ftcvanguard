@@ -654,6 +654,45 @@ body {
     white-space: nowrap;
 }
 
+.stats-table th.sortable {
+    cursor: pointer;
+    user-select: none;
+    transition: opacity 0.3s ease;
+}
+
+.stats-table th.sortable:hover {
+    opacity: 0.8;
+}
+
+.stats-table th.sortable:active {
+    opacity: 0.6;
+}
+
+.stats-table th.sortable::after {
+    content: "";
+    display: inline-block;
+    margin-left: 4px;
+    width: 8px;
+    height: 5px;
+    vertical-align: middle;
+}
+
+.stats-table th.sortable.sort-asc::after {
+    width: 0;
+    height: 0;
+    border-left: 4px solid transparent;
+    border-right: 4px solid transparent;
+    border-bottom: 5px solid #868686;
+}
+
+.stats-table th.sortable.sort-desc::after {
+    width: 0;
+    height: 0;
+    border-left: 4px solid transparent;
+    border-right: 4px solid transparent;
+    border-top: 5px solid #868686;
+}
+
 .stats-table td {
     padding: 8px;
     color: #cccccc;
@@ -686,6 +725,10 @@ body {
     min-width: 100%;
     border-collapse: collapse;
     font-size: 13px;
+}
+
+#rankings-table tbody {
+    transition: opacity 0.1s ease-out;
 }
 
 #rankings-table th {
