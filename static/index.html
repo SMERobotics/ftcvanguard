@@ -151,7 +151,175 @@
                     </div>
                 </div>
                 <div id="admin-container" style="display: none;">
-                    <span>Admin Dashboard</span>
+                    <div class="admin-header">
+                        <h1>Admin Panel</h1>
+                        <div id="admin-message" class="admin-message" style="display: none;"></div>
+                    </div>
+                    
+                    <div class="admin-nav">
+                        <button id="admin-nav-overview" class="admin-nav-btn admin-nav-active" onclick="switchAdminSection('overview')">Overview</button>
+                        <button id="admin-nav-users" class="admin-nav-btn" onclick="switchAdminSection('users')">User Management</button>
+                        <button id="admin-nav-notes" class="admin-nav-btn" onclick="switchAdminSection('notes')">Notes Management</button>
+                        <button id="admin-nav-notifications" class="admin-nav-btn" onclick="switchAdminSection('notifications')">Notifications</button>
+                        <button id="admin-nav-database" class="admin-nav-btn" onclick="switchAdminSection('database')">Database</button>
+                    </div>
+
+                    <div id="admin-section-overview" class="admin-section">
+                        <h2>Server Statistics</h2>
+                        <div class="admin-stats-grid">
+                            <div class="admin-stat-card">
+                                <div class="admin-stat-label">Total Users</div>
+                                <div class="admin-stat-value" id="stat-total-users">0</div>
+                            </div>
+                            <div class="admin-stat-card">
+                                <div class="admin-stat-label">Total Notes</div>
+                                <div class="admin-stat-value" id="stat-total-notes">0</div>
+                            </div>
+                            <div class="admin-stat-card">
+                                <div class="admin-stat-label">Total Notifications</div>
+                                <div class="admin-stat-value" id="stat-total-notifications">0</div>
+                            </div>
+                            <div class="admin-stat-card">
+                                <div class="admin-stat-label">Database Size</div>
+                                <div class="admin-stat-value" id="stat-database-size">0 MB</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="admin-section-users" class="admin-section" style="display: none;">
+                        <h2>User Management</h2>
+                        
+                        <div class="admin-card">
+                            <h3>Create New User</h3>
+                            <div class="admin-form">
+                                <div class="admin-form-row">
+                                    <div class="form-group">
+                                        <label for="new-user-id">Team ID</label>
+                                        <input type="text" inputmode="numeric" pattern="[0-9]*" id="new-user-id" placeholder="12345">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="new-user-password">Password</label>
+                                        <input type="password" id="new-user-password" placeholder="Enter password">
+                                    </div>
+                                    <button class="admin-btn admin-btn-primary" onclick="createUser()">Create User</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="admin-card">
+                            <h3>Registered Users</h3>
+                            <div class="admin-table-container">
+                                <table class="admin-table" id="admin-users-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Team ID</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="admin-section-notes" class="admin-section" style="display: none;">
+                        <h2>Notes Management</h2>
+                        
+                        <div class="admin-card">
+                            <h3>All Team Notes</h3>
+                            <div class="admin-table-container">
+                                <table class="admin-table" id="admin-notes-table">
+                                    <thead>
+                                        <tr>
+                                            <th>ID</th>
+                                            <th>Team ID</th>
+                                            <th>Subject Team ID</th>
+                                            <th>Last Updated</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="admin-section-notifications" class="admin-section" style="display: none;">
+                        <h2>Notification Management</h2>
+                        
+                        <div class="admin-card">
+                            <h3>Send Custom Notification</h3>
+                            <div class="admin-form">
+                                <div class="form-group">
+                                    <label for="notif-team-id">Team ID</label>
+                                    <input type="text" inputmode="numeric" pattern="[0-9]*" id="notif-team-id" placeholder="12345">
+                                </div>
+                                <div class="form-group">
+                                    <label for="notif-title">Title</label>
+                                    <input type="text" id="notif-title" placeholder="Notification Title">
+                                </div>
+                                <div class="form-group">
+                                    <label for="notif-message">Message</label>
+                                    <textarea id="notif-message" placeholder="Notification message" rows="4"></textarea>
+                                </div>
+                                <div class="form-group">
+                                    <label for="notif-priority">Priority</label>
+                                    <select id="notif-priority">
+                                        <option value="1">Low (1)</option>
+                                        <option value="2">Low-Medium (2)</option>
+                                        <option value="3" selected>Default (3)</option>
+                                        <option value="4">Medium-High (4)</option>
+                                        <option value="5">High (5)</option>
+                                    </select>
+                                </div>
+                                <button class="admin-btn admin-btn-primary" onclick="sendNotification()">Send Notification</button>
+                            </div>
+                        </div>
+
+                        <div class="admin-card">
+                            <div class="admin-card-header">
+                                <h3>Notification History (Last 100)</h3>
+                                <button class="admin-btn admin-btn-danger" onclick="clearNotificationHistory()">Clear History</button>
+                            </div>
+                            <div class="admin-table-container">
+                                <table class="admin-table" id="admin-notifications-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Team ID</th>
+                                            <th>Title</th>
+                                            <th>Message</th>
+                                            <th>Sent At</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="admin-section-database" class="admin-section" style="display: none;">
+                        <h2>Database Management</h2>
+                        
+                        <div class="admin-card">
+                            <h3>Database Maintenance</h3>
+                            <p class="admin-card-description">Optimize the database by reclaiming unused space and reorganizing data.</p>
+                            <button class="admin-btn admin-btn-primary" onclick="vacuumDatabase()">Vacuum Database</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="reset-password-modal" class="admin-modal" style="display: none;">
+                    <div class="admin-modal-content">
+                        <h3>Reset Password for User <span id="reset-password-user-id"></span></h3>
+                        <div class="form-group">
+                            <label for="reset-password-input">New Password</label>
+                            <input type="password" id="reset-password-input" placeholder="Enter new password">
+                        </div>
+                        <div class="admin-modal-actions">
+                            <button class="admin-btn admin-btn-secondary" onclick="hideResetPasswordModal()">Cancel</button>
+                            <button class="admin-btn admin-btn-primary" onclick="resetPassword()">Reset Password</button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -179,5 +347,6 @@
             </div>
         </div>
         <script src="/assets/app.js"></script>
+        <script src="/assets/admin.js"></script>
     </body>
 </html>

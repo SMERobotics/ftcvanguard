@@ -1431,10 +1431,14 @@ async function handleAdminLogin(event) {
         if (response.status === 200) {
             const data = await response.json();
             localStorage.setItem("token", data.token);
+            localStorage.setItem("adminToken", data.token);
             currentUserScopes = ["user", "admin"];
             isAdminAuthenticated = true;
             updateAdminViewState();
             otpInput.value = "";
+            if (typeof window.switchAdminSection === "function") {
+                window.switchAdminSection("overview");
+            }
         }
         else if (response.status === 403) {
             errorElement.textContent = "Invalid or expired code";

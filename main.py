@@ -31,6 +31,7 @@ ADMIN_SECRET = settings["admin"]["admin_secret"]
 get_db = lambda: sqlite3.connect("default.db", check_same_thread=True)
 get_totp = lambda: pyotp.TOTP(ADMIN_SECRET)
 
+
 def get_active_event(team_id: int) -> str | None:
     now = datetime.now() - timedelta(weeks=34)
     year = now.year
@@ -47,19 +48,26 @@ def get_active_event(team_id: int) -> str | None:
             return event.get("code")
     return None
 
-def get_next_match(schedule: list[dict], team_id: int, now: datetime) -> tuple[str, str, datetime] | None:
+
+def get_next_match(
+    schedule: list[dict], team_id: int, now: datetime
+) -> tuple[str, str, datetime] | None:
     next_match: tuple[str, str, datetime] | None = None
 
     for i, match in enumerate(schedule):
         if not match.get("teams"):
             continue
-        if not any(team.get("teamNumber") == team_id for team in match.get("teams", [])):
+        if not any(
+            team.get("teamNumber") == team_id for team in match.get("teams", [])
+        ):
             continue
 
         queue_time: datetime | None = None
 
         if match.get("matchNumber") == 1:
-            queue_time = datetime.fromisoformat(match.get("startTime")) - timedelta(minutes=10)
+            queue_time = datetime.fromisoformat(match.get("startTime")) - timedelta(
+                minutes=10
+            )
         else:
             prev_match = None
             for prev in schedule[:i]:
@@ -68,7 +76,9 @@ def get_next_match(schedule: list[dict], team_id: int, now: datetime) -> tuple[s
             if prev_match:
                 queue_time = datetime.fromisoformat(prev_match.get("startTime"))
             else:
-                queue_time = datetime.fromisoformat(match.get("startTime")) - timedelta(minutes=10)
+                queue_time = datetime.fromisoformat(match.get("startTime")) - timedelta(
+                    minutes=10
+                )
 
         if queue_time <= now:
             continue
@@ -78,19 +88,22 @@ def get_next_match(schedule: list[dict], team_id: int, now: datetime) -> tuple[s
 
     return next_match
 
-def send_notification(team_id: int, title: str, message: str, priority: int=3, click: str=""):
+
+def send_notification(
+    team_id: int, title: str, message: str, priority: int = 3, click: str = ""
+):
     db = get_db()
     cursor = db.cursor()
-    
+
     cursor.execute(
         "SELECT id FROM notifications WHERE team_id = ? AND title = ? AND message = ?",
-        (team_id, title, message)
+        (team_id, title, message),
     )
     if cursor.fetchone() is not None:
         cursor.close()
         db.close()
         return True
-    
+
     print(f"Sending notification to team {team_id}: {title} - {message}")
     topic = NTFY_TOPIC.format(team_id)
     url = f"{NTFY_SERVER_URL}/{topic}"
@@ -100,14 +113,14 @@ def send_notification(team_id: int, title: str, message: str, priority: int=3, c
     }
     if click:
         headers["Click"] = click
-    
+
     try:
         r = requests.post(url, data=message.encode("utf-8"), headers=headers)
         if r.status_code == 200:
             sent_at = int(datetime.now().timestamp())
             cursor.execute(
                 "INSERT OR IGNORE INTO notifications (team_id, title, message, sent_at) VALUES (?, ?, ?, ?)",
-                (team_id, title, message, sent_at)
+                (team_id, title, message, sent_at),
             )
             db.commit()
         cursor.close()
@@ -118,6 +131,7 @@ def send_notification(team_id: int, title: str, message: str, priority: int=3, c
         cursor.close()
         db.close()
         return False
+
 
 def notification_callback():
     now = datetime.now() - timedelta(weeks=34)
@@ -135,7 +149,13 @@ def notification_callback():
             continue
 
         schedule_url = f"{VANGUARD_URL}/?view=schedule&event={event}"
-        send_notification(team_id, "Schedule Available", f"Match schedule for {event} is available!", priority=5, click=schedule_url)
+        send_notification(
+            team_id,
+            "Schedule Available",
+            f"Match schedule for {event} is available!",
+            priority=5,
+            click=schedule_url,
+        )
 
         schedule = r.json().get("schedule", [])
         match_info = get_next_match(schedule, team_id, now)
@@ -151,27 +171,28 @@ def notification_callback():
             if match.get("description") == name and match.get("field") == field:
                 match_number = match.get("matchNumber")
                 break
-        
+
         match_url = f"{VANGUARD_URL}/?view=schedule&event={event}"
         if match_number:
             match_url += f"&match={match_number}"
 
         if 240 < until_queue <= 360:
             send_notification(
-            team_id,
-            "Upcoming Match",
-            f"{name} on field {field} in 5 minutes. Get ready!",
-            priority=3,
-            click=match_url
+                team_id,
+                "Upcoming Match",
+                f"{name} on field {field} in 5 minutes. Get ready!",
+                priority=3,
+                click=match_url,
             )
         elif -60 <= until_queue <= 60:
             send_notification(
-            team_id,
-            "Match Queueing",
-            f"{name} on field {field} is queueing now. Good luck!",
-            priority=5,
-            click=match_url
+                team_id,
+                "Match Queueing",
+                f"{name} on field {field} is queueing now. Good luck!",
+                priority=5,
+                click=match_url,
             )
+
 
 def notification_loop():
     while True:
@@ -180,6 +201,7 @@ def notification_loop():
         except Exception as e:
             print(f"Notification loop error: {e}")
         time.sleep(30)
+
 
 app = Flask(__name__)
 
@@ -197,7 +219,9 @@ with open(os.path.join(ssh_dir, "id_rsa.pem"), "r") as f:
 db = get_db()
 cursor = db.cursor()
 cursor.execute("PRAGMA journal_mode=WAL;")
-cursor.execute("CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, password TEXT)")
+cursor.execute(
+    "CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, password TEXT)"
+)
 
 cursor.execute("""CREATE TABLE IF NOT EXISTS notes (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -224,19 +248,22 @@ if len(NTFY_TEAMS) > 0:
     thread = threading.Thread(target=notification_loop, daemon=True)
     thread.start()
 
+
 @app.route("/", methods=["GET"])
 def _root():
     return send_from_directory("static", "index.html")
+
 
 @app.route("/assets/<path:path>", methods=["GET"])
 def _assets(path):
     return send_from_directory("static/assets", path)
 
+
 @app.route("/api/v1/register", methods=["POST"])
 def _api_v1_register():
     if BLOCK_REGISTRATION:
         return {"status": "fuck", "error": "nrn try again ltr"}, 403
-    
+
     data = request.json
     id = data.get("id")
 
@@ -244,7 +271,7 @@ def _api_v1_register():
         team_id = int(id)
     except ValueError:
         return {"status": "fuck", "error": "id must be int"}, 400
-    
+
     password = data.get("password")
     hash = ph.hash(password)
 
@@ -254,8 +281,10 @@ def _api_v1_register():
         cursor.execute("SELECT id FROM users WHERE id = ?", (team_id,))
         if cursor.fetchone() is not None:
             return {"status": "fuck", "error": "no hallucinations"}, 409
-        
-        cursor.execute("INSERT INTO users (id, password) VALUES (?, ?)", (team_id, hash))
+
+        cursor.execute(
+            "INSERT INTO users (id, password) VALUES (?, ?)", (team_id, hash)
+        )
         db.commit()
         cursor.close()
         db.close()
@@ -263,6 +292,7 @@ def _api_v1_register():
     except Exception as e:
         print(e)
         return {"status": "fuck", "error": "idk"}, 500
+
 
 @app.route("/api/v1/login", methods=["POST"])
 def _api_v1_login():
@@ -288,7 +318,15 @@ def _api_v1_login():
         stored_hash = row[0]
         ph.verify(stored_hash, password)
 
-        token = jwt.encode({"id": team_id, "scope": ["user"], "exp": int((datetime.now() + timedelta(hours=24)).timestamp())}, RSA_PRIVATE_KEY, algorithm="RS256")
+        token = jwt.encode(
+            {
+                "id": team_id,
+                "scope": ["user"],
+                "exp": int((datetime.now() + timedelta(hours=24)).timestamp()),
+            },
+            RSA_PRIVATE_KEY,
+            algorithm="RS256",
+        )
         cursor.close()
         db.close()
         return {"status": "success!", "token": token}, 200
@@ -298,27 +336,33 @@ def _api_v1_login():
         print(e)
         return {"status": "fuck", "error": "idk"}, 500
 
+
 @app.route("/api/v1/verify", methods=["GET"])
 def _api_v1_verify():
     auth_header = request.headers.get("Authorization")
     if not auth_header or not auth_header.startswith("Bearer "):
         return {"status": "fuck", "error": "no auth"}, 401
-    
+
     token = auth_header.split(" ")[1]
     try:
         payload = jwt.decode(token, RSA_PUBLIC_KEY, algorithms=["RS256"])
-        return {"status": "success!", "scope": payload.get("scope"), "id": payload.get("id")}, 200
+        return {
+            "status": "success!",
+            "scope": payload.get("scope"),
+            "id": payload.get("id"),
+        }, 200
     except jwt.ExpiredSignatureError:
         return {"status": "fuck", "error": "token expired"}, 401
     except:
         return {"status": "fuck", "error": "invalid token"}, 401
+
 
 @app.route("/api/v1/events", methods=["GET"])
 def _api_v1_events():
     auth_header = request.headers.get("Authorization")
     if not auth_header or not auth_header.startswith("Bearer "):
         return {"status": "fuck", "error": "no auth"}, 401
-    
+
     token = auth_header.split(" ")[1]
     try:
         payload = jwt.decode(token, RSA_PUBLIC_KEY, algorithms=["RS256"])
@@ -327,7 +371,7 @@ def _api_v1_events():
         return {"status": "fuck", "error": "token expired"}, 401
     except:
         return {"status": "fuck", "error": "invalid token"}, 401
-    
+
     # fetch events from FTC API
 
     now = datetime.now() - timedelta(weeks=34)
@@ -336,12 +380,13 @@ def _api_v1_events():
     r = s.get(f"{FTC_API_URL}/{year}/events?teamNumber={team_id}")
     return r.json(), r.status_code
 
+
 @app.route("/api/v1/event", methods=["GET"])
 def _api_v1_event():
     auth_header = request.headers.get("Authorization")
     if not auth_header or not auth_header.startswith("Bearer "):
         return {"status": "fuck", "error": "no auth"}, 401
-    
+
     token = auth_header.split(" ")[1]
     try:
         payload = jwt.decode(token, RSA_PUBLIC_KEY, algorithms=["RS256"])
@@ -349,7 +394,7 @@ def _api_v1_event():
         return {"status": "fuck", "error": "token expired"}, 401
     except:
         return {"status": "fuck", "error": "invalid token"}, 401
-    
+
     # fetch event from FTC API
 
     try:
@@ -363,12 +408,13 @@ def _api_v1_event():
     r = s.get(f"{FTC_API_URL}/{year}/events?eventCode={event}")
     return r.json(), r.status_code
 
+
 @app.route("/api/v1/schedule", methods=["GET"])
 def _api_v1_schedule():
     auth_header = request.headers.get("Authorization")
     if not auth_header or not auth_header.startswith("Bearer "):
         return {"status": "fuck", "error": "no auth"}, 401
-    
+
     token = auth_header.split(" ")[1]
     try:
         jwt.decode(token, RSA_PUBLIC_KEY, algorithms=["RS256"])
@@ -376,7 +422,7 @@ def _api_v1_schedule():
         return {"status": "fuck", "error": "token expired"}, 401
     except:
         return {"status": "fuck", "error": "invalid token"}, 401
-    
+
     # fetch schedule from FTC API
 
     try:
@@ -409,12 +455,13 @@ def _api_v1_schedule():
 
     return {"schedule": merged_schedule}, 200
 
+
 @app.route("/api/v1/matches", methods=["GET"])
 def _api_v1_matches():
     auth_header = request.headers.get("Authorization")
     if not auth_header or not auth_header.startswith("Bearer "):
         return {"status": "fuck", "error": "no auth"}, 401
-    
+
     token = auth_header.split(" ")[1]
     try:
         jwt.decode(token, RSA_PUBLIC_KEY, algorithms=["RS256"])
@@ -445,12 +492,13 @@ def _api_v1_matches():
     r = s.get(url)
     return r.json(), r.status_code
 
+
 @app.route("/api/v1/scores/<event>/<level>", methods=["GET"])
 def _api_v1_scores(event, level):
     auth_header = request.headers.get("Authorization")
     if not auth_header or not auth_header.startswith("Bearer "):
         return {"status": "fuck", "error": "no auth"}, 401
-    
+
     token = auth_header.split(" ")[1]
     try:
         jwt.decode(token, RSA_PUBLIC_KEY, algorithms=["RS256"])
@@ -461,16 +509,17 @@ def _api_v1_scores(event, level):
 
     now = datetime.now() - timedelta(weeks=34)
     year = now.year
-    
+
     r = s.get(f"{FTC_API_URL}/{year}/scores/{event}/{level}")
     return r.json(), r.status_code
+
 
 @app.route("/api/v1/team/<int:team_number>/events", methods=["GET"])
 def _api_v1_team_events(team_number):
     auth_header = request.headers.get("Authorization")
     if not auth_header or not auth_header.startswith("Bearer "):
         return {"status": "fuck", "error": "no auth"}, 401
-    
+
     token = auth_header.split(" ")[1]
     try:
         jwt.decode(token, RSA_PUBLIC_KEY, algorithms=["RS256"])
@@ -481,16 +530,17 @@ def _api_v1_team_events(team_number):
 
     now = datetime.now() - timedelta(weeks=34)
     year = now.year
-    
+
     r = s.get(f"{FTC_API_URL}/{year}/events?teamNumber={team_number}")
     return r.json(), r.status_code
+
 
 @app.route("/api/v1/rankings", methods=["GET"])
 def _api_v1_rankings():
     auth_header = request.headers.get("Authorization")
     if not auth_header or not auth_header.startswith("Bearer "):
         return {"status": "fuck", "error": "no auth"}, 401
-    
+
     token = auth_header.split(" ")[1]
     try:
         payload = jwt.decode(token, RSA_PUBLIC_KEY, algorithms=["RS256"])
@@ -498,7 +548,7 @@ def _api_v1_rankings():
         return {"status": "fuck", "error": "token expired"}, 401
     except:
         return {"status": "fuck", "error": "invalid token"}, 401
-    
+
     # fetch rankings from FTC API using event rankings
 
     try:
@@ -511,16 +561,17 @@ def _api_v1_rankings():
 
     now = datetime.now() - timedelta(weeks=34)
     year = now.year
-    
+
     r = s.get(f"{FTC_API_URL}/{year}/rankings/{event}")
     return r.json(), r.status_code
+
 
 @app.route("/api/v1/teams", methods=["GET"])
 def _api_v1_teams():
     auth_header = request.headers.get("Authorization")
     if not auth_header or not auth_header.startswith("Bearer "):
         return {"status": "fuck", "error": "no auth"}, 401
-    
+
     token = auth_header.split(" ")[1]
     try:
         payload = jwt.decode(token, RSA_PUBLIC_KEY, algorithms=["RS256"])
@@ -528,24 +579,25 @@ def _api_v1_teams():
         return {"status": "fuck", "error": "token expired"}, 401
     except jwt.InvalidTokenError:
         return {"status": "fuck", "error": "invalid token"}, 401
-    
+
     try:
         event = request.args.get("event")
     except:
         return {"status": "fuck", "error": "bad request"}, 400
-    
+
     now = datetime.now() - timedelta(weeks=34)
     year = now.year
-    
+
     r = s.get(f"{FTC_API_URL}/{year}/teams?eventCode={event}")
     return r.json(), r.status_code
+
 
 @app.route("/api/v1/notes", methods=["GET"])
 def _api_v1_notes_get():
     auth_header = request.headers.get("Authorization")
     if not auth_header or not auth_header.startswith("Bearer "):
         return {"status": "fuck", "error": "no auth"}, 401
-    
+
     token = auth_header.split(" ")[1]
     try:
         payload = jwt.decode(token, RSA_PUBLIC_KEY, algorithms=["RS256"])
@@ -554,28 +606,28 @@ def _api_v1_notes_get():
         return {"status": "fuck", "error": "token expired"}, 401
     except jwt.InvalidTokenError:
         return {"status": "fuck", "error": "invalid token"}, 401
-    
+
     subject_team_id = request.args.get("team")
     if not subject_team_id:
         return {"status": "fuck", "error": "missing team parameter"}, 400
-    
+
     try:
         subject_team_id = int(subject_team_id)
     except ValueError:
         return {"status": "fuck", "error": "team must be integer"}, 400
-    
+
     try:
         db = get_db()
         cursor = db.cursor()
         cursor.execute(
             """SELECT auto_performance, teleop_performance, general_notes, updated_at 
                FROM notes WHERE team_id = ? AND subject_team_id = ?""",
-            (team_id, subject_team_id)
+            (team_id, subject_team_id),
         )
         row = cursor.fetchone()
         cursor.close()
         db.close()
-        
+
         if row is None:
             return {
                 "status": "success",
@@ -583,29 +635,30 @@ def _api_v1_notes_get():
                     "autoPerformance": "",
                     "teleopPerformance": "",
                     "generalNotes": "",
-                    "updatedAt": None
-                }
+                    "updatedAt": None,
+                },
             }, 200
-        
+
         return {
             "status": "success",
             "notes": {
                 "autoPerformance": row[0] or "",
                 "teleopPerformance": row[1] or "",
                 "generalNotes": row[2] or "",
-                "updatedAt": row[3]
-            }
+                "updatedAt": row[3],
+            },
         }, 200
     except Exception as e:
         print(e)
         return {"status": "fuck", "error": "idk"}, 500
+
 
 @app.route("/api/v1/notes", methods=["POST"])
 def _api_v1_notes_post():
     auth_header = request.headers.get("Authorization")
     if not auth_header or not auth_header.startswith("Bearer "):
         return {"status": "fuck", "error": "no auth"}, 401
-    
+
     token = auth_header.split(" ")[1]
     try:
         payload = jwt.decode(token, RSA_PUBLIC_KEY, algorithms=["RS256"])
@@ -614,11 +667,11 @@ def _api_v1_notes_post():
         return {"status": "fuck", "error": "token expired"}, 401
     except jwt.InvalidTokenError:
         return {"status": "fuck", "error": "invalid token"}, 401
-    
+
     data = request.json
     if not data:
         return {"status": "fuck", "error": "missing request body"}, 400
-    
+
     try:
         subject_team_id = int(data.get("subjectTeamId"))
         auto_performance = data.get("autoPerformance", "")
@@ -627,35 +680,46 @@ def _api_v1_notes_post():
     except (ValueError, TypeError) as e:
         print(f"Invalid request data: {e}")
         return {"status": "fuck", "error": "invalid request data"}, 400
-    
+
     try:
         db = get_db()
         cursor = db.cursor()
         updated_at = int(datetime.now().timestamp())
-        
+
         cursor.execute(
             """INSERT INTO notes (team_id, subject_team_id, auto_performance, teleop_performance, general_notes, updated_at)
                VALUES (?, ?, ?, ?, ?, ?)
                ON CONFLICT(team_id, subject_team_id) 
                DO UPDATE SET auto_performance=?, teleop_performance=?, general_notes=?, updated_at=?""",
-            (team_id, subject_team_id, auto_performance, teleop_performance, general_notes, updated_at,
-             auto_performance, teleop_performance, general_notes, updated_at)
+            (
+                team_id,
+                subject_team_id,
+                auto_performance,
+                teleop_performance,
+                general_notes,
+                updated_at,
+                auto_performance,
+                teleop_performance,
+                general_notes,
+                updated_at,
+            ),
         )
         db.commit()
         cursor.close()
         db.close()
-        
+
         return {"status": "success", "updatedAt": updated_at}, 200
     except Exception as e:
         print(e)
         return {"status": "fuck", "error": "idk"}, 500
+
 
 @app.route("/api/v1/notes/list", methods=["GET"])
 def _api_v1_notes_list():
     auth_header = request.headers.get("Authorization")
     if not auth_header or not auth_header.startswith("Bearer "):
         return {"status": "fuck", "error": "no auth"}, 401
-    
+
     token = auth_header.split(" ")[1]
     try:
         payload = jwt.decode(token, RSA_PUBLIC_KEY, algorithms=["RS256"])
@@ -664,34 +728,35 @@ def _api_v1_notes_list():
         return {"status": "fuck", "error": "token expired"}, 401
     except jwt.InvalidTokenError:
         return {"status": "fuck", "error": "invalid token"}, 401
-    
+
     try:
         db = get_db()
         cursor = db.cursor()
         cursor.execute(
             """SELECT subject_team_id, updated_at FROM notes 
                WHERE team_id = ?""",
-            (team_id,)
+            (team_id,),
         )
         rows = cursor.fetchall()
         cursor.close()
         db.close()
-        
+
         notes_status = {}
         for row in rows:
             notes_status[row[0]] = row[1]
-        
+
         return {"status": "success", "notesStatus": notes_status}, 200
     except Exception as e:
         print(e)
         return {"status": "fuck", "error": "idk"}, 500
+
 
 @app.route("/api/v1/admin/self", methods=["GET"])
 def _api_v1_admin_teams():
     auth_header = request.headers.get("Authorization")
     if not auth_header or not auth_header.startswith("Bearer "):
         return {"status": "fuck", "error": "no auth"}, 401
-    
+
     token = auth_header.split(" ")[1]
     try:
         payload = jwt.decode(token, RSA_PUBLIC_KEY, algorithms=["RS256"])
@@ -700,18 +765,19 @@ def _api_v1_admin_teams():
         return {"status": "fuck", "error": "token expired"}, 401
     except jwt.InvalidTokenError:
         return {"status": "fuck", "error": "invalid token"}, 401
-    
+
     if team_id in ADMIN_TEAMS:
         return {"status": "success", "message": "you're chill"}, 200
-    
+
     return {"status": "fuck", "error": "unauthorized"}, 403
+
 
 @app.route("/api/v1/admin/login", methods=["GET"])
 def _api_v1_admin_login():
     auth_header = request.headers.get("Authorization")
     if not auth_header or not auth_header.startswith("Bearer "):
         return {"status": "fuck", "error": "no auth"}, 401
-    
+
     token = auth_header.split(" ")[1]
     try:
         payload = jwt.decode(token, RSA_PUBLIC_KEY, algorithms=["RS256"])
@@ -720,10 +786,10 @@ def _api_v1_admin_login():
         return {"status": "fuck", "error": "token expired"}, 401
     except jwt.InvalidTokenError:
         return {"status": "fuck", "error": "invalid token"}, 401
-    
+
     if team_id not in ADMIN_TEAMS:
         return {"status": "fuck", "error": "unauthorized"}, 403
-    
+
     try:
         otp = int(request.args.get("otp"))
 
@@ -731,13 +797,443 @@ def _api_v1_admin_login():
             raise ValueError("OTP must be a 6-digit number")
     except:
         return {"status": "fuck", "error": "bad request"}, 400
-    
+
     totp = get_totp()
     if not totp.verify(otp, valid_window=1):
         return {"status": "fuck", "error": "unauthorized"}, 403
-    
-    token = jwt.encode({"id": team_id, "scope": ["user", "admin"], "exp": int((datetime.now() + timedelta(hours=24)).timestamp())}, RSA_PRIVATE_KEY, algorithm="RS256")
+
+    token = jwt.encode(
+        {
+            "id": team_id,
+            "scope": ["user", "admin"],
+            "exp": int((datetime.now() + timedelta(hours=24)).timestamp()),
+        },
+        RSA_PRIVATE_KEY,
+        algorithm="RS256",
+    )
     return {"status": "success!", "token": token}, 200
+
+
+@app.route("/api/v1/admin/stats", methods=["GET"])
+def _api_v1_admin_stats():
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return {"status": "fuck", "error": "no auth"}, 401
+
+    token = auth_header.split(" ")[1]
+    try:
+        payload = jwt.decode(token, RSA_PUBLIC_KEY, algorithms=["RS256"])
+        if "admin" not in payload.get("scope", []):
+            return {"status": "fuck", "error": "unauthorized"}, 403
+    except jwt.ExpiredSignatureError:
+        return {"status": "fuck", "error": "token expired"}, 401
+    except jwt.InvalidTokenError:
+        return {"status": "fuck", "error": "invalid token"}, 401
+
+    try:
+        db = get_db()
+        cursor = db.cursor()
+
+        cursor.execute("SELECT COUNT(*) FROM users")
+        total_users = cursor.fetchone()[0]
+
+        cursor.execute("SELECT COUNT(*) FROM notes")
+        total_notes = cursor.fetchone()[0]
+
+        cursor.execute("SELECT COUNT(*) FROM notifications")
+        total_notifications = cursor.fetchone()[0]
+
+        cursor.execute(
+            "SELECT page_count * page_size FROM pragma_page_count(), pragma_page_size()"
+        )
+        db_size = cursor.fetchone()[0]
+
+        cursor.close()
+        db.close()
+
+        return {
+            "status": "success",
+            "stats": {
+                "totalUsers": total_users,
+                "totalNotes": total_notes,
+                "totalNotifications": total_notifications,
+                "databaseSize": db_size,
+            },
+        }, 200
+    except Exception as e:
+        print(e)
+        return {"status": "fuck", "error": "idk"}, 500
+
+
+@app.route("/api/v1/admin/users", methods=["GET"])
+def _api_v1_admin_users():
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return {"status": "fuck", "error": "no auth"}, 401
+
+    token = auth_header.split(" ")[1]
+    try:
+        payload = jwt.decode(token, RSA_PUBLIC_KEY, algorithms=["RS256"])
+        if "admin" not in payload.get("scope", []):
+            return {"status": "fuck", "error": "unauthorized"}, 403
+    except jwt.ExpiredSignatureError:
+        return {"status": "fuck", "error": "token expired"}, 401
+    except jwt.InvalidTokenError:
+        return {"status": "fuck", "error": "invalid token"}, 401
+
+    try:
+        db = get_db()
+        cursor = db.cursor()
+        cursor.execute("SELECT id FROM users ORDER BY id ASC")
+        rows = cursor.fetchall()
+        cursor.close()
+        db.close()
+
+        users = [{"id": row[0]} for row in rows]
+        return {"status": "success", "users": users}, 200
+    except Exception as e:
+        print(e)
+        return {"status": "fuck", "error": "idk"}, 500
+
+
+@app.route("/api/v1/admin/users", methods=["POST"])
+def _api_v1_admin_create_user():
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return {"status": "fuck", "error": "no auth"}, 401
+
+    token = auth_header.split(" ")[1]
+    try:
+        payload = jwt.decode(token, RSA_PUBLIC_KEY, algorithms=["RS256"])
+        if "admin" not in payload.get("scope", []):
+            return {"status": "fuck", "error": "unauthorized"}, 403
+    except jwt.ExpiredSignatureError:
+        return {"status": "fuck", "error": "token expired"}, 401
+    except jwt.InvalidTokenError:
+        return {"status": "fuck", "error": "invalid token"}, 401
+
+    data = request.json
+    team_id = data.get("id")
+    password = data.get("password")
+
+    if not team_id or not password:
+        return {"status": "fuck", "error": "missing id or password"}, 400
+
+    try:
+        team_id = int(team_id)
+    except ValueError:
+        return {"status": "fuck", "error": "id must be int"}, 400
+
+    try:
+        hash = ph.hash(password)
+        db = get_db()
+        cursor = db.cursor()
+
+        cursor.execute("SELECT id FROM users WHERE id = ?", (team_id,))
+        if cursor.fetchone() is not None:
+            return {"status": "fuck", "error": "user already exists"}, 409
+
+        cursor.execute(
+            "INSERT INTO users (id, password) VALUES (?, ?)", (team_id, hash)
+        )
+        db.commit()
+        cursor.close()
+        db.close()
+
+        return {"status": "success"}, 201
+    except Exception as e:
+        print(e)
+        return {"status": "fuck", "error": "idk"}, 500
+
+
+@app.route("/api/v1/admin/users/<int:user_id>", methods=["DELETE"])
+def _api_v1_admin_delete_user(user_id):
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return {"status": "fuck", "error": "no auth"}, 401
+
+    token = auth_header.split(" ")[1]
+    try:
+        payload = jwt.decode(token, RSA_PUBLIC_KEY, algorithms=["RS256"])
+        if "admin" not in payload.get("scope", []):
+            return {"status": "fuck", "error": "unauthorized"}, 403
+    except jwt.ExpiredSignatureError:
+        return {"status": "fuck", "error": "token expired"}, 401
+    except jwt.InvalidTokenError:
+        return {"status": "fuck", "error": "invalid token"}, 401
+
+    try:
+        db = get_db()
+        cursor = db.cursor()
+        cursor.execute("DELETE FROM users WHERE id = ?", (user_id,))
+        db.commit()
+        cursor.close()
+        db.close()
+
+        return {"status": "success"}, 200
+    except Exception as e:
+        print(e)
+        return {"status": "fuck", "error": "idk"}, 500
+
+
+@app.route("/api/v1/admin/users/<int:user_id>/password", methods=["PUT"])
+def _api_v1_admin_reset_password(user_id):
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return {"status": "fuck", "error": "no auth"}, 401
+
+    token = auth_header.split(" ")[1]
+    try:
+        payload = jwt.decode(token, RSA_PUBLIC_KEY, algorithms=["RS256"])
+        if "admin" not in payload.get("scope", []):
+            return {"status": "fuck", "error": "unauthorized"}, 403
+    except jwt.ExpiredSignatureError:
+        return {"status": "fuck", "error": "token expired"}, 401
+    except jwt.InvalidTokenError:
+        return {"status": "fuck", "error": "invalid token"}, 401
+
+    data = request.json
+    password = data.get("password")
+
+    if not password:
+        return {"status": "fuck", "error": "missing password"}, 400
+
+    try:
+        hash = ph.hash(password)
+        db = get_db()
+        cursor = db.cursor()
+        cursor.execute("UPDATE users SET password = ? WHERE id = ?", (hash, user_id))
+        db.commit()
+        cursor.close()
+        db.close()
+
+        return {"status": "success"}, 200
+    except Exception as e:
+        print(e)
+        return {"status": "fuck", "error": "idk"}, 500
+
+
+@app.route("/api/v1/admin/notes", methods=["GET"])
+def _api_v1_admin_notes():
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return {"status": "fuck", "error": "no auth"}, 401
+
+    token = auth_header.split(" ")[1]
+    try:
+        payload = jwt.decode(token, RSA_PUBLIC_KEY, algorithms=["RS256"])
+        if "admin" not in payload.get("scope", []):
+            return {"status": "fuck", "error": "unauthorized"}, 403
+    except jwt.ExpiredSignatureError:
+        return {"status": "fuck", "error": "token expired"}, 401
+    except jwt.InvalidTokenError:
+        return {"status": "fuck", "error": "invalid token"}, 401
+
+    try:
+        db = get_db()
+        cursor = db.cursor()
+        cursor.execute("""
+            SELECT id, team_id, subject_team_id, auto_performance, teleop_performance, general_notes, updated_at 
+            FROM notes 
+            ORDER BY updated_at DESC
+        """)
+        rows = cursor.fetchall()
+        cursor.close()
+        db.close()
+
+        notes = [
+            {
+                "id": row[0],
+                "teamId": row[1],
+                "subjectTeamId": row[2],
+                "autoPerformance": row[3] or "",
+                "teleopPerformance": row[4] or "",
+                "generalNotes": row[5] or "",
+                "updatedAt": row[6],
+            }
+            for row in rows
+        ]
+
+        return {"status": "success", "notes": notes}, 200
+    except Exception as e:
+        print(e)
+        return {"status": "fuck", "error": "idk"}, 500
+
+
+@app.route("/api/v1/admin/notes/<int:note_id>", methods=["DELETE"])
+def _api_v1_admin_delete_note(note_id):
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return {"status": "fuck", "error": "no auth"}, 401
+
+    token = auth_header.split(" ")[1]
+    try:
+        payload = jwt.decode(token, RSA_PUBLIC_KEY, algorithms=["RS256"])
+        if "admin" not in payload.get("scope", []):
+            return {"status": "fuck", "error": "unauthorized"}, 403
+    except jwt.ExpiredSignatureError:
+        return {"status": "fuck", "error": "token expired"}, 401
+    except jwt.InvalidTokenError:
+        return {"status": "fuck", "error": "invalid token"}, 401
+
+    try:
+        db = get_db()
+        cursor = db.cursor()
+        cursor.execute("DELETE FROM notes WHERE id = ?", (note_id,))
+        db.commit()
+        cursor.close()
+        db.close()
+
+        return {"status": "success"}, 200
+    except Exception as e:
+        print(e)
+        return {"status": "fuck", "error": "idk"}, 500
+
+
+@app.route("/api/v1/admin/notifications", methods=["GET"])
+def _api_v1_admin_notifications():
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return {"status": "fuck", "error": "no auth"}, 401
+
+    token = auth_header.split(" ")[1]
+    try:
+        payload = jwt.decode(token, RSA_PUBLIC_KEY, algorithms=["RS256"])
+        if "admin" not in payload.get("scope", []):
+            return {"status": "fuck", "error": "unauthorized"}, 403
+    except jwt.ExpiredSignatureError:
+        return {"status": "fuck", "error": "token expired"}, 401
+    except jwt.InvalidTokenError:
+        return {"status": "fuck", "error": "invalid token"}, 401
+
+    try:
+        db = get_db()
+        cursor = db.cursor()
+        cursor.execute("""
+            SELECT id, team_id, title, message, sent_at 
+            FROM notifications 
+            ORDER BY sent_at DESC
+            LIMIT 100
+        """)
+        rows = cursor.fetchall()
+        cursor.close()
+        db.close()
+
+        notifications = [
+            {
+                "id": row[0],
+                "teamId": row[1],
+                "title": row[2],
+                "message": row[3],
+                "sentAt": row[4],
+            }
+            for row in rows
+        ]
+
+        return {"status": "success", "notifications": notifications}, 200
+    except Exception as e:
+        print(e)
+        return {"status": "fuck", "error": "idk"}, 500
+
+
+@app.route("/api/v1/admin/notifications", methods=["POST"])
+def _api_v1_admin_send_notification():
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return {"status": "fuck", "error": "no auth"}, 401
+
+    token = auth_header.split(" ")[1]
+    try:
+        payload = jwt.decode(token, RSA_PUBLIC_KEY, algorithms=["RS256"])
+        if "admin" not in payload.get("scope", []):
+            return {"status": "fuck", "error": "unauthorized"}, 403
+    except jwt.ExpiredSignatureError:
+        return {"status": "fuck", "error": "token expired"}, 401
+    except jwt.InvalidTokenError:
+        return {"status": "fuck", "error": "invalid token"}, 401
+
+    data = request.json
+    team_id = data.get("teamId")
+    title = data.get("title")
+    message = data.get("message")
+    priority = data.get("priority", 3)
+
+    if not team_id or not title or not message:
+        return {"status": "fuck", "error": "missing required fields"}, 400
+
+    try:
+        team_id = int(team_id)
+        priority = int(priority)
+    except ValueError:
+        return {"status": "fuck", "error": "invalid data"}, 400
+
+    success = send_notification(team_id, title, message, priority)
+
+    if success:
+        return {"status": "success"}, 200
+    else:
+        return {"status": "fuck", "error": "failed to send"}, 500
+
+
+@app.route("/api/v1/admin/notifications/clear", methods=["DELETE"])
+def _api_v1_admin_clear_notifications():
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return {"status": "fuck", "error": "no auth"}, 401
+
+    token = auth_header.split(" ")[1]
+    try:
+        payload = jwt.decode(token, RSA_PUBLIC_KEY, algorithms=["RS256"])
+        if "admin" not in payload.get("scope", []):
+            return {"status": "fuck", "error": "unauthorized"}, 403
+    except jwt.ExpiredSignatureError:
+        return {"status": "fuck", "error": "token expired"}, 401
+    except jwt.InvalidTokenError:
+        return {"status": "fuck", "error": "invalid token"}, 401
+
+    try:
+        db = get_db()
+        cursor = db.cursor()
+        cursor.execute("DELETE FROM notifications")
+        db.commit()
+        cursor.close()
+        db.close()
+
+        return {"status": "success"}, 200
+    except Exception as e:
+        print(e)
+        return {"status": "fuck", "error": "idk"}, 500
+
+
+@app.route("/api/v1/admin/database/vacuum", methods=["POST"])
+def _api_v1_admin_vacuum():
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return {"status": "fuck", "error": "no auth"}, 401
+
+    token = auth_header.split(" ")[1]
+    try:
+        payload = jwt.decode(token, RSA_PUBLIC_KEY, algorithms=["RS256"])
+        if "admin" not in payload.get("scope", []):
+            return {"status": "fuck", "error": "unauthorized"}, 403
+    except jwt.ExpiredSignatureError:
+        return {"status": "fuck", "error": "token expired"}, 401
+    except jwt.InvalidTokenError:
+        return {"status": "fuck", "error": "invalid token"}, 401
+
+    try:
+        db = get_db()
+        cursor = db.cursor()
+        cursor.execute("VACUUM")
+        db.commit()
+        cursor.close()
+        db.close()
+
+        return {"status": "success"}, 200
+    except Exception as e:
+        print(e)
+        return {"status": "fuck", "error": "idk"}, 500
+
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8080)
