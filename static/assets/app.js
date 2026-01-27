@@ -961,7 +961,7 @@ function renderAllianceBreakdown(scoreMatch, allianceColor, chartJobs) {
             ${renderMetricRow("Auto Overflow Artifacts", alliance.autoOverflowArtifacts ?? 0)}
             ${renderMetricRow("Auto Leave Points", alliance.autoLeavePoints ?? 0)}
             ${renderMetricRow("Auto Pattern Points", alliance.autoPatternPoints ?? 0)}
-            ${renderMetricRow("Auto Artifact Point", alliance.autoArtifactPoints ?? 0)}
+            ${renderMetricRow("Auto Artifact Points", alliance.autoArtifactPoints ?? 0)}
         </div>
     `;
     const teleopSection = `
