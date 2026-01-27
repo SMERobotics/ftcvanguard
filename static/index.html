@@ -227,20 +227,7 @@
                         
                         <div class="admin-card">
                             <h3>All Team Notes</h3>
-                            <div class="admin-table-container">
-                                <table class="admin-table" id="admin-notes-table">
-                                    <thead>
-                                        <tr>
-                                            <th>ID</th>
-                                            <th>Team ID</th>
-                                            <th>Subject Team ID</th>
-                                            <th>Last Updated</th>
-                                            <th>Actions</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody></tbody>
-                                </table>
-                            </div>
+                            <div id="admin-notes-list" class="admin-notes-list"></div>
                         </div>
                     </div>
 
@@ -250,9 +237,21 @@
                         <div class="admin-card">
                             <h3>Send Custom Notification</h3>
                             <div class="admin-form">
-                                <div class="form-group">
-                                    <label for="notif-team-id">Team ID</label>
-                                    <input type="text" inputmode="numeric" pattern="[0-9]*" id="notif-team-id" placeholder="12345">
+                                <div class="admin-form-row">
+                                    <div class="form-group">
+                                        <label for="notif-team-id">Team ID</label>
+                                        <input type="text" inputmode="numeric" pattern="[0-9]*" id="notif-team-id" placeholder="12345">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="notif-priority">Priority</label>
+                                        <select id="notif-priority">
+                                            <option value="1">Low (1)</option>
+                                            <option value="2">Low-Medium (2)</option>
+                                            <option value="3" selected>Default (3)</option>
+                                            <option value="4">Medium-High (4)</option>
+                                            <option value="5">High (5)</option>
+                                        </select>
+                                    </div>
                                 </div>
                                 <div class="form-group">
                                     <label for="notif-title">Title</label>
@@ -260,17 +259,7 @@
                                 </div>
                                 <div class="form-group">
                                     <label for="notif-message">Message</label>
-                                    <textarea id="notif-message" placeholder="Notification message" rows="4"></textarea>
-                                </div>
-                                <div class="form-group">
-                                    <label for="notif-priority">Priority</label>
-                                    <select id="notif-priority">
-                                        <option value="1">Low (1)</option>
-                                        <option value="2">Low-Medium (2)</option>
-                                        <option value="3" selected>Default (3)</option>
-                                        <option value="4">Medium-High (4)</option>
-                                        <option value="5">High (5)</option>
-                                    </select>
+                                    <textarea id="notif-message" placeholder="Notification message" rows="3"></textarea>
                                 </div>
                                 <button class="admin-btn admin-btn-primary" onclick="sendNotification()">Send Notification</button>
                             </div>
@@ -279,21 +268,9 @@
                         <div class="admin-card">
                             <div class="admin-card-header">
                                 <h3>Notification History (Last 100)</h3>
-                                <button class="admin-btn admin-btn-danger" onclick="clearNotificationHistory()">Clear History</button>
+                                <button class="admin-btn admin-btn-danger admin-btn-small" onclick="clearNotificationHistory()">Clear History</button>
                             </div>
-                            <div class="admin-table-container">
-                                <table class="admin-table" id="admin-notifications-table">
-                                    <thead>
-                                        <tr>
-                                            <th>Team ID</th>
-                                            <th>Title</th>
-                                            <th>Message</th>
-                                            <th>Sent At</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody></tbody>
-                                </table>
-                            </div>
+                            <div id="admin-notifications-list" class="admin-notifications-list"></div>
                         </div>
                     </div>
 

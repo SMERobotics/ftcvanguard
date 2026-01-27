@@ -3017,6 +3017,153 @@ textarea:focus-visible {
     justify-content: flex-end;
 }
 
+.admin-notes-list {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    max-height: 600px;
+    overflow-y: auto;
+}
+
+.admin-note-card {
+    background-color: #1f1f1f;
+    border: 1px solid #333333;
+    border-radius: 6px;
+    padding: 16px;
+    transition: border-color 0.2s;
+}
+
+.admin-note-card:hover {
+    border-color: #505050;
+}
+
+.admin-note-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+    margin-bottom: 12px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #333333;
+}
+
+.admin-note-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.admin-note-label {
+    color: #ffffff;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.admin-note-date {
+    color: #868686;
+    font-size: 12px;
+}
+
+.admin-note-content {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.admin-note-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.admin-note-field strong {
+    color: #868686;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 500;
+}
+
+.admin-note-field p {
+    color: #cccccc;
+    font-size: 13px;
+    line-height: 1.5;
+    margin: 0;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.admin-note-empty {
+    color: #868686;
+    font-size: 13px;
+    font-style: italic;
+}
+
+.admin-empty-state {
+    color: #868686;
+    font-size: 14px;
+    text-align: center;
+    padding: 40px 20px;
+}
+
+.admin-btn-small {
+    padding: 6px 12px;
+    font-size: 12px;
+}
+
+.admin-notifications-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    max-height: 500px;
+    overflow-y: auto;
+}
+
+.admin-notification-card {
+    background-color: #1f1f1f;
+    border: 1px solid #333333;
+    border-radius: 6px;
+    padding: 12px 16px;
+    transition: border-color 0.2s;
+}
+
+.admin-notification-card:hover {
+    border-color: #505050;
+}
+
+.admin-notification-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.admin-notification-team {
+    color: #0078d4;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.admin-notification-date {
+    color: #868686;
+    font-size: 11px;
+}
+
+.admin-notification-title {
+    color: #ffffff;
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 4px;
+}
+
+.admin-notification-message {
+    color: #cccccc;
+    font-size: 12px;
+    line-height: 1.4;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
 @media (max-width: 768px) {
     #admin-container {
         padding: 16px;
@@ -3055,5 +3202,18 @@ textarea:focus-visible {
     .admin-modal-content {
         width: 95%;
         padding: 20px;
+    }
+    
+    .admin-notes-list {
+        max-height: 400px;
+    }
+    
+    .admin-note-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .admin-notifications-list {
+        max-height: 350px;
     }
 }

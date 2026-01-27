@@ -214,26 +214,62 @@ async function loadAdminNotes(): Promise<void> {
         const data = await response.json();
         const notes: AdminNote[] = data.notes;
         
-        const tbody = document.querySelector("#admin-notes-table tbody")!;
-        tbody.innerHTML = "";
+        const container = document.getElementById("admin-notes-list")!;
+        container.innerHTML = "";
+        
+        if (notes.length === 0) {
+            container.innerHTML = `<div class="admin-empty-state">No notes found</div>`;
+            return;
+        }
         
         for (const note of notes) {
-            const row = document.createElement("tr");
-            row.innerHTML = `
-                <td>${note.id}</td>
-                <td>${note.teamId}</td>
-                <td>${note.subjectTeamId}</td>
-                <td>${new Date(note.updatedAt * 1000).toLocaleString()}</td>
-                <td>
-                    <button class="admin-action-btn admin-btn-danger" onclick="deleteNote(${note.id})">Delete</button>
-                </td>
+            const hasContent = note.autoPerformance || note.teleopPerformance || note.generalNotes;
+            
+            const card = document.createElement("div");
+            card.className = "admin-note-card";
+            card.innerHTML = `
+                <div class="admin-note-header">
+                    <div class="admin-note-meta">
+                        <span class="admin-note-label">Team ${note.teamId} → Team ${note.subjectTeamId}</span>
+                        <span class="admin-note-date">${new Date(note.updatedAt * 1000).toLocaleString()}</span>
+                    </div>
+                    <button class="admin-action-btn admin-btn-danger admin-btn-small" onclick="deleteNote(${note.id})">Delete</button>
+                </div>
+                ${hasContent ? `
+                    <div class="admin-note-content">
+                        ${note.autoPerformance ? `
+                            <div class="admin-note-field">
+                                <strong>Auto Performance:</strong>
+                                <p>${escapeHtml(note.autoPerformance)}</p>
+                            </div>
+                        ` : ""}
+                        ${note.teleopPerformance ? `
+                            <div class="admin-note-field">
+                                <strong>Teleop Performance:</strong>
+                                <p>${escapeHtml(note.teleopPerformance)}</p>
+                            </div>
+                        ` : ""}
+                        ${note.generalNotes ? `
+                            <div class="admin-note-field">
+                                <strong>General Notes:</strong>
+                                <p>${escapeHtml(note.generalNotes)}</p>
+                            </div>
+                        ` : ""}
+                    </div>
+                ` : `<div class="admin-note-empty">No content</div>`}
             `;
-            tbody.appendChild(row);
+            container.appendChild(card);
         }
     } catch (error) {
         console.error("Error loading notes:", error);
         showAdminMessage("Failed to load notes", "error");
     }
+}
+
+function escapeHtml(text: string): string {
+    const div = document.createElement("div");
+    div.textContent = text;
+    return div.innerHTML;
 }
 
 async function deleteNote(noteId: number): Promise<void> {
@@ -269,18 +305,26 @@ async function loadAdminNotifications(): Promise<void> {
         const data = await response.json();
         const notifications: AdminNotification[] = data.notifications;
         
-        const tbody = document.querySelector("#admin-notifications-table tbody")!;
-        tbody.innerHTML = "";
+        const container = document.getElementById("admin-notifications-list")!;
+        container.innerHTML = "";
+        
+        if (notifications.length === 0) {
+            container.innerHTML = `<div class="admin-empty-state">No notifications sent yet</div>`;
+            return;
+        }
         
         for (const notif of notifications) {
-            const row = document.createElement("tr");
-            row.innerHTML = `
-                <td>${notif.teamId}</td>
-                <td>${notif.title}</td>
-                <td>${notif.message}</td>
-                <td>${new Date(notif.sentAt * 1000).toLocaleString()}</td>
+            const card = document.createElement("div");
+            card.className = "admin-notification-card";
+            card.innerHTML = `
+                <div class="admin-notification-header">
+                    <span class="admin-notification-team">Team ${notif.teamId}</span>
+                    <span class="admin-notification-date">${new Date(notif.sentAt * 1000).toLocaleString()}</span>
+                </div>
+                <div class="admin-notification-title">${escapeHtml(notif.title)}</div>
+                <div class="admin-notification-message">${escapeHtml(notif.message)}</div>
             `;
-            tbody.appendChild(row);
+            container.appendChild(card);
         }
     } catch (error) {
         console.error("Error loading notifications:", error);
