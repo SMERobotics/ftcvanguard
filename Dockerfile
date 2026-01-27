@@ -11,8 +11,8 @@ RUN mkdir /home/vanguard/.ssh
 RUN chown -R vanguard:vanguard /home/vanguard/.ssh
 RUN chmod 700 /home/vanguard/.ssh
 
-RUN openssl genpkey -algorithm RSA -out ~/.ssh/id_rsa.pem -pkeyopt rsa_keygen_bits:4096
-RUN openssl rsa -in ~/.ssh/id_rsa.pem -pubout -out ~/.ssh/id_rsa.pub
+RUN openssl genpkey -algorithm RSA -out /home/vanguard/.ssh/id_rsa.pem -pkeyopt rsa_keygen_bits:4096
+RUN openssl rsa -in /home/vanguard/.ssh/id_rsa.pem -pubout -out /home/vanguard/.ssh/id_rsa.pub
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
