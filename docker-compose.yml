@@ -1,0 +1,14 @@
+services:
+  ftcvanguard:
+    image: milesmuehlbach/ftcvanguard:latest
+    container_name: ftcvanguard
+    restart: unless-stopped
+
+    ports:
+      - "8000:8000"
+
+    environment:
+      PYTHONUNBUFFERED: "1"
+
+    volumes:
+      - ./config:/app/config
