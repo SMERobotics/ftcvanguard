@@ -1,6 +1,5 @@
 {
   "devDependencies": {
-    "typescript": "^5.9.3",
-    "tailwindcss": "^4.1.18"
+    "typescript": "^5.9.3"
   }
 }

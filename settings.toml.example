@@ -1,19 +1,15 @@
-# FTC Api creds
 [ftc_api]
-username = "username"
-token = "apikey"
+username = "GraciousProfessionalist"
+token = "67676767-6767-6767-6767-676767676767"
 
 [notifications]
 ntfy_server_url = "https://ntfy.sh"
 ntfy_topic = "FTC-{}"
-# Put teams you want to recieve notifications here
-ntfy_teams = [6547, 26855]
+ntfy_teams = [26855, 6547]
 
 [server]
-vanguard_url = "https://example.com"
+vanguard_url = "https://ftc.technodot.org"
 
 [admin]
-password = "password"
-max_failed_attempts = 5
-lockout_duration_minutes = 15
-
+admin_teams = [26855, 6547]
+admin_secret = "67676767676767676767676767676767"

@@ -1,7 +1,7 @@
 [project]
 name = "ftcvanguard"
-version = "0.1.0"
-description = "A real-time scouting app for FIRST Tech Challenge with advanced, real time insights."
+version = "1.0.0"
+description = "unified ftc management infra. provide streamlined, real-time data, enabling rapid strategic insights. instant situational awareness, precise decisions, and ultratactical asymmetry."
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
@@ -9,9 +9,7 @@ dependencies = [
     "dotenv>=0.9.9",
     "flask>=3.1.2",
     "gunicorn>=23.0.0",
-    "matplotlib>=3.10.7",
-    "numpy>=2.3.5",
     "pyjwt[crypto]>=2.10.1",
+    "pyotp>=2.9.0",
     "requests>=2.32.5",
-    "scipy>=1.16.3",
 ]

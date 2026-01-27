@@ -8,13 +8,14 @@ const tabs = [
     { buttonId: "button-rankings", viewId: "view-rankings" },
     { buttonId: "button-notes", viewId: "view-notes" },
     { buttonId: "button-insights", viewId: "view-insights" },
+    { buttonId: "button-compare", viewId: "view-compare" },
     { buttonId: "button-settings", viewId: "view-settings" },
     { buttonId: "button-about", viewId: "view-about" },
+    { buttonId: "button-admin", viewId: "view-admin" },
 ];
 let currentMatches = [];
 let currentRankings = [];
 let currentTeams = [];
-let currentOPRData = [];
 let currentEventCode = "";
 let currentNotesStatus = {};
 let loggedInTeamId = null;
@@ -27,9 +28,11 @@ let currentSelectedNotesTeam = null;
 let currentInsightsTeam = null;
 let currentScoreMatches = [];
 let showAllMatches = false;
-let rankingSortMode = "rank";
-let rankingScopeMode = "league";
+let queueInterval;
 const activeCharts = {};
+let currentOPRData = new Map();
+let isAdminAuthenticated = false;
+let currentUserScopes = [];
 function getViewNameFromId(viewId) {
     return viewId.replace("view-", "");
 }
@@ -334,59 +337,6 @@ async function populateMeetSelectorWithStateRestore(events, urlState) {
     // Set initial URL state
     updateUrl(true);
 }
-async function fetchOPRData(teamNumbers) {
-    const season = 2025;
-    const oprData = [];
-    const promises = teamNumbers.map(async (teamNumber) => {
-        try {
-            const response = await fetch("https://api.ftcscout.org/graphql", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify({
-                    query: `
-                        query Opr($season: Int!, $number: Int!) {
-                            teamByNumber(number: $number) {
-                                events(season: $season) {
-                                    stats {
-                                        ... on TeamEventStats2025 {
-                                            opr {
-                                                totalPointsNp
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    `,
-                    variables: {
-                        season: season,
-                        number: teamNumber
-                    }
-                })
-            });
-            if (response.ok) {
-                const data = await response.json();
-                const events = data?.data?.teamByNumber?.events || [];
-                let latestOPR = null;
-                for (const event of events) {
-                    const opr = event?.stats?.opr?.totalPointsNp;
-                    if (opr !== undefined && opr !== null) {
-                        latestOPR = opr;
-                    }
-                }
-                return { teamNumber, opr: latestOPR };
-            }
-        }
-        catch (error) {
-            console.error(`Failed to fetch OPR for team ${teamNumber}:`, error);
-        }
-        return { teamNumber, opr: null };
-    });
-    const results = await Promise.all(promises);
-    return results;
-}
 async function loadScheduleWithStateRestore(eventCode, urlState) {
     const token = localStorage.getItem("token");
     if (!token)
@@ -409,27 +359,25 @@ async function loadScheduleWithStateRestore(eventCode, urlState) {
             return;
         }
         currentEventStartTimestamp = event.dateStart ? new Date(event.dateStart).getTime() : null;
-        const regionCode = event.regionCode;
-        const leagueCode = event.leagueCode;
-        const [scheduleRes, rankingsRes, teamsRes, scoresRes] = await Promise.all([
+        const [scheduleRes, rankingsRes, teamsRes, qualScoresRes, playoffScoresRes] = await Promise.all([
             authFetch(`/api/v1/schedule?event=${eventCode}`, { headers: { "Authorization": `Bearer ${token}` } }),
-            authFetch(`/api/v1/rankings?event=${eventCode}&region=${regionCode}&league=${leagueCode}`, { headers: { "Authorization": `Bearer ${token}` } }),
+            authFetch(`/api/v1/rankings?event=${eventCode}`, { headers: { "Authorization": `Bearer ${token}` } }),
             authFetch(`/api/v1/teams?event=${eventCode}`, { headers: { "Authorization": `Bearer ${token}` } }),
-            authFetch(`/api/v1/scores/${eventCode}/qual`, { headers: { "Authorization": `Bearer ${token}` } })
+            authFetch(`/api/v1/scores/${eventCode}/qual`, { headers: { "Authorization": `Bearer ${token}` } }),
+            authFetch(`/api/v1/scores/${eventCode}/playoff`, { headers: { "Authorization": `Bearer ${token}` } })
         ]);
-        if (scheduleRes.ok && rankingsRes.ok && teamsRes.ok) {
+        if (scheduleRes.ok && teamsRes.ok) {
             const scheduleData = await scheduleRes.json();
-            const rankingsData = await rankingsRes.json();
+            const rankingsData = rankingsRes.ok ? await rankingsRes.json() : { rankings: [] };
             const teamsData = await teamsRes.json();
-            const scoresData = scoresRes.ok ? await scoresRes.json() : { matchScores: [] };
+            const qualScoresData = qualScoresRes.ok ? await qualScoresRes.json() : { matchScores: [] };
+            const playoffScoresData = playoffScoresRes.ok ? await playoffScoresRes.json() : { matchScores: [] };
             currentMatches = scheduleData.schedule || [];
             currentMatches.sort((a, b) => getMatchStartTimestamp(a) - getMatchStartTimestamp(b));
             currentRankings = rankingsData.rankings || [];
             currentTeams = teamsData.teams || [];
-            currentScoreMatches = scoresData.matchScores || [];
+            currentScoreMatches = [...(qualScoresData.matchScores || []), ...(playoffScoresData.matchScores || [])];
             mergeScoresIntoScheduleMatches(currentMatches, currentScoreMatches);
-            const teamNumbers = currentRankings.map(r => r.teamNumber);
-            currentOPRData = await fetchOPRData(teamNumbers);
             // Restore or infer showAll state
             if (urlState.showAll !== undefined) {
                 showAllMatches = urlState.showAll;
@@ -447,6 +395,14 @@ async function loadScheduleWithStateRestore(eventCode, urlState) {
             }
             renderSchedule(currentMatches, currentRankings, currentTeams);
             renderRankings(currentRankings);
+            // Fetch OPR data for all ranked teams
+            const rankedTeamNumbers = currentRankings.map(r => r.teamNumber);
+            if (rankedTeamNumbers.length > 0) {
+                fetchOPRData(rankedTeamNumbers).then(oprResults => {
+                    currentOPRData = new Map(oprResults.map(r => [r.teamNumber, r.opr]));
+                    renderRankings(currentRankings);
+                });
+            }
             // Restore match selection from URL
             if (urlState.match !== undefined) {
                 currentSelectedMatch = urlState.match;
@@ -503,6 +459,63 @@ function populateMeetSelector(events) {
         updateUrl();
     });
 }
+async function fetchOPRData(teamNumbers) {
+    const now = new Date();
+    const seasonDate = new Date(now.getTime() - 34 * 7 * 24 * 60 * 60 * 1000); // 34 weeks ago b/c season starts ~beginning of September
+    const season = seasonDate.getFullYear();
+    const seasonStatsName = `TeamEventStats${season}`;
+    const promises = teamNumbers.map(async (teamNumber) => {
+        try {
+            const response = await fetch("https://api.ftcscout.org/graphql", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    query: `
+                        query OPR_totalPointsNp($season: Int!, $number: Int!) {
+                            teamByNumber(number: $number) {
+                                events(season: $season) {
+                                    stats {
+                                        ... on ${seasonStatsName} {
+                                            opr {
+                                                totalPointsNp
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    `,
+                    variables: {
+                        season: season,
+                        number: teamNumber
+                    }
+                })
+            });
+            if (response.ok) {
+                const data = await response.json();
+                const events = data?.data?.teamByNumber?.events || [];
+                let highestOPR = null;
+                for (const event of events) {
+                    const opr = event?.stats?.opr?.totalPointsNp;
+                    if (opr !== undefined && opr !== null) {
+                        if (highestOPR === null || opr > highestOPR) {
+                            highestOPR = opr;
+                        }
+                    }
+                }
+                return { teamNumber, opr: highestOPR };
+            }
+        }
+        catch (error) {
+            console.error(`Failed to fetch OPR for team ${teamNumber}:`, error);
+        }
+        return { teamNumber, opr: null };
+    });
+    const results = await Promise.all(promises);
+    return results;
+}
 async function loadSchedule(eventCode) {
     const token = localStorage.getItem("token");
     if (!token)
@@ -514,7 +527,7 @@ async function loadSchedule(eventCode) {
     }
     showLoading();
     try {
-        // First, fetch event details to get regionCode and leagueCode
+        // First, fetch event details
         const eventRes = await authFetch(`/api/v1/event?event=${eventCode}`, { headers: { "Authorization": `Bearer ${token}` } });
         if (!eventRes.ok) {
             console.error("Failed to load event details");
@@ -527,24 +540,24 @@ async function loadSchedule(eventCode) {
             return;
         }
         currentEventStartTimestamp = event.dateStart ? new Date(event.dateStart).getTime() : null;
-        const regionCode = event.regionCode;
-        const leagueCode = event.leagueCode;
-        const [scheduleRes, rankingsRes, teamsRes, scoresRes] = await Promise.all([
+        const [scheduleRes, rankingsRes, teamsRes, qualScoresRes, playoffScoresRes] = await Promise.all([
             authFetch(`/api/v1/schedule?event=${eventCode}`, { headers: { "Authorization": `Bearer ${token}` } }),
-            authFetch(`/api/v1/rankings?event=${eventCode}&region=${regionCode}&league=${leagueCode}`, { headers: { "Authorization": `Bearer ${token}` } }),
+            authFetch(`/api/v1/rankings?event=${eventCode}`, { headers: { "Authorization": `Bearer ${token}` } }),
             authFetch(`/api/v1/teams?event=${eventCode}`, { headers: { "Authorization": `Bearer ${token}` } }),
-            authFetch(`/api/v1/scores/${eventCode}/qual`, { headers: { "Authorization": `Bearer ${token}` } })
+            authFetch(`/api/v1/scores/${eventCode}/qual`, { headers: { "Authorization": `Bearer ${token}` } }),
+            authFetch(`/api/v1/scores/${eventCode}/playoff`, { headers: { "Authorization": `Bearer ${token}` } })
         ]);
-        if (scheduleRes.ok && rankingsRes.ok && teamsRes.ok) {
+        if (scheduleRes.ok && teamsRes.ok) {
             const scheduleData = await scheduleRes.json();
-            const rankingsData = await rankingsRes.json();
+            const rankingsData = rankingsRes.ok ? await rankingsRes.json() : { rankings: [] };
             const teamsData = await teamsRes.json();
-            const scoresData = scoresRes.ok ? await scoresRes.json() : { matchScores: [] };
+            const qualScoresData = qualScoresRes.ok ? await qualScoresRes.json() : { matchScores: [] };
+            const playoffScoresData = playoffScoresRes.ok ? await playoffScoresRes.json() : { matchScores: [] };
             currentMatches = scheduleData.schedule || [];
             currentMatches.sort((a, b) => getMatchStartTimestamp(a) - getMatchStartTimestamp(b));
             currentRankings = rankingsData.rankings || [];
             currentTeams = teamsData.teams || [];
-            currentScoreMatches = scoresData.matchScores || [];
+            currentScoreMatches = [...(qualScoresData.matchScores || []), ...(playoffScoresData.matchScores || [])];
             mergeScoresIntoScheduleMatches(currentMatches, currentScoreMatches);
             const showAllCheckbox = document.getElementById("show-all-matches");
             if (showAllCheckbox) {
@@ -552,6 +565,14 @@ async function loadSchedule(eventCode) {
             }
             renderSchedule(currentMatches, currentRankings, currentTeams);
             renderRankings(currentRankings);
+            // Fetch OPR data for all ranked teams
+            const rankedTeamNumbers = currentRankings.map(r => r.teamNumber);
+            if (rankedTeamNumbers.length > 0) {
+                fetchOPRData(rankedTeamNumbers).then(oprResults => {
+                    currentOPRData = new Map(oprResults.map(r => [r.teamNumber, r.opr]));
+                    renderRankings(currentRankings);
+                });
+            }
             if (activeViewId === "view-notes" && currentTeams.length > 0) {
                 await initializeNotesView(eventCode);
             }
@@ -564,7 +585,6 @@ async function loadSchedule(eventCode) {
         hideLoading();
     }
 }
-let queueInterval;
 function parseScore(value) {
     if (typeof value === "number") {
         return value;
@@ -685,98 +705,30 @@ function getMatchResultIndicator(match) {
 }
 function renderRankings(rankings) {
     const tbody = document.querySelector("#rankings-table tbody");
-    const thead = document.querySelector("#rankings-table thead tr");
-    if (!tbody || !thead)
+    if (!tbody)
         return;
     tbody.innerHTML = "";
-    // Filter rankings based on scope mode
-    let filteredRankings = rankings;
-    if (rankingScopeMode === "event" && currentTeams.length > 0) {
-        const eventTeamNumbers = new Set(currentTeams.map(t => t.teamNumber));
-        filteredRankings = rankings.filter(r => eventTeamNumbers.has(r.teamNumber));
-    }
-    const oprData = currentOPRData.find(o => o.teamNumber === filteredRankings[0]?.teamNumber);
-    const oprValue = (oprData?.opr !== null && oprData?.opr !== undefined)
-        ? oprData.opr.toFixed(2)
-        : "-";
-    if (rankingSortMode === "opr") {
-        thead.innerHTML = `
-            <th>Rank</th>
-            <th>Team</th>
-            <th>Name</th>
-            <th>OPR</th>
-            <th>Ranking Points</th>
-            <th>Match Points</th>
-            <th>Base Points</th>
-            <th>Auto Points</th>
-            <th>High Score</th>
-            <th>W-L-T</th>
-            <th>Played</th>
-        `;
-    }
-    else {
-        thead.innerHTML = `
-            <th>Rank</th>
-            <th>Team</th>
-            <th>Name</th>
-            <th>Ranking Points</th>
-            <th>Match Points</th>
-            <th>Base Points</th>
-            <th>Auto Points</th>
-            <th>High Score</th>
-            <th>OPR</th>
-            <th>W-L-T</th>
-            <th>Played</th>
-        `;
-    }
-    let sortedRankings = [...filteredRankings];
-    if (rankingSortMode === "opr") {
-        sortedRankings.sort((a, b) => {
-            const aOPR = currentOPRData.find(o => o.teamNumber === a.teamNumber)?.opr ?? -1;
-            const bOPR = currentOPRData.find(o => o.teamNumber === b.teamNumber)?.opr ?? -1;
-            return bOPR - aOPR;
-        });
-    }
-    sortedRankings.forEach((rank, index) => {
+    rankings.forEach((rank, index) => {
         const tr = document.createElement("tr");
         tr.style.animationDelay = `${index * 0.03}s`;
         if (loggedInTeamId && rank.teamNumber === loggedInTeamId) {
             tr.classList.add("current-team-rank");
         }
-        const teamOprData = currentOPRData.find(o => o.teamNumber === rank.teamNumber);
-        const teamOprValue = teamOprData?.opr !== null && teamOprData?.opr !== undefined
-            ? teamOprData.opr.toFixed(2)
-            : "-";
-        if (rankingSortMode === "opr") {
-            tr.innerHTML = `
-                <td>${rank.rank}</td>
-                <td>${rank.teamNumber}</td>
-                <td>${rank.teamName}</td>
-                <td>${teamOprValue}</td>
-                <td>${rank.sortOrder1}</td>
-                <td>${rank.sortOrder2}</td>
-                <td>${rank.sortOrder3}</td>
-                <td>${rank.sortOrder4}</td>
-                <td>${Math.floor(rank.sortOrder6)}</td>
-                <td>${rank.wins}-${rank.losses}-${rank.ties}</td>
-                <td>${rank.matchesPlayed}</td>
-            `;
-        }
-        else {
-            tr.innerHTML = `
-                <td>${rank.rank}</td>
-                <td>${rank.teamNumber}</td>
-                <td>${rank.teamName}</td>
-                <td>${rank.sortOrder1}</td>
-                <td>${rank.sortOrder2}</td>
-                <td>${rank.sortOrder3}</td>
-                <td>${rank.sortOrder4}</td>
-                <td>${Math.floor(rank.sortOrder6)}</td>
-                <td>${teamOprValue}</td>
-                <td>${rank.wins}-${rank.losses}-${rank.ties}</td>
-                <td>${rank.matchesPlayed}</td>
-            `;
-        }
+        const oprValue = currentOPRData.get(rank.teamNumber);
+        const oprDisplay = oprValue !== null && oprValue !== undefined ? oprValue.toFixed(1) : "–";
+        tr.innerHTML = `
+            <td>${rank.rank}</td>
+            <td><span class="team-number-link" data-team="${rank.teamNumber}">${rank.teamNumber}</span></td>
+            <td>${rank.teamName}</td>
+            <td>${rank.sortOrder1}</td>
+            <td>${oprDisplay}</td>
+            <td>${rank.sortOrder2}</td>
+            <td>${rank.sortOrder3}</td>
+            <td>${rank.sortOrder4}</td>
+            <td>${Math.floor(rank.sortOrder6)}</td>
+            <td>${rank.wins}-${rank.losses}-${rank.ties}</td>
+            <td>${rank.matchesPlayed}</td>
+        `;
         tbody.appendChild(tr);
     });
 }
@@ -792,6 +744,7 @@ function renderSchedule(matches, rankings, teams) {
         const item = document.createElement("div");
         item.className = "match-item";
         item.dataset.matchNumber = match.matchNumber.toString();
+        item.dataset.tournamentLevel = match.tournamentLevel || "";
         item.style.animationDelay = `${index * 0.03}s`;
         item.onclick = () => {
             document.querySelectorAll(".match-item").forEach(el => el.classList.remove("active"));
@@ -802,8 +755,11 @@ function renderSchedule(matches, rankings, teams) {
         };
         const redTeams = match.teams.filter(t => t.station.startsWith("Red")).map(t => t.teamNumber);
         const blueTeams = match.teams.filter(t => t.station.startsWith("Blue")).map(t => t.teamNumber);
-        const formatTeamNumbers = (teams, colorClass) => {
-            return teams.join(", ");
+        const formatTeamNumbers = (teamNums, colorClass) => {
+            const validTeams = teamNums.filter(t => t && t > 0);
+            if (validTeams.length === 0)
+                return "TBD";
+            return validTeams.join(", ");
         };
         // Queue logic
         let queueText = "";
@@ -1139,10 +1095,20 @@ async function renderMatchDetails(match, rankings, teams) {
     const redTeams = match.teams.filter(t => t.station.startsWith("Red"));
     const blueTeams = match.teams.filter(t => t.station.startsWith("Blue"));
     const allTeams = [...redTeams, ...blueTeams];
+    const validTeams = allTeams.filter(t => t.teamNumber && t.teamNumber > 0);
     const scoreMatch = findScoreMatchForScheduleMatch(match);
     const chartJobs = [];
     const scoreBreakdownHtml = renderScoreBreakdown(scoreMatch, chartJobs);
     const getTeamRow = (team, colorClass) => {
+        // Handle missing/invalid team data (common in incomplete playoff matches)
+        if (!team.teamNumber || team.teamNumber <= 0) {
+            return `
+                <div class="team-row">
+                    <span class="${colorClass}">TBD</span>
+                    <span class="team-rank">-</span>
+                </div>
+            `;
+        }
         const rank = rankings.find(r => r.teamNumber === team.teamNumber);
         const teamInfo = teams.find(t => t.teamNumber === team.teamNumber);
         const rankText = rank ? `#${rank.rank}` : "-";
@@ -1160,7 +1126,7 @@ async function renderMatchDetails(match, rankings, teams) {
             </div>
         `;
     };
-    const statsTableRows = allTeams.map(team => {
+    const statsTableRows = validTeams.map(team => {
         const rank = rankings.find(r => r.teamNumber === team.teamNumber);
         const rankText = rank ? `#${rank.rank}` : "-";
         const rp = rank ? rank.sortOrder1 : "-";
@@ -1193,7 +1159,7 @@ async function renderMatchDetails(match, rankings, teams) {
                     <tr>
                         <th>Team</th>
                         <th>Rank</th>
-                        <th>Ranking Points</th>
+                        <th>Ranking Score</th>
                         <th>Match Points</th>
                         <th>Base Points</th>
                         <th>Auto Points</th>
@@ -1215,7 +1181,7 @@ async function renderMatchDetails(match, rankings, teams) {
     const blueScoreText = blueScore !== null ? ` - ${blueScore}${blueWon ? " 👑" : ""}` : "";
     const redAllianceTitle = `Red Alliance${redScoreText}`;
     const blueAllianceTitle = `Blue Alliance${blueScoreText}`;
-    const notesLoadingSection = allTeams.length > 0 ? `
+    const notesLoadingSection = validTeams.length > 0 ? `
         <div class="notes-display-container" id="notes-section">
             <div class="notes-display-title">Scouting Notes</div>
             <div class="notes-loading">Loading notes...</div>
@@ -1247,8 +1213,8 @@ async function renderMatchDetails(match, rankings, teams) {
         </div>
     `;
     chartJobs.forEach(job => job());
-    if (allTeams.length > 0) {
-        const teamNumbers = allTeams.map(t => t.teamNumber);
+    if (validTeams.length > 0) {
+        const teamNumbers = validTeams.map(t => t.teamNumber);
         const notesMap = await loadNotesForTeams(teamNumbers);
         const notesSection = document.getElementById("notes-section");
         if (notesSection) {
@@ -1262,7 +1228,7 @@ async function renderMatchDetails(match, rankings, teams) {
             };
             notesSection.innerHTML = `
                 <div class="notes-display-title">Scouting Notes</div>
-                ${allTeams.map(team => {
+                ${validTeams.map(team => {
                 const notes = notesMap.get(team.teamNumber);
                 const teamInfo = teams.find(t => t.teamNumber === team.teamNumber);
                 const teamName = teamInfo ? (teamInfo.nameShort || teamInfo.nameFull) : `Team ${team.teamNumber}`;
@@ -1306,6 +1272,8 @@ async function verifyToken(token) {
         if (response.ok) {
             const data = await response.json();
             loggedInTeamId = data.id;
+            currentUserScopes = Array.isArray(data.scope) ? data.scope : [];
+            isAdminAuthenticated = currentUserScopes.includes("admin");
             return true;
         }
         return false;
@@ -1313,6 +1281,102 @@ async function verifyToken(token) {
     catch (error) {
         console.error("Token verification failed:", error);
         return false;
+    }
+}
+async function checkAdminStatus() {
+    const adminButton = document.getElementById("button-admin");
+    if (!adminButton)
+        return;
+    if (currentUserScopes.includes("admin")) {
+        adminButton.style.display = "";
+        return;
+    }
+    const token = localStorage.getItem("token");
+    if (!token)
+        return;
+    try {
+        const response = await authFetch("/api/v1/admin/self", {
+            method: "GET",
+            headers: {
+                "Authorization": `Bearer ${token}`
+            }
+        });
+        if (response.status === 200) {
+            adminButton.style.display = "";
+        }
+    }
+    catch (error) {
+        console.log("Admin check failed:", error);
+    }
+}
+function updateAdminViewState() {
+    const adminLogin = document.getElementById("admin-login");
+    const adminContainer = document.getElementById("admin-container");
+    if (isAdminAuthenticated) {
+        if (adminLogin)
+            adminLogin.style.display = "none";
+        if (adminContainer)
+            adminContainer.style.display = "";
+    }
+    else {
+        if (adminLogin)
+            adminLogin.style.display = "";
+        if (adminContainer)
+            adminContainer.style.display = "none";
+    }
+}
+async function handleAdminLogin(event) {
+    event.preventDefault();
+    const otpInput = document.getElementById("admin-otp");
+    const errorElement = document.getElementById("admin-login-error");
+    const submitButton = document.getElementById("admin-login-button");
+    if (!otpInput || !errorElement || !submitButton)
+        return;
+    const otp = otpInput.value.trim();
+    if (!/^\d{6}$/.test(otp)) {
+        errorElement.textContent = "Please enter a valid 6-digit code";
+        errorElement.style.display = "block";
+        return;
+    }
+    submitButton.textContent = "Authenticating...";
+    submitButton.disabled = true;
+    errorElement.style.display = "none";
+    try {
+        const token = localStorage.getItem("token");
+        if (!token) {
+            throw new Error("No token found");
+        }
+        const response = await authFetch(`/api/v1/admin/login?otp=${otp}`, {
+            method: "GET",
+            headers: {
+                "Authorization": `Bearer ${token}`
+            }
+        });
+        if (response.status === 200) {
+            const data = await response.json();
+            localStorage.setItem("token", data.token);
+            currentUserScopes = ["user", "admin"];
+            isAdminAuthenticated = true;
+            updateAdminViewState();
+            otpInput.value = "";
+        }
+        else if (response.status === 403) {
+            errorElement.textContent = "Invalid or expired code";
+            errorElement.style.display = "block";
+        }
+        else {
+            errorElement.textContent = "Authentication failed";
+            errorElement.style.display = "block";
+        }
+    }
+    catch (error) {
+        console.error("Admin login error:", error);
+        errorElement.textContent = "Authentication failed";
+        errorElement.style.display = "block";
+    }
+    finally {
+        submitButton.textContent = "Authenticate";
+        submitButton.disabled = false;
     }
 }
 function showLogin() {
@@ -1350,7 +1414,11 @@ async function handleLogin(event) {
         if (response.ok) {
             localStorage.setItem("token", data.token);
             loggedInTeamId = id;
+            currentUserScopes = ["user"];
+            isAdminAuthenticated = false;
             hideLogin();
+            await checkAdminStatus();
+            updateAdminViewState();
             loadEvents();
             if (tabs.length > 0) {
                 switchTab(tabs[0]);
@@ -1620,29 +1688,47 @@ async function initializeNotesView(eventCode) {
     renderNotesTeamList(currentTeams, eventCode);
 }
 function findTeamMatches(teamNumber, schedule, matchScores) {
-    const teamMatchNumbers = new Set();
+    // Use composite key of level + series + matchNumber to handle both qual and playoff matches
+    const teamMatchKeys = new Set();
     const teamAlliances = new Map();
     for (const match of schedule) {
+        // Skip matches with incomplete team data
+        if (!match.teams.every(t => t.teamNumber && t.teamNumber > 0))
+            continue;
         for (const team of match.teams) {
             if (team.teamNumber === teamNumber) {
-                teamMatchNumbers.add(match.matchNumber);
+                const level = normalizeLevel(match.tournamentLevel);
+                const series = typeof match.series === "number" ? match.series : 0;
+                const key = `${level}-${series}-${match.matchNumber}`;
+                teamMatchKeys.add(key);
                 const alliance = team.station.startsWith("Red") ? "Red" : "Blue";
-                teamAlliances.set(match.matchNumber, alliance);
+                teamAlliances.set(key, alliance);
                 break;
             }
         }
     }
     const filteredScores = [];
     for (const matchScore of matchScores) {
-        if (teamMatchNumbers.has(matchScore.matchNumber)) {
-            const teamAllianceName = teamAlliances.get(matchScore.matchNumber);
+        const level = normalizeLevel(matchScore.matchLevel);
+        const series = typeof matchScore.matchSeries === "number" ? matchScore.matchSeries : 0;
+        const key = `${level}-${series}-${matchScore.matchNumber}`;
+        if (teamMatchKeys.has(key)) {
+            const teamAllianceName = teamAlliances.get(key);
             filteredScores.push({
                 ...matchScore,
                 teamAlliance: teamAllianceName
             });
         }
     }
-    return filteredScores.sort((a, b) => a.matchNumber - b.matchNumber);
+    // Sort by level (qual first, then playoff) then by match number
+    return filteredScores.sort((a, b) => {
+        const aLevel = normalizeLevel(a.matchLevel);
+        const bLevel = normalizeLevel(b.matchLevel);
+        if (aLevel !== bLevel) {
+            return aLevel.includes("qual") ? -1 : 1;
+        }
+        return a.matchNumber - b.matchNumber;
+    });
 }
 function roundTo2(val) {
     if (val === null || val === undefined)
@@ -1670,7 +1756,9 @@ function buildTeamList(schedule) {
     const teams = new Set();
     for (const match of schedule) {
         for (const team of match.teams) {
-            teams.add(team.teamNumber);
+            if (team.teamNumber && team.teamNumber > 0) {
+                teams.add(team.teamNumber);
+            }
         }
     }
     return Array.from(teams).sort((a, b) => a - b);
@@ -1680,6 +1768,23 @@ function eventHasAllScores(schedule, matchScores) {
     schedule.forEach(match => scheduleMap.set(match.matchNumber, match));
     for (const match of schedule) {
         const score = matchScores.find(ms => ms.matchNumber === match.matchNumber);
+        if (!score || !isScoreComplete(score)) {
+            return false;
+        }
+    }
+    return true;
+}
+function eventHasAllScoresForMatches(schedule, matchScores) {
+    for (const match of schedule) {
+        const level = normalizeLevel(match.tournamentLevel);
+        const series = typeof match.series === "number" ? match.series : 0;
+        const score = matchScores.find(ms => {
+            const scoreLevel = normalizeLevel(ms.matchLevel);
+            const scoreSeries = typeof ms.matchSeries === "number" ? ms.matchSeries : 0;
+            return ms.matchNumber === match.matchNumber &&
+                scoreLevel === level &&
+                scoreSeries === series;
+        });
         if (!score || !isScoreComplete(score)) {
             return false;
         }
@@ -1747,12 +1852,35 @@ function buildLeastSquaresSolution(teamIds, equations) {
     return solution;
 }
 function computeOprForEvent(teamNumber, schedule, matchScores) {
-    const qualSchedule = schedule.filter(isQualMatch).sort((a, b) => a.matchNumber - b.matchNumber);
-    const qualScores = matchScores.filter(isQualMatch).sort((a, b) => a.matchNumber - b.matchNumber);
-    const eventComplete = eventHasAllScores(qualSchedule, qualScores);
-    const teamMatches = findTeamMatches(teamNumber, qualSchedule, qualScores);
+    // Filter schedule to only include matches with valid team data
+    const validSchedule = schedule.filter(match => match.teams.every(t => t.teamNumber && t.teamNumber > 0)).sort((a, b) => {
+        const aLevel = normalizeLevel(a.tournamentLevel);
+        const bLevel = normalizeLevel(b.tournamentLevel);
+        if (aLevel !== bLevel)
+            return aLevel.includes("QUAL") ? -1 : 1;
+        return a.matchNumber - b.matchNumber;
+    });
+    const validScores = matchScores.filter(isScoreComplete).sort((a, b) => {
+        const aLevel = normalizeLevel(a.matchLevel);
+        const bLevel = normalizeLevel(b.matchLevel);
+        if (aLevel !== bLevel)
+            return aLevel.includes("QUAL") ? -1 : 1;
+        return a.matchNumber - b.matchNumber;
+    });
+    // OPR is calculated ONLY from qualification matches
+    const qualSchedule = validSchedule.filter(isQualMatch);
+    const qualScores = validScores.filter(isQualMatch);
+    const eventComplete = eventHasAllScoresForMatches(qualSchedule, qualScores);
+    // Get all team matches (qual + playoff) for display
+    const teamMatches = findTeamMatches(teamNumber, validSchedule, validScores);
+    // Build team list only from qual matches for OPR calculation
     const teamList = buildTeamList(qualSchedule);
-    const matchLabels = teamMatches.map(match => `Q${match.matchNumber}`);
+    // Generate labels based on match level
+    const matchLabels = teamMatches.map(match => {
+        const level = normalizeLevel(match.matchLevel);
+        const prefix = level.includes("QUAL") ? "Q" : "P";
+        return `${prefix}${match.matchNumber}`;
+    });
     if (!eventComplete || teamList.length === 0 || teamMatches.length === 0) {
         return {
             eventComplete,
@@ -1768,14 +1896,24 @@ function computeOprForEvent(teamNumber, schedule, matchScores) {
             teamOpr: null
         };
     }
-    const scheduleMap = new Map();
-    qualSchedule.forEach(match => scheduleMap.set(match.matchNumber, match));
+    // Build schedule map ONLY from qual matches for OPR
+    const qualScheduleMap = new Map();
+    qualSchedule.forEach(match => {
+        const level = normalizeLevel(match.tournamentLevel);
+        const series = typeof match.series === "number" ? match.series : 0;
+        const key = `${level}-${series}-${match.matchNumber}`;
+        qualScheduleMap.set(key, match);
+    });
+    // Build equations ONLY from qual scores
     const buildEquations = (metric) => {
         const equations = [];
         for (const score of qualScores) {
             if (!isScoreComplete(score))
                 continue;
-            const scheduleMatch = scheduleMap.get(score.matchNumber);
+            const level = normalizeLevel(score.matchLevel);
+            const series = typeof score.matchSeries === "number" ? score.matchSeries : 0;
+            const key = `${level}-${series}-${score.matchNumber}`;
+            const scheduleMatch = qualScheduleMap.get(key);
             if (!scheduleMatch)
                 continue;
             for (const alliance of score.alliances) {
@@ -1808,12 +1946,13 @@ function computeOprForEvent(teamNumber, schedule, matchScores) {
         autoArtifacts: solutions.autoArtifacts.get(teamNumber) || 0,
         teleopArtifacts: solutions.teleopArtifacts.get(teamNumber) || 0
     };
+    // OPR is only shown for qual matches, null for playoff matches
     const perMatchOpr = {
-        overall: teamMatches.map(() => teamOpr.overall),
-        auto: teamMatches.map(() => teamOpr.auto),
-        teleop: teamMatches.map(() => teamOpr.teleop),
-        autoArtifacts: teamMatches.map(() => teamOpr.autoArtifacts),
-        teleopArtifacts: teamMatches.map(() => teamOpr.teleopArtifacts)
+        overall: teamMatches.map(match => isQualMatch(match) ? teamOpr.overall : null),
+        auto: teamMatches.map(match => isQualMatch(match) ? teamOpr.auto : null),
+        teleop: teamMatches.map(match => isQualMatch(match) ? teamOpr.teleop : null),
+        autoArtifacts: teamMatches.map(match => isQualMatch(match) ? teamOpr.autoArtifacts : null),
+        teleopArtifacts: teamMatches.map(match => isQualMatch(match) ? teamOpr.teleopArtifacts : null)
     };
     return {
         eventComplete,
@@ -1837,15 +1976,9 @@ async function analyzeTeam(teamNumber, updateHistory = true) {
     content.innerHTML = '<div class="insights-loading">Loading team data...</div>';
     showLoading();
     try {
-        // Fetch team info and events in parallel
-        const [teamInfoRes, eventsRes] = await Promise.all([
-            authFetch(`/api/v1/team/${teamNumber}/info`, {
-                headers: { "Authorization": `Bearer ${token}` }
-            }),
-            authFetch(`/api/v1/team/${teamNumber}/events`, {
-                headers: { "Authorization": `Bearer ${token}` }
-            })
-        ]);
+        const eventsRes = await authFetch(`/api/v1/team/${teamNumber}/events`, {
+            headers: { "Authorization": `Bearer ${token}` }
+        });
         if (!eventsRes.ok) {
             content.innerHTML = '<div class="insights-error">Failed to load team events. Please check the team number.</div>';
             hideLoading();
@@ -1853,14 +1986,6 @@ async function analyzeTeam(teamNumber, updateHistory = true) {
         }
         const eventsData = await eventsRes.json();
         const events = eventsData.events || [];
-        // Get team info
-        let teamInfo = null;
-        if (teamInfoRes.ok) {
-            const teamInfoData = await teamInfoRes.json();
-            if (teamInfoData.teams && teamInfoData.teams.length > 0) {
-                teamInfo = teamInfoData.teams[0];
-            }
-        }
         if (events.length === 0) {
             content.innerHTML = '<div class="insights-error">No events found for this team.</div>';
             hideLoading();
@@ -1874,19 +1999,43 @@ async function analyzeTeam(teamNumber, updateHistory = true) {
         const allScoreData = [];
         for (const event of sortedEvents) {
             try {
-                const [scoresRes, scheduleRes] = await Promise.all([
+                const [qualScoresRes, playoffScoresRes, scheduleRes] = await Promise.all([
                     authFetch(`/api/v1/scores/${event.code}/qual`, {
+                        headers: { "Authorization": `Bearer ${token}` }
+                    }),
+                    authFetch(`/api/v1/scores/${event.code}/playoff`, {
                         headers: { "Authorization": `Bearer ${token}` }
                     }),
                     authFetch(`/api/v1/schedule?event=${event.code}`, {
                         headers: { "Authorization": `Bearer ${token}` }
                     })
                 ]);
-                if (scoresRes.ok && scheduleRes.ok) {
-                    const scoresData = await scoresRes.json();
+                if (scheduleRes.ok) {
+                    const qualScoresData = qualScoresRes.ok ? await qualScoresRes.json() : { matchScores: [] };
+                    const playoffScoresData = playoffScoresRes.ok ? await playoffScoresRes.json() : { matchScores: [] };
                     const scheduleData = await scheduleRes.json();
-                    if (scoresData.matchScores && scheduleData.schedule) {
-                        const { eventComplete, teamMatches, matchLabels, perMatchOpr, teamOpr } = computeOprForEvent(teamNumber, scheduleData.schedule, scoresData.matchScores);
+                    const qualScores = qualScoresData.matchScores || [];
+                    const playoffScores = playoffScoresData.matchScores || [];
+                    // Filter playoff scores to only include complete matches with valid team data
+                    const validPlayoffScores = playoffScores.filter((score) => {
+                        if (!isScoreComplete(score))
+                            return false;
+                        // Check if the corresponding schedule match has valid teams (matching level, series, and matchNumber)
+                        const scoreSeries = typeof score.matchSeries === "number" ? score.matchSeries : 0;
+                        const scheduleMatch = (scheduleData.schedule || []).find((m) => {
+                            const matchSeries = typeof m.series === "number" ? m.series : 0;
+                            return m.matchNumber === score.matchNumber &&
+                                normalizeLevel(m.tournamentLevel) === normalizeLevel(score.matchLevel) &&
+                                matchSeries === scoreSeries;
+                        });
+                        if (!scheduleMatch)
+                            return false;
+                        // Ensure all teams have valid team numbers
+                        return scheduleMatch.teams.every((t) => t.teamNumber && t.teamNumber > 0);
+                    });
+                    const allScores = [...qualScores, ...validPlayoffScores];
+                    if (allScores.length > 0 && scheduleData.schedule) {
+                        const { eventComplete, teamMatches, matchLabels, perMatchOpr, teamOpr } = computeOprForEvent(teamNumber, scheduleData.schedule, allScores);
                         if (teamMatches.length > 0) {
                             allScoreData.push({
                                 event: event.name,
@@ -1905,7 +2054,7 @@ async function analyzeTeam(teamNumber, updateHistory = true) {
                 console.warn(`Failed to fetch scores for ${event.code}`, e);
             }
         }
-        renderInsights(teamNumber, teamInfo, sortedEvents, allScoreData);
+        renderInsights(teamNumber, sortedEvents, allScoreData);
     }
     catch (error) {
         console.error("Failed to analyze team:", error);
@@ -1968,7 +2117,7 @@ function generateStatsHTML(stats) {
         </div>
     `;
 }
-function renderInsights(teamNumber, teamInfo, events, scoreData) {
+function renderInsights(teamNumber, events, scoreData) {
     const content = document.getElementById("insights-content");
     if (!content)
         return;
@@ -1976,34 +2125,10 @@ function renderInsights(teamNumber, teamInfo, events, scoreData) {
     const playedEvents = events.filter(e => eventCodes.has(e.code));
     const stats = calculateTeamStatistics(teamNumber, scoreData);
     const charts = generateChartsHTML(stats);
-    // Build team info HTML
-    let teamInfoHTML = '';
-    if (teamInfo) {
-        const location = [teamInfo.city, teamInfo.stateProv, teamInfo.country]
-            .filter(Boolean)
-            .join(', ');
-        teamInfoHTML = `
-            <div class="team-info-card">
-                <div class="team-info-header">
-                    <h2>${teamNumber}${teamInfo.nameShort ? ` - ${teamInfo.nameShort}` : ''}</h2>
-                </div>
-                <div class="team-info-details">
-                    ${teamInfo.nameFull ? `<div class="team-info-row"><span class="team-info-label">Full Name:</span><span>${teamInfo.nameFull}</span></div>` : ''}
-                    ${teamInfo.schoolName ? `<div class="team-info-row"><span class="team-info-label">School:</span><span>${teamInfo.schoolName}</span></div>` : ''}
-                    ${location ? `<div class="team-info-row"><span class="team-info-label">Location:</span><span>${location}</span></div>` : ''}
-                    ${teamInfo.rookieYear ? `<div class="team-info-row"><span class="team-info-label">Rookie Year:</span><span>${teamInfo.rookieYear}</span></div>` : ''}
-                    ${teamInfo.website ? `<div class="team-info-row"><span class="team-info-label">Website:</span><a href="${teamInfo.website}" target="_blank" rel="noopener noreferrer">${teamInfo.website}</a></div>` : ''}
-                    ${teamInfo.robotName ? `<div class="team-info-row"><span class="team-info-label">Robot Name:</span><span>${teamInfo.robotName}</span></div>` : ''}
-                </div>
-            </div>
-        `;
-    }
     content.innerHTML = `
         <div class="insights-results">
-            ${teamInfoHTML}
-            
             <div class="insights-team-header">
-                <h2>Performance Analysis <span class="header-info-icon" title="All statistics exclude penalty points">(i)</span></h2>
+                <h2>Team ${teamNumber} - Performance Analysis <span class="header-info-icon" title="All statistics exclude penalty points">(i)</span></h2>
                 <p>${playedEvents.length} events completed</p>
             </div>
 
@@ -2323,7 +2448,7 @@ function generateBarChart(data, labels, maxValue, overlayLabel, overlayData, ove
                 tension: 0,
                 borderWidth: 2,
                 borderDash: [6, 4],
-                spanGaps: true
+                spanGaps: false
             });
         }
         new window.Chart(ctx, {
@@ -2458,7 +2583,7 @@ function generateComparisonChart(data1, data2, labels, maxValue, overlay1Label, 
                 tension: 0,
                 borderWidth: 2,
                 borderDash: [6, 4],
-                spanGaps: true
+                spanGaps: false
             });
         }
         if (overlay2Data && overlay2Data.length === data2.length && overlay2Data.some(v => v !== null && v !== undefined)) {
@@ -2472,7 +2597,7 @@ function generateComparisonChart(data1, data2, labels, maxValue, overlay1Label, 
                 tension: 0,
                 borderWidth: 2,
                 borderDash: [6, 4],
-                spanGaps: true
+                spanGaps: false
             });
         }
         new window.Chart(ctx, {
@@ -2620,7 +2745,7 @@ function generateLineChart(data1, data2, labels, maxValue, overlay1Label, overla
                 tension: 0,
                 borderWidth: 2,
                 borderDash: [6, 4],
-                spanGaps: true
+                spanGaps: false
             });
         }
         if (overlay2Data && overlay2Data.length === data2.length && overlay2Data.some(v => v !== null && v !== undefined)) {
@@ -2634,7 +2759,7 @@ function generateLineChart(data1, data2, labels, maxValue, overlay1Label, overla
                 tension: 0,
                 borderWidth: 2,
                 borderDash: [6, 4],
-                spanGaps: true
+                spanGaps: false
             });
         }
         new window.Chart(ctx, {
@@ -2973,26 +3098,6 @@ document.addEventListener("DOMContentLoaded", async () => {
             updateUrl();
         });
     }
-    // Ranking sort radio buttons initialization
-    const rankingSortRadios = document.querySelectorAll("input[name='ranking-sort']");
-    rankingSortRadios.forEach(radio => {
-        radio.addEventListener("change", () => {
-            if (radio.checked) {
-                rankingSortMode = radio.value;
-                renderRankings(currentRankings);
-            }
-        });
-    });
-    // Ranking scope radio buttons initialization
-    const rankingScopeRadios = document.querySelectorAll("input[name='ranking-scope']");
-    rankingScopeRadios.forEach(radio => {
-        radio.addEventListener("change", () => {
-            if (radio.checked) {
-                rankingScopeMode = radio.value;
-                renderRankings(currentRankings);
-            }
-        });
-    });
     // Insights initialization
     const analyzeBtn = document.getElementById("insights-analyze-btn");
     const teamInput = document.getElementById("insights-team-input");
@@ -3017,6 +3122,22 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (loginForm) {
         loginForm.addEventListener("submit", handleLogin);
     }
+    // Admin login initialization
+    const adminLoginForm = document.getElementById("admin-login-form");
+    const adminOtpInput = document.getElementById("admin-otp");
+    if (adminLoginForm) {
+        adminLoginForm.addEventListener("submit", handleAdminLogin);
+    }
+    if (adminOtpInput) {
+        adminOtpInput.addEventListener("input", () => {
+            const value = adminOtpInput.value.replace(/\D/g, "");
+            adminOtpInput.value = value;
+            if (value.length === 6) {
+                adminOtpInput?.blur();
+                adminLoginForm?.dispatchEvent(new Event("submit", { cancelable: true }));
+            }
+        });
+    }
     // Logout initialization
     const logoutBtn = document.getElementById("button-logout");
     if (logoutBtn) {
@@ -3028,6 +3149,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         const isValid = await verifyToken(token);
         if (isValid) {
             hideLogin();
+            await checkAdminStatus();
+            updateAdminViewState();
             await restoreStateFromUrl();
             await loadEventsWithStateRestore();
         }
@@ -3040,17 +3163,17 @@ document.addEventListener("DOMContentLoaded", async () => {
         showLogin();
     }
 });
-// Easter egg: Click version number to reveal hidden message
-let clickCount = 0;
-const versionNumber = document.getElementById("version-number");
-const easterEgg = document.getElementById("easter-egg");
-if (versionNumber && easterEgg) {
-    versionNumber.addEventListener("click", () => {
-        clickCount++;
-        if (clickCount >= 3) {
-            easterEgg.style.opacity = "1";
-            easterEgg.style.transform = "translateY(0)";
-            clickCount = 0;
-        }
-    });
+// nothing
+// ts obfuscator was BUNS
+var _0xf5ab = (496071 ^ 496071) + (575947 ^ 575938);
+let a = 466676 ^ 466676;
+_0xf5ab = (668349 ^ 668351) + (763093 ^ 763088);
+const b = document['\u0067\u0065\u0074\u0045\u006C\u0065\u006D\u0065\u006E\u0074\u0042\u0079\u0049\u0064']("\u0076\u0065\u0072\u0073\u0069\u006F\u006E\u002D\u006E\u0075\u006D\u0062\u0065\u0072");
+const c = document['\u0067\u0065\u0074\u0045\u006C\u0065\u006D\u0065\u006E\u0074\u0042\u0079\u0049\u0064']("\u0065\u0061\u0073\u0074\u0065\u0072\u002D\u0065\u0067\u0067");
+if (b && c) {
+    b['\u0061\u0064\u0064\u0045\u0076\u0065\u006E\u0074\u004C\u0069\u0073\u0074\u0065\u006E\u0065\u0072']("\u0063\u006C\u0069\u0063\u006B", () => { a++; if (a >= (631746 ^ 631745)) {
+        c['\u0073\u0074\u0079\u006C\u0065']['\u006F\u0070\u0061\u0063\u0069\u0074\u0079'] = "\u0031";
+        c['\u0073\u0074\u0079\u006C\u0065']['\u0074\u0072\u0061\u006E\u0073\u0066\u006F\u0072\u006D'] = "\u0074\u0072\u0061\u006E\u0073\u006C\u0061\u0074\u0065\u0059\u0028\u0030\u0029";
+        a = 302601 ^ 302601;
+    } });
 }

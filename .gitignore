@@ -15,6 +15,4 @@ default.db
 default.db-shm
 default.db-wal
 
-*.db
-
 node_modules/
