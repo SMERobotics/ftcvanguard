@@ -23,4 +23,4 @@ RUN chown -R vanguard:vanguard /app
 USER vanguard
 
 EXPOSE 8000
-ENTRYPOINT ["docker-entrypoint.sh"]
+ENTRYPOINT ["./docker-entrypoint.sh"]
