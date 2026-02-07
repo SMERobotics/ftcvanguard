@@ -44,6 +44,12 @@ interface TeamInfo {
     teamNumber: number;
     nameShort: string;
     nameFull: string;
+    rookieYear?: number;
+    organizationType?: string;
+    schoolName?: string;
+    city?: string;
+    stateProv?: string;
+    country?: string;
 }
 
 interface TeamOPR {
@@ -2424,9 +2430,14 @@ async function analyzeTeam(teamNumber: number, updateHistory: boolean = true) {
     showLoading();
 
     try {
-        const eventsRes = await authFetch(`/api/v1/team/${teamNumber}/events`, {
-            headers: { "Authorization": `Bearer ${token}` }
-        });
+        const [eventsRes, teamInfoRes] = await Promise.all([
+            authFetch(`/api/v1/team/${teamNumber}/events`, {
+                headers: { "Authorization": `Bearer ${token}` }
+            }),
+            authFetch(`/api/v1/team/${teamNumber}`, {
+                headers: { "Authorization": `Bearer ${token}` }
+            })
+        ]);
 
         if (!eventsRes.ok) {
             content.innerHTML = '<div class="insights-error">Failed to load team events. Please check the team number.</div>';
@@ -2436,6 +2447,15 @@ async function analyzeTeam(teamNumber: number, updateHistory: boolean = true) {
 
         const eventsData = await eventsRes.json();
         const events = eventsData.events || [];
+
+        let teamInfo: TeamInfo | null = null;
+        if (teamInfoRes.ok) {
+            const teamInfoData = await teamInfoRes.json();
+            const teams = teamInfoData.teams || [];
+            if (teams.length > 0) {
+                teamInfo = teams[0];
+            }
+        }
 
         if (events.length === 0) {
             content.innerHTML = '<div class="insights-error">No events found for this team.</div>';
@@ -2515,7 +2535,7 @@ async function analyzeTeam(teamNumber: number, updateHistory: boolean = true) {
             }
         }
 
-        renderInsights(teamNumber, sortedEvents, allScoreData);
+        renderInsights(teamNumber, sortedEvents, allScoreData, teamInfo);
     } catch (error) {
         console.error("Failed to analyze team:", error);
         content.innerHTML = '<div class="insights-error">An error occurred while analyzing the team.</div>';
@@ -2578,7 +2598,7 @@ function generateStatsHTML(stats: any) {
     `;
 }
 
-function renderInsights(teamNumber: number, events: any[], scoreData: any[]) {
+function renderInsights(teamNumber: number, events: any[], scoreData: any[], teamInfo: TeamInfo | null) {
     const content = document.getElementById("insights-content");
     if (!content) return;
 
@@ -2588,11 +2608,20 @@ function renderInsights(teamNumber: number, events: any[], scoreData: any[]) {
     const stats = calculateTeamStatistics(teamNumber, scoreData);
     const charts = generateChartsHTML(stats);
 
+    const teamNickname = teamInfo ? (teamInfo.nameShort || teamInfo.nameFull || "") : "";
+    const teamTitle = teamNickname ? `Team ${teamNumber} - ${teamNickname} - Performance Analysis` : `Team ${teamNumber} - Performance Analysis`;
+    
+    const rookieYear = teamInfo?.rookieYear ? `Rookie year: ${teamInfo.rookieYear}` : "";
+    const orgType = teamInfo?.organizationType || "";
+    const infoItems = [rookieYear, orgType].filter(item => item).join(" | ");
+    const eventsText = `${playedEvents.length} event${playedEvents.length !== 1 ? "s" : ""} completed`;
+    const headerInfo = infoItems ? `${eventsText} | ${infoItems}` : eventsText;
+
     content.innerHTML = `
         <div class="insights-results">
             <div class="insights-team-header">
-                <h2>Team ${teamNumber} - Performance Analysis <span class="header-info-icon" title="All statistics exclude penalty points">(i)</span></h2>
-                <p>${playedEvents.length} events completed</p>
+                <h2>${teamTitle} <span class="header-info-icon" title="All statistics exclude penalty points">(i)</span></h2>
+                <p>${headerInfo}</p>
             </div>
 
             <div class="insights-events">
