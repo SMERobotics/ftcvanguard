@@ -15,11 +15,13 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
-RUN chmod +x ./docker-entrypoint.sh
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+RUN rm docker-entrypoint.sh
 
 RUN chown -R vanguard:vanguard /app
 
 USER vanguard
 
 EXPOSE 8000
-ENTRYPOINT ["./docker-entrypoint.sh"]
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
