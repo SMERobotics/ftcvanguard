@@ -241,6 +241,30 @@ cursor.execute("""CREATE TABLE IF NOT EXISTS notifications (
     sent_at INTEGER NOT NULL,
     UNIQUE(team_id, title, message)
 )""")
+cursor.execute("""CREATE TABLE IF NOT EXISTS strategy (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    team_id INTEGER NOT NULL,
+    event_code TEXT NOT NULL,
+    match_number INTEGER NOT NULL,
+    match_description TEXT NOT NULL,
+    phase TEXT NOT NULL,
+    drawing_data TEXT,
+    robots_data TEXT,
+    updated_at INTEGER NOT NULL,
+    UNIQUE(team_id, event_code, match_description, phase)
+)""")
+
+# Migration: add match_description column if it doesn't exist
+cursor.execute("PRAGMA table_info(strategy)")
+columns = [col[1] for col in cursor.fetchall()]
+if "match_description" not in columns:
+    print("Migrating strategy table: adding match_description column")
+    cursor.execute("ALTER TABLE strategy ADD COLUMN match_description TEXT DEFAULT ''")
+    # For existing rows, set match_description to "Match {match_number}" as fallback
+    cursor.execute(
+        "UPDATE strategy SET match_description = 'Match ' || match_number WHERE match_description = ''"
+    )
+    db.commit()
 db.commit()
 db.close()
 
@@ -746,6 +770,142 @@ def _api_v1_notes_list():
             notes_status[row[0]] = row[1]
 
         return {"status": "success", "notesStatus": notes_status}, 200
+    except Exception as e:
+        print(e)
+        return {"status": "fuck", "error": "idk"}, 500
+
+
+@app.route("/api/v1/strategy", methods=["GET"])
+def _api_v1_strategy_get():
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return {"status": "fuck", "error": "no auth"}, 401
+
+    token = auth_header.split(" ")[1]
+    try:
+        payload = jwt.decode(token, RSA_PUBLIC_KEY, algorithms=["RS256"])
+        team_id = payload.get("id")
+    except jwt.ExpiredSignatureError:
+        return {"status": "fuck", "error": "token expired"}, 401
+    except jwt.InvalidTokenError:
+        return {"status": "fuck", "error": "invalid token"}, 401
+
+    event_code = request.args.get("event")
+    match_number = request.args.get("match")
+    match_description = request.args.get("description")
+    phase = request.args.get("phase")
+
+    if not event_code or not match_number or not match_description or not phase:
+        return {"status": "fuck", "error": "missing params"}, 400
+
+    try:
+        match_number = int(match_number)
+    except ValueError:
+        return {"status": "fuck", "error": "match must be int"}, 400
+
+    if phase not in ("auto", "teleop", "endgame"):
+        return {"status": "fuck", "error": "invalid phase"}, 400
+
+    try:
+        db = get_db()
+        cursor = db.cursor()
+        cursor.execute(
+            """SELECT drawing_data, robots_data, updated_at
+               FROM strategy WHERE team_id = ? AND event_code = ? AND match_description = ? AND phase = ?""",
+            (team_id, event_code, match_description, phase),
+        )
+        row = cursor.fetchone()
+        cursor.close()
+        db.close()
+
+        if row is None:
+            return {
+                "status": "success",
+                "strategy": {
+                    "drawingData": None,
+                    "robotsData": None,
+                    "updatedAt": None,
+                },
+            }, 200
+
+        return {
+            "status": "success",
+            "strategy": {
+                "drawingData": row[0],
+                "robotsData": row[1],
+                "updatedAt": row[2],
+            },
+        }, 200
+    except Exception as e:
+        print(e)
+        return {"status": "fuck", "error": "idk"}, 500
+
+
+@app.route("/api/v1/strategy", methods=["POST"])
+def _api_v1_strategy_post():
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return {"status": "fuck", "error": "no auth"}, 401
+
+    token = auth_header.split(" ")[1]
+    try:
+        payload = jwt.decode(token, RSA_PUBLIC_KEY, algorithms=["RS256"])
+        team_id = payload.get("id")
+    except jwt.ExpiredSignatureError:
+        return {"status": "fuck", "error": "token expired"}, 401
+    except jwt.InvalidTokenError:
+        return {"status": "fuck", "error": "invalid token"}, 401
+
+    data = request.json
+    if not data:
+        return {"status": "fuck", "error": "missing request body"}, 400
+
+    try:
+        event_code = data.get("eventCode")
+        match_number = int(data.get("matchNumber"))
+        match_description = data.get("matchDescription")
+        phase = data.get("phase")
+        drawing_data = data.get("drawingData")
+        robots_data = data.get("robotsData")
+    except (ValueError, TypeError) as e:
+        print(f"Invalid strategy data: {e}")
+        return {"status": "fuck", "error": "invalid request data"}, 400
+
+    if not event_code or not match_description or not phase:
+        return {"status": "fuck", "error": "missing required fields"}, 400
+
+    if phase not in ("auto", "teleop", "endgame"):
+        return {"status": "fuck", "error": "invalid phase"}, 400
+
+    try:
+        db = get_db()
+        cursor = db.cursor()
+        updated_at = int(datetime.now().timestamp())
+
+        cursor.execute(
+            """INSERT INTO strategy (team_id, event_code, match_number, match_description, phase, drawing_data, robots_data, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+               ON CONFLICT(team_id, event_code, match_description, phase)
+               DO UPDATE SET drawing_data=?, robots_data=?, updated_at=?""",
+            (
+                team_id,
+                event_code,
+                match_number,
+                match_description,
+                phase,
+                drawing_data,
+                robots_data,
+                updated_at,
+                drawing_data,
+                robots_data,
+                updated_at,
+            ),
+        )
+        db.commit()
+        cursor.close()
+        db.close()
+
+        return {"status": "success", "updatedAt": updated_at}, 200
     except Exception as e:
         print(e)
         return {"status": "fuck", "error": "idk"}, 500
