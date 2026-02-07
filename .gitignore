@@ -16,3 +16,4 @@ default.db-shm
 default.db-wal
 
 node_modules/
+dockerbp.sh
