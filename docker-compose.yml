@@ -11,4 +11,4 @@ services:
       PYTHONUNBUFFERED: "1"
 
     volumes:
-      - .:/app
+      - ./app:/app
