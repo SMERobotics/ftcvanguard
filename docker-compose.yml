@@ -11,4 +11,7 @@ services:
       PYTHONUNBUFFERED: "1"
 
     volumes:
-      - ./app:/app
+      - vanguard-app:/app
+
+volumes:
+  vanguard-app:
