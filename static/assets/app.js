@@ -8,6 +8,7 @@ const tabs = [
     { buttonId: "button-rankings", viewId: "view-rankings" },
     { buttonId: "button-notes", viewId: "view-notes" },
     { buttonId: "button-insights", viewId: "view-insights" },
+    { buttonId: "button-strategy", viewId: "view-strategy" },
     { buttonId: "button-compare", viewId: "view-compare" },
     { buttonId: "button-settings", viewId: "view-settings" },
     { buttonId: "button-about", viewId: "view-about" },
@@ -397,6 +398,11 @@ async function loadScheduleWithStateRestore(eventCode, urlState) {
             }
             renderSchedule(currentMatches, currentRankings, currentTeams);
             renderRankings(currentRankings);
+            // Render strategy match list if on strategy tab
+            const currentView = document.querySelector('.view:not([style*="display: none"])');
+            if (currentView?.id === "view-strategy") {
+                renderStrategyMatchList();
+            }
             // Fetch OPR data for all ranked teams
             const rankedTeamNumbers = currentRankings.map(r => r.teamNumber);
             if (rankedTeamNumbers.length > 0) {
@@ -2963,6 +2969,887 @@ function generateLineChart(data1, data2, labels, maxValue, overlay1Label, overla
         </div>
     `;
 }
+// Strategy Planner
+// Configurable defaults - tweak these to adjust field layout
+const STRATEGY_CONFIG = {
+    // Robot appearance
+    robotSizeMin: 100,
+    robotSizeMax: 120,
+    robotSizeFactor: 0.1, // fraction of field width
+    robotBorderRadius: 4, // px
+    robotFontSizeFactor: 0.28, // fraction of robot size
+    robotMinFontSize: 10, // px
+    // Robot default positions and rotations (fractions of field bounds)
+    // x, y: (0,0) is top-left, (1,1) is bottom-right
+    // rotation: degrees (0 = pointing up)
+    defaultPositions: {
+        blue1: { x: 0.16, y: 0.11, rotation: -53 },
+        blue2: { x: 0.415, y: 0.94, rotation: 0 },
+        red1: { x: 0.585, y: 0.94, rotation: 0 },
+        red2: { x: 0.84, y: 0.11, rotation: 53 },
+    },
+    // Drawing
+    drawLineWidth: 3,
+    eraserRadius: 20,
+    // Rotation
+    rotationStep: 15, // degrees per scroll tick / button press
+    // Autosave
+    autoSaveDelay: 800, // ms
+    // Colors
+    blueColor: "#4da6ff",
+    redColor: "#ff6b6b",
+    fieldBackground: "#1a1a1a",
+};
+let strategyCurrentMatch = null;
+let strategyCurrentPhase = "auto";
+let strategyDrawingColor = "#ffffff";
+let strategyTool = "draw";
+let strategyIsDrawing = false;
+let strategyAutoSaveTimeout = null;
+let strategyShowAllMatches = false;
+let strategyFieldImage = null;
+let strategyRobotStates = new Map();
+let strategyPhaseCache = new Map();
+let strategyEraserCursorEl = null;
+function getStrategyPhaseKey(match, phase) {
+    return `${currentEventCode}_${match.description}_${phase}`;
+}
+function renderStrategyMatchList() {
+    const listContainer = document.getElementById("strategy-match-list");
+    if (!listContainer)
+        return;
+    listContainer.innerHTML = "";
+    const filteredMatches = strategyShowAllMatches ? currentMatches : currentMatches.filter(match => match.teams.some(team => team.teamNumber === loggedInTeamId));
+    if (filteredMatches.length === 0) {
+        listContainer.innerHTML = '<div class="empty-state">No matches available</div>';
+        return;
+    }
+    filteredMatches.forEach((match, index) => {
+        const item = document.createElement("div");
+        item.className = "match-item";
+        item.dataset.matchNumber = match.matchNumber.toString();
+        item.style.animationDelay = `${index * 0.03}s`;
+        item.onclick = () => {
+            strategyCurrentMatch = match;
+            openStrategyBoard(match);
+        };
+        const redTeams = match.teams.filter(t => t.station.startsWith("Red")).map(t => t.teamNumber);
+        const blueTeams = match.teams.filter(t => t.station.startsWith("Blue")).map(t => t.teamNumber);
+        const formatTeams = (teamNums) => {
+            const valid = teamNums.filter(t => t && t > 0);
+            return valid.length === 0 ? "TBD" : valid.join(", ");
+        };
+        const matchTime = new Date(match.startTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+        item.innerHTML = `
+            <div class="match-header">
+                <span class="match-title">${match.description}</span>
+                <span class="match-time">${matchTime}</span>
+            </div>
+            <div class="match-teams">
+                <span class="team-red">${formatTeams(redTeams)}</span>
+                <span class="team-vs">vs</span>
+                <span class="team-blue">${formatTeams(blueTeams)}</span>
+            </div>
+        `;
+        listContainer.appendChild(item);
+    });
+}
+function loadFieldImage() {
+    return new Promise((resolve, reject) => {
+        if (strategyFieldImage) {
+            resolve(strategyFieldImage);
+            return;
+        }
+        const img = new Image();
+        img.onload = () => {
+            strategyFieldImage = img;
+            resolve(img);
+        };
+        img.onerror = reject;
+        img.src = "/assets/field.png";
+    });
+}
+function resizeStrategyCanvases() {
+    const container = document.getElementById("strategy-canvas-container");
+    const fieldCanvas = document.getElementById("strategy-field-canvas");
+    const drawingCanvas = document.getElementById("strategy-drawing-canvas");
+    if (!container || !fieldCanvas || !drawingCanvas)
+        return;
+    const rect = container.getBoundingClientRect();
+    const w = rect.width;
+    const h = rect.height;
+    fieldCanvas.width = w;
+    fieldCanvas.height = h;
+    drawingCanvas.width = w;
+    drawingCanvas.height = h;
+    renderFieldBackground();
+}
+function renderFieldBackground() {
+    const fieldCanvas = document.getElementById("strategy-field-canvas");
+    if (!fieldCanvas || !strategyFieldImage)
+        return;
+    const ctx = fieldCanvas.getContext("2d");
+    if (!ctx)
+        return;
+    ctx.clearRect(0, 0, fieldCanvas.width, fieldCanvas.height);
+    ctx.fillStyle = STRATEGY_CONFIG.fieldBackground;
+    ctx.fillRect(0, 0, fieldCanvas.width, fieldCanvas.height);
+    const imgAspect = strategyFieldImage.width / strategyFieldImage.height;
+    const canvasAspect = fieldCanvas.width / fieldCanvas.height;
+    let drawW, drawH, offsetX, offsetY;
+    if (canvasAspect > imgAspect) {
+        drawH = fieldCanvas.height;
+        drawW = drawH * imgAspect;
+        offsetX = (fieldCanvas.width - drawW) / 2;
+        offsetY = 0;
+    }
+    else {
+        drawW = fieldCanvas.width;
+        drawH = drawW / imgAspect;
+        offsetX = 0;
+        offsetY = (fieldCanvas.height - drawH) / 2;
+    }
+    ctx.drawImage(strategyFieldImage, offsetX, offsetY, drawW, drawH);
+}
+function getFieldBounds() {
+    const fieldCanvas = document.getElementById("strategy-field-canvas");
+    if (!fieldCanvas || !strategyFieldImage)
+        return { x: 0, y: 0, w: 0, h: 0 };
+    const imgAspect = strategyFieldImage.width / strategyFieldImage.height;
+    const canvasAspect = fieldCanvas.width / fieldCanvas.height;
+    if (canvasAspect > imgAspect) {
+        const drawH = fieldCanvas.height;
+        const drawW = drawH * imgAspect;
+        return { x: (fieldCanvas.width - drawW) / 2, y: 0, w: drawW, h: drawH };
+    }
+    else {
+        const drawW = fieldCanvas.width;
+        const drawH = drawW / imgAspect;
+        return { x: 0, y: (fieldCanvas.height - drawH) / 2, w: drawW, h: drawH };
+    }
+}
+function createStrategyRobots(match) {
+    const robotsLayer = document.getElementById("strategy-robots-layer");
+    if (!robotsLayer)
+        return;
+    robotsLayer.innerHTML = "";
+    const redTeams = match.teams.filter(t => t.station.startsWith("Red")).sort((a, b) => a.station.localeCompare(b.station));
+    const blueTeams = match.teams.filter(t => t.station.startsWith("Blue")).sort((a, b) => a.station.localeCompare(b.station));
+    const bounds = getFieldBounds();
+    const cfg = STRATEGY_CONFIG;
+    const robotSize = Math.max(cfg.robotSizeMin, Math.min(cfg.robotSizeMax, bounds.w * cfg.robotSizeFactor));
+    const posKeys = [
+        { teams: blueTeams, posKey: "blue1", color: cfg.blueColor },
+        { teams: blueTeams, posKey: "blue2", color: cfg.blueColor },
+        { teams: redTeams, posKey: "red1", color: cfg.redColor },
+        { teams: redTeams, posKey: "red2", color: cfg.redColor },
+    ];
+    const positions = [];
+    posKeys.forEach(({ teams, posKey, color }) => {
+        const idx = posKey.endsWith("1") ? 0 : 1;
+        const team = teams[idx];
+        if (!team)
+            return;
+        const defPos = cfg.defaultPositions[posKey];
+        positions.push({
+            team,
+            x: bounds.x + defPos.x * bounds.w,
+            y: bounds.y + defPos.y * bounds.h,
+            rotation: defPos.rotation,
+            color
+        });
+    });
+    positions.forEach((pos, i) => {
+        if (!pos.team.teamNumber || pos.team.teamNumber <= 0)
+            return;
+        const robotId = `robot-${pos.team.station}`;
+        const phaseKey = getStrategyPhaseKey(match, strategyCurrentPhase);
+        const savedState = strategyRobotStates.get(`${phaseKey}_${robotId}`);
+        const rotation = savedState?.rotation ?? pos.rotation;
+        // Convert saved fractions back to pixels for current bounds
+        const robotCenterX = savedState ? bounds.x + savedState.xFraction * bounds.w : pos.x;
+        const robotCenterY = savedState ? bounds.y + savedState.yFraction * bounds.h : pos.y;
+        const el = document.createElement("div");
+        el.className = "strategy-robot";
+        el.id = robotId;
+        el.style.width = `${robotSize}px`;
+        el.style.height = `${robotSize}px`;
+        el.style.borderColor = pos.color;
+        el.style.left = `${robotCenterX - robotSize / 2}px`;
+        el.style.top = `${robotCenterY - robotSize / 2}px`;
+        el.style.transform = `rotate(${rotation}deg)`;
+        el.dataset.rotation = rotation.toString();
+        el.style.animationDelay = `${i * 0.05}s`;
+        // Direction indicator arrow (always points "forward" relative to rotation)
+        const arrow = document.createElement("div");
+        arrow.className = "strategy-robot-arrow";
+        arrow.style.borderBottomColor = pos.color;
+        // Team number label
+        const label = document.createElement("span");
+        label.style.color = pos.color;
+        label.textContent = pos.team.teamNumber.toString();
+        // Rotate button
+        const rotateBtn = document.createElement("button");
+        rotateBtn.className = "strategy-robot-rotate-btn";
+        rotateBtn.title = "Drag to rotate";
+        rotateBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none"><path d="M1 4v6h6M23 20v-6h-6" stroke="${pos.color}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M20.49 9A9 9 0 005.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 013.51 15" stroke="${pos.color}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+        el.appendChild(arrow);
+        el.appendChild(label);
+        el.appendChild(rotateBtn);
+        makeRobotDraggable(el, match);
+        makeRobotRotatable(el, match);
+        makeRobotRotateDraggable(el, rotateBtn, match);
+        robotsLayer.appendChild(el);
+    });
+}
+function makeRobotDraggable(el, match) {
+    let isDragging = false;
+    let startX = 0;
+    let startY = 0;
+    let origLeft = 0;
+    let origTop = 0;
+    const onStart = (clientX, clientY) => {
+        if (strategyTool !== "draw" && strategyTool !== "eraser")
+            return;
+        isDragging = true;
+        startX = clientX;
+        startY = clientY;
+        origLeft = el.offsetLeft;
+        origTop = el.offsetTop;
+        el.classList.add("dragging");
+        el.style.zIndex = "100";
+    };
+    const onMove = (clientX, clientY) => {
+        if (!isDragging)
+            return;
+        const dx = clientX - startX;
+        const dy = clientY - startY;
+        el.style.left = `${origLeft + dx}px`;
+        el.style.top = `${origTop + dy}px`;
+    };
+    const onEnd = () => {
+        if (!isDragging)
+            return;
+        isDragging = false;
+        el.classList.remove("dragging");
+        el.style.zIndex = "";
+        saveRobotState(el, match);
+        scheduleStrategySave();
+    };
+    el.addEventListener("mousedown", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        onStart(e.clientX, e.clientY);
+    });
+    document.addEventListener("mousemove", (e) => onMove(e.clientX, e.clientY));
+    document.addEventListener("mouseup", onEnd);
+    el.addEventListener("touchstart", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const touch = e.touches[0];
+        onStart(touch.clientX, touch.clientY);
+    }, { passive: false });
+    document.addEventListener("touchmove", (e) => {
+        if (isDragging) {
+            const touch = e.touches[0];
+            onMove(touch.clientX, touch.clientY);
+        }
+    });
+    document.addEventListener("touchend", onEnd);
+}
+function makeRobotRotatable(el, match) {
+    el.addEventListener("wheel", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const currentRotation = parseFloat(el.dataset.rotation || "0");
+        const newRotation = currentRotation + (e.deltaY > 0 ? STRATEGY_CONFIG.rotationStep : -STRATEGY_CONFIG.rotationStep);
+        el.dataset.rotation = newRotation.toString();
+        el.style.transform = `rotate(${newRotation}deg)`;
+        saveRobotState(el, match);
+        scheduleStrategySave();
+    }, { passive: false });
+}
+function makeRobotRotateDraggable(el, rotateBtn, match) {
+    let isRotating = false;
+    const getRobotCenter = () => {
+        const rect = el.getBoundingClientRect();
+        return {
+            x: rect.left + rect.width / 2,
+            y: rect.top + rect.height / 2
+        };
+    };
+    const calculateAngle = (clientX, clientY) => {
+        const center = getRobotCenter();
+        const dx = clientX - center.x;
+        const dy = clientY - center.y;
+        // atan2 gives angle in radians, convert to degrees
+        // atan2(dy, dx) gives 0° pointing right, we want 0° pointing up
+        // so subtract 90° and normalize
+        let angle = (Math.atan2(dy, dx) * 180 / Math.PI) - 90;
+        return angle;
+    };
+    const onRotateStart = (clientX, clientY, e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        isRotating = true;
+        el.classList.add("rotating");
+    };
+    const onRotateMove = (clientX, clientY) => {
+        if (!isRotating)
+            return;
+        const angle = calculateAngle(clientX, clientY);
+        el.dataset.rotation = angle.toString();
+        el.style.transform = `rotate(${angle}deg)`;
+    };
+    const onRotateEnd = () => {
+        if (!isRotating)
+            return;
+        isRotating = false;
+        el.classList.remove("rotating");
+        saveRobotState(el, match);
+        scheduleStrategySave();
+    };
+    // Mouse events
+    rotateBtn.addEventListener("mousedown", (e) => {
+        onRotateStart(e.clientX, e.clientY, e);
+    });
+    document.addEventListener("mousemove", (e) => {
+        if (isRotating) {
+            onRotateMove(e.clientX, e.clientY);
+        }
+    });
+    document.addEventListener("mouseup", () => {
+        onRotateEnd();
+    });
+    // Touch events
+    rotateBtn.addEventListener("touchstart", (e) => {
+        const touch = e.touches[0];
+        onRotateStart(touch.clientX, touch.clientY, e);
+    }, { passive: false });
+    document.addEventListener("touchmove", (e) => {
+        if (isRotating && e.touches.length > 0) {
+            const touch = e.touches[0];
+            onRotateMove(touch.clientX, touch.clientY);
+        }
+    });
+    document.addEventListener("touchend", () => {
+        onRotateEnd();
+    });
+}
+function saveRobotState(el, match) {
+    if (!strategyCurrentMatch)
+        return;
+    const phaseKey = getStrategyPhaseKey(match, strategyCurrentPhase);
+    const robotSize = el.offsetWidth;
+    const bounds = getFieldBounds();
+    // Save as fractions relative to field bounds
+    const robotCenterX = el.offsetLeft + robotSize / 2;
+    const robotCenterY = el.offsetTop + robotSize / 2;
+    strategyRobotStates.set(`${phaseKey}_${el.id}`, {
+        xFraction: (robotCenterX - bounds.x) / bounds.w,
+        yFraction: (robotCenterY - bounds.y) / bounds.h,
+        rotation: parseFloat(el.dataset.rotation || "0")
+    });
+}
+function collectRobotsData() {
+    if (!strategyCurrentMatch)
+        return "{}";
+    const phaseKey = getStrategyPhaseKey(strategyCurrentMatch, strategyCurrentPhase);
+    const data = {};
+    strategyRobotStates.forEach((state, key) => {
+        if (key.startsWith(phaseKey + "_")) {
+            const robotId = key.substring(phaseKey.length + 1);
+            data[robotId] = state;
+        }
+    });
+    return JSON.stringify(data);
+}
+function restoreRobotsFromData(robotsDataStr, match, phase) {
+    if (!robotsDataStr)
+        return;
+    try {
+        const data = JSON.parse(robotsDataStr);
+        const phaseKey = getStrategyPhaseKey(match, phase);
+        Object.entries(data).forEach(([robotId, state]) => {
+            strategyRobotStates.set(`${phaseKey}_${robotId}`, state);
+        });
+    }
+    catch {
+        // ignore invalid data
+    }
+}
+function initStrategyDrawing() {
+    const drawingCanvas = document.getElementById("strategy-drawing-canvas");
+    if (!drawingCanvas)
+        return;
+    const ctx = drawingCanvas.getContext("2d");
+    if (!ctx)
+        return;
+    let lastX = 0;
+    let lastY = 0;
+    // Eraser circle cursor
+    ensureEraserCursor();
+    const getPos = (e) => {
+        const rect = drawingCanvas.getBoundingClientRect();
+        return {
+            x: e.clientX - rect.left,
+            y: e.clientY - rect.top
+        };
+    };
+    const startDraw = (x, y) => {
+        strategyIsDrawing = true;
+        lastX = x;
+        lastY = y;
+    };
+    const draw = (x, y) => {
+        if (!strategyIsDrawing)
+            return;
+        ctx.beginPath();
+        ctx.moveTo(lastX, lastY);
+        ctx.lineTo(x, y);
+        if (strategyTool === "eraser") {
+            ctx.globalCompositeOperation = "destination-out";
+            ctx.strokeStyle = "rgba(0,0,0,1)";
+            ctx.lineWidth = STRATEGY_CONFIG.eraserRadius * 2;
+        }
+        else {
+            ctx.globalCompositeOperation = "source-over";
+            ctx.strokeStyle = strategyDrawingColor;
+            ctx.lineWidth = STRATEGY_CONFIG.drawLineWidth;
+        }
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+        ctx.stroke();
+        lastX = x;
+        lastY = y;
+    };
+    const endDraw = () => {
+        if (strategyIsDrawing) {
+            strategyIsDrawing = false;
+            cacheCurrentPhaseDrawing();
+            scheduleStrategySave();
+        }
+    };
+    drawingCanvas.addEventListener("mousedown", (e) => {
+        const target = e.target;
+        if (target.closest(".strategy-robot"))
+            return;
+        const pos = getPos(e);
+        startDraw(pos.x, pos.y);
+    });
+    drawingCanvas.addEventListener("mousemove", (e) => {
+        const pos = getPos(e);
+        draw(pos.x, pos.y);
+        updateEraserCursor(e.clientX, e.clientY);
+    });
+    drawingCanvas.addEventListener("mouseup", endDraw);
+    drawingCanvas.addEventListener("mouseleave", (e) => {
+        endDraw();
+        hideEraserCursor();
+    });
+    drawingCanvas.addEventListener("mouseenter", (e) => {
+        if (strategyTool === "eraser")
+            showEraserCursor();
+    });
+    drawingCanvas.addEventListener("touchstart", (e) => {
+        const target = e.target;
+        if (target.closest(".strategy-robot"))
+            return;
+        e.preventDefault();
+        const pos = getPos(e.touches[0]);
+        startDraw(pos.x, pos.y);
+        if (strategyTool === "eraser") {
+            showEraserCursor();
+            updateEraserCursor(e.touches[0].clientX, e.touches[0].clientY);
+        }
+    }, { passive: false });
+    drawingCanvas.addEventListener("touchmove", (e) => {
+        e.preventDefault();
+        const pos = getPos(e.touches[0]);
+        draw(pos.x, pos.y);
+        if (strategyTool === "eraser") {
+            updateEraserCursor(e.touches[0].clientX, e.touches[0].clientY);
+        }
+    }, { passive: false });
+    drawingCanvas.addEventListener("touchend", () => {
+        endDraw();
+        hideEraserCursor();
+    });
+}
+function ensureEraserCursor() {
+    if (strategyEraserCursorEl)
+        return;
+    const el = document.createElement("div");
+    el.className = "strategy-eraser-cursor";
+    const size = STRATEGY_CONFIG.eraserRadius * 2;
+    el.style.width = `${size}px`;
+    el.style.height = `${size}px`;
+    document.body.appendChild(el);
+    strategyEraserCursorEl = el;
+}
+function showEraserCursor() {
+    if (strategyEraserCursorEl) {
+        strategyEraserCursorEl.style.display = "block";
+    }
+}
+function hideEraserCursor() {
+    if (strategyEraserCursorEl) {
+        strategyEraserCursorEl.style.display = "none";
+    }
+}
+function updateEraserCursor(clientX, clientY) {
+    if (!strategyEraserCursorEl || strategyTool !== "eraser") {
+        hideEraserCursor();
+        return;
+    }
+    showEraserCursor();
+    const r = STRATEGY_CONFIG.eraserRadius;
+    strategyEraserCursorEl.style.left = `${clientX - r}px`;
+    strategyEraserCursorEl.style.top = `${clientY - r}px`;
+}
+function cacheCurrentPhaseDrawing() {
+    if (!strategyCurrentMatch)
+        return;
+    const drawingCanvas = document.getElementById("strategy-drawing-canvas");
+    if (!drawingCanvas)
+        return;
+    const key = getStrategyPhaseKey(strategyCurrentMatch, strategyCurrentPhase);
+    strategyPhaseCache.set(key, {
+        drawingData: drawingCanvas.toDataURL(),
+        robotsData: collectRobotsData()
+    });
+}
+function restorePhaseDrawing() {
+    if (!strategyCurrentMatch)
+        return;
+    const drawingCanvas = document.getElementById("strategy-drawing-canvas");
+    if (!drawingCanvas)
+        return;
+    const ctx = drawingCanvas.getContext("2d");
+    if (!ctx)
+        return;
+    const key = getStrategyPhaseKey(strategyCurrentMatch, strategyCurrentPhase);
+    const cached = strategyPhaseCache.get(key);
+    ctx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
+    if (cached?.drawingData) {
+        const img = new Image();
+        img.onload = () => {
+            ctx.drawImage(img, 0, 0);
+        };
+        img.src = cached.drawingData;
+    }
+    createStrategyRobots(strategyCurrentMatch);
+}
+async function loadStrategyFromBackend(match, phase) {
+    const token = localStorage.getItem("token");
+    if (!token || !currentEventCode)
+        return;
+    try {
+        const res = await authFetch(`/api/v1/strategy?event=${encodeURIComponent(currentEventCode)}&match=${match.matchNumber}&description=${encodeURIComponent(match.description)}&phase=${phase}`, {
+            headers: { "Authorization": `Bearer ${token}` }
+        });
+        if (!res.ok)
+            return;
+        const data = await res.json();
+        const strategy = data.strategy;
+        if (!strategy)
+            return;
+        const key = getStrategyPhaseKey(match, phase);
+        if (strategy.drawingData || strategy.robotsData) {
+            strategyPhaseCache.set(key, {
+                drawingData: strategy.drawingData,
+                robotsData: strategy.robotsData
+            });
+            restoreRobotsFromData(strategy.robotsData, match, phase);
+        }
+    }
+    catch (e) {
+        console.error("Failed to load strategy:", e);
+    }
+}
+function saveStrategyToBackend() {
+    if (!strategyCurrentMatch || !currentEventCode)
+        return;
+    const token = localStorage.getItem("token");
+    if (!token)
+        return;
+    const drawingCanvas = document.getElementById("strategy-drawing-canvas");
+    if (!drawingCanvas)
+        return;
+    const drawingData = drawingCanvas.toDataURL();
+    const robotsData = collectRobotsData();
+    authFetch("/api/v1/strategy", {
+        method: "POST",
+        headers: {
+            "Authorization": `Bearer ${token}`,
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+            eventCode: currentEventCode,
+            matchNumber: strategyCurrentMatch.matchNumber,
+            matchDescription: strategyCurrentMatch.description,
+            phase: strategyCurrentPhase,
+            drawingData: drawingData,
+            robotsData: robotsData
+        })
+    }).catch(e => console.error("Failed to save strategy:", e));
+}
+function scheduleStrategySave() {
+    if (strategyAutoSaveTimeout) {
+        clearTimeout(strategyAutoSaveTimeout);
+    }
+    strategyAutoSaveTimeout = window.setTimeout(() => {
+        saveStrategyToBackend();
+    }, STRATEGY_CONFIG.autoSaveDelay);
+}
+async function openStrategyBoard(match) {
+    const matchSelect = document.getElementById("strategy-match-select");
+    const boardWrapper = document.getElementById("strategy-board-wrapper");
+    const titleEl = document.getElementById("strategy-match-title");
+    if (!matchSelect || !boardWrapper || !titleEl)
+        return;
+    matchSelect.style.display = "none";
+    boardWrapper.style.display = "flex";
+    boardWrapper.classList.remove("strategy-board-animate-in");
+    void boardWrapper.offsetWidth;
+    boardWrapper.classList.add("strategy-board-animate-in");
+    titleEl.textContent = match.description;
+    strategyCurrentMatch = match;
+    strategyCurrentPhase = "auto";
+    // Reset phase buttons
+    document.querySelectorAll(".strategy-phase-btn").forEach(btn => {
+        btn.classList.toggle("active", btn.dataset.phase === "auto");
+    });
+    await loadFieldImage();
+    resizeStrategyCanvases();
+    // Load all three phases from backend
+    await Promise.all([
+        loadStrategyFromBackend(match, "auto"),
+        loadStrategyFromBackend(match, "teleop"),
+        loadStrategyFromBackend(match, "endgame")
+    ]);
+    restorePhaseDrawing();
+    initStrategyDrawing();
+}
+function closeStrategyBoard() {
+    const matchSelect = document.getElementById("strategy-match-select");
+    const boardWrapper = document.getElementById("strategy-board-wrapper");
+    // Save current state before closing
+    if (strategyCurrentMatch) {
+        cacheCurrentPhaseDrawing();
+        saveStrategyToBackend();
+    }
+    if (boardWrapper) {
+        boardWrapper.classList.remove("strategy-board-animate-in");
+        boardWrapper.classList.add("strategy-board-animate-out");
+        boardWrapper.addEventListener("animationend", function handler() {
+            boardWrapper.removeEventListener("animationend", handler);
+            boardWrapper.classList.remove("strategy-board-animate-out");
+            boardWrapper.style.display = "none";
+            if (matchSelect) {
+                matchSelect.style.display = "";
+                matchSelect.classList.remove("strategy-list-animate-in");
+                void matchSelect.offsetWidth;
+                matchSelect.classList.add("strategy-list-animate-in");
+            }
+        });
+    }
+    else {
+        if (matchSelect)
+            matchSelect.style.display = "";
+    }
+    hideEraserCursor();
+    strategyCurrentMatch = null;
+}
+function switchStrategyPhase(phase) {
+    if (!strategyCurrentMatch || phase === strategyCurrentPhase)
+        return;
+    // Cache current phase
+    cacheCurrentPhaseDrawing();
+    saveStrategyToBackend();
+    strategyCurrentPhase = phase;
+    document.querySelectorAll(".strategy-phase-btn").forEach(btn => {
+        btn.classList.toggle("active", btn.dataset.phase === phase);
+    });
+    // Animate canvas transition
+    const canvasContainer = document.getElementById("strategy-canvas-container");
+    if (canvasContainer) {
+        canvasContainer.classList.remove("strategy-phase-transition");
+        void canvasContainer.offsetWidth;
+        canvasContainer.classList.add("strategy-phase-transition");
+    }
+    restorePhaseDrawing();
+}
+function clearStrategyDrawing() {
+    const drawingCanvas = document.getElementById("strategy-drawing-canvas");
+    if (!drawingCanvas)
+        return;
+    const ctx = drawingCanvas.getContext("2d");
+    if (!ctx)
+        return;
+    ctx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
+    // Reset robot positions for this phase
+    if (strategyCurrentMatch) {
+        const phaseKey = getStrategyPhaseKey(strategyCurrentMatch, strategyCurrentPhase);
+        const keysToDelete = [];
+        strategyRobotStates.forEach((_, key) => {
+            if (key.startsWith(phaseKey + "_"))
+                keysToDelete.push(key);
+        });
+        keysToDelete.forEach(k => strategyRobotStates.delete(k));
+        createStrategyRobots(strategyCurrentMatch);
+        cacheCurrentPhaseDrawing();
+        scheduleStrategySave();
+    }
+}
+function downloadStrategyAsPng() {
+    if (!strategyCurrentMatch)
+        return;
+    const fieldCanvas = document.getElementById("strategy-field-canvas");
+    const drawingCanvas = document.getElementById("strategy-drawing-canvas");
+    const robotsLayer = document.getElementById("strategy-robots-layer");
+    if (!fieldCanvas || !drawingCanvas || !robotsLayer)
+        return;
+    const exportCanvas = document.createElement("canvas");
+    exportCanvas.width = fieldCanvas.width;
+    exportCanvas.height = fieldCanvas.height;
+    const ctx = exportCanvas.getContext("2d");
+    if (!ctx)
+        return;
+    // Draw field
+    ctx.drawImage(fieldCanvas, 0, 0);
+    // Draw drawings
+    ctx.drawImage(drawingCanvas, 0, 0);
+    // Draw robots
+    const robots = robotsLayer.querySelectorAll(".strategy-robot");
+    robots.forEach(robot => {
+        const left = parseFloat(robot.style.left);
+        const top = parseFloat(robot.style.top);
+        const size = robot.offsetWidth;
+        const rotation = parseFloat(robot.dataset.rotation || "0");
+        const color = robot.style.borderColor;
+        const text = robot.querySelector("span")?.textContent || "";
+        ctx.save();
+        ctx.translate(left + size / 2, top + size / 2);
+        ctx.rotate((rotation * Math.PI) / 180);
+        ctx.fillStyle = "rgba(30, 30, 30, 0.85)";
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.roundRect(-size / 2, -size / 2, size, size, STRATEGY_CONFIG.robotBorderRadius);
+        ctx.fill();
+        ctx.stroke();
+        // Direction arrow
+        const arrowSize = size * 0.18;
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.moveTo(0, -size / 2 + 2);
+        ctx.lineTo(-arrowSize, -size / 2 + 2 + arrowSize);
+        ctx.lineTo(arrowSize, -size / 2 + 2 + arrowSize);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = color;
+        ctx.font = `bold ${Math.max(STRATEGY_CONFIG.robotMinFontSize, size * STRATEGY_CONFIG.robotFontSizeFactor)}px "JetBrains Mono", monospace`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(text, 0, 2);
+        ctx.restore();
+    });
+    // Draw phase label
+    ctx.fillStyle = "rgba(0, 0, 0, 0.6)";
+    ctx.fillRect(0, 0, 200, 36);
+    ctx.fillStyle = "#ffffff";
+    ctx.font = 'bold 14px "JetBrains Mono", monospace';
+    ctx.textAlign = "left";
+    ctx.textBaseline = "middle";
+    ctx.fillText(`${strategyCurrentMatch.description} - ${strategyCurrentPhase.charAt(0).toUpperCase() + strategyCurrentPhase.slice(1)}`, 10, 18);
+    const link = document.createElement("a");
+    link.download = `strategy_${currentEventCode}_match${strategyCurrentMatch.matchNumber}_${strategyCurrentPhase}.png`;
+    link.href = exportCanvas.toDataURL("image/png");
+    link.click();
+}
+function initStrategyEventListeners() {
+    // Back button
+    const backBtn = document.getElementById("strategy-back-btn");
+    if (backBtn) {
+        backBtn.addEventListener("click", closeStrategyBoard);
+    }
+    // Phase buttons
+    document.querySelectorAll(".strategy-phase-btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+            const phase = btn.dataset.phase;
+            if (phase)
+                switchStrategyPhase(phase);
+        });
+    });
+    // Draw/Eraser toggle
+    const drawBtn = document.getElementById("strategy-draw-btn");
+    const eraserBtn = document.getElementById("strategy-eraser-btn");
+    if (drawBtn) {
+        drawBtn.addEventListener("click", () => {
+            strategyTool = "draw";
+            drawBtn.classList.add("active");
+            eraserBtn?.classList.remove("active");
+            hideEraserCursor();
+            const dc = document.getElementById("strategy-drawing-canvas");
+            if (dc)
+                dc.style.cursor = "crosshair";
+        });
+    }
+    if (eraserBtn) {
+        eraserBtn.addEventListener("click", () => {
+            strategyTool = "eraser";
+            eraserBtn.classList.add("active");
+            drawBtn?.classList.remove("active");
+            const dc = document.getElementById("strategy-drawing-canvas");
+            if (dc)
+                dc.style.cursor = "none";
+        });
+    }
+    // Color picker
+    document.querySelectorAll(".strategy-color-btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+            strategyDrawingColor = btn.dataset.color || "#ffffff";
+            document.querySelectorAll(".strategy-color-btn").forEach(b => b.classList.remove("active"));
+            btn.classList.add("active");
+            // Switch to draw tool when picking a color
+            strategyTool = "draw";
+            drawBtn?.classList.add("active");
+            eraserBtn?.classList.remove("active");
+            hideEraserCursor();
+            const dc = document.getElementById("strategy-drawing-canvas");
+            if (dc)
+                dc.style.cursor = "crosshair";
+        });
+    });
+    // Clear button
+    const clearBtn = document.getElementById("strategy-clear-btn");
+    if (clearBtn) {
+        clearBtn.addEventListener("click", clearStrategyDrawing);
+    }
+    // Download button
+    const downloadBtn = document.getElementById("strategy-download-btn");
+    if (downloadBtn) {
+        downloadBtn.addEventListener("click", downloadStrategyAsPng);
+    }
+    // Show all matches checkbox
+    const showAllCheckbox = document.getElementById("strategy-show-all");
+    if (showAllCheckbox) {
+        showAllCheckbox.addEventListener("change", () => {
+            strategyShowAllMatches = showAllCheckbox.checked;
+            renderStrategyMatchList();
+        });
+    }
+    // Resize handler
+    window.addEventListener("resize", () => {
+        if (strategyCurrentMatch) {
+            // Save drawing before resize
+            cacheCurrentPhaseDrawing();
+            resizeStrategyCanvases();
+            restorePhaseDrawing();
+        }
+    });
+}
 function handleLogout() {
     localStorage.removeItem("token");
     loggedInTeamId = null;
@@ -2974,6 +3861,12 @@ function handleLogout() {
     currentSelectedMatch = null;
     currentSelectedNotesTeam = null;
     currentInsightsTeam = null;
+    // Clear strategy state
+    strategyCurrentMatch = null;
+    strategyCurrentPhase = "auto";
+    strategyRobotStates.clear();
+    strategyPhaseCache.clear();
+    hideEraserCursor();
     // Clear URL state
     history.replaceState(null, "", window.location.pathname);
     // Reset UI elements
@@ -3119,6 +4012,9 @@ window.addEventListener("popstate", async (event) => {
         }
         else {
             currentInsightsTeam = null;
+            strategyCurrentMatch = null;
+            strategyPhaseCache.clear();
+            strategyRobotStates.clear();
             const teamInput = document.getElementById("insights-team-input");
             if (teamInput) {
                 teamInput.value = "";
@@ -3158,6 +4054,9 @@ document.addEventListener("DOMContentLoaded", async () => {
                 switchTab(tab);
                 if (tab.viewId === "view-notes" && currentEventCode && currentTeams.length > 0) {
                     initializeNotesView(currentEventCode);
+                }
+                if (tab.viewId === "view-strategy") {
+                    renderStrategyMatchList();
                 }
             });
         }
@@ -3224,6 +4123,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (loginForm) {
         loginForm.addEventListener("submit", handleLogin);
     }
+    // Strategy initialization
+    initStrategyEventListeners();
     // Admin login initialization
     const adminLoginForm = document.getElementById("admin-login-form");
     const adminOtpInput = document.getElementById("admin-otp");
