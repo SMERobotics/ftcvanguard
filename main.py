@@ -16,7 +16,7 @@ BLOCK_REGISTRATION = True
 RSA_PUBLIC_KEY = ""
 RSA_PRIVATE_KEY = ""
 
-with open("./settings.toml", "rb") as f:
+with open("./data/settings.toml", "rb") as f:
     settings = tomllib.load(f)
 
 FTC_API_USERNAME = settings["ftc_api"]["username"]
@@ -28,7 +28,7 @@ VANGUARD_URL = settings["server"]["vanguard_url"]
 ADMIN_TEAMS = settings["admin"]["admin_teams"]
 ADMIN_SECRET = settings["admin"]["admin_secret"]
 
-get_db = lambda: sqlite3.connect("default.db", check_same_thread=True)
+get_db = lambda: sqlite3.connect("data/default.db", check_same_thread=True)
 get_totp = lambda: pyotp.TOTP(ADMIN_SECRET)
 
 

@@ -19,7 +19,7 @@ except Exception as e:
     print("Missing dependency 'argon2-cffi'. Install with: pip install argon2-cffi")
     raise
 
-DB_PATH = "default.db"
+DB_PATH = "data/default.db"
 
 
 def main():
@@ -50,7 +50,9 @@ def main():
 
     try:
         # Ensure users table exists (same schema as main.py)
-        cursor.execute("CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, password TEXT)")
+        cursor.execute(
+            "CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, password TEXT)"
+        )
         conn.commit()
 
         # Check for existing user
@@ -59,7 +61,9 @@ def main():
             print(f"A user with id {team_id} already exists. Aborting.")
             sys.exit(1)
 
-        cursor.execute("INSERT INTO users (id, password) VALUES (?, ?)", (team_id, pw_hash))
+        cursor.execute(
+            "INSERT INTO users (id, password) VALUES (?, ?)", (team_id, pw_hash)
+        )
         conn.commit()
         print(f"User {team_id} inserted successfully into {DB_PATH}.")
     except Exception as e:

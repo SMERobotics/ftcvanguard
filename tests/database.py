@@ -1,6 +1,6 @@
 import sqlite3
 
-db = sqlite3.connect("default.db")
+db = sqlite3.connect("data/default.db")
 cursor = db.cursor()
 
 if __name__ == "__main__":

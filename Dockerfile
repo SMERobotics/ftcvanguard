@@ -19,7 +19,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
-RUN chown -R vanguard:vanguard /app
+RUN mkdir -p /app/data \
+    && chown -R vanguard:vanguard /app
 
 USER vanguard
 EXPOSE 8000
