@@ -1,14 +1,18 @@
 #!/bin/bash
 set -e
 
-mkdir -p /app
+mkdir -p /app/data
+chown -R vanguard:vanguard /app/data
+chmod 755 /app/data
 
 cd /app
 
+# Run SSH key generation as vanguard user
 if [ ! -f /home/vanguard/.ssh/id_rsa.pem ]; then
-    rm -f /home/vanguard/.ssh/*
-    openssl genpkey -algorithm RSA -out /home/vanguard/.ssh/id_rsa.pem -pkeyopt rsa_keygen_bits:4096
-    openssl rsa -in /home/vanguard/.ssh/id_rsa.pem -pubout -out /home/vanguard/.ssh/id_rsa.pub
+    su vanguard -c 'rm -f /home/vanguard/.ssh/*'
+    su vanguard -c 'openssl genpkey -algorithm RSA -out /home/vanguard/.ssh/id_rsa.pem -pkeyopt rsa_keygen_bits:4096'
+    su vanguard -c 'openssl rsa -in /home/vanguard/.ssh/id_rsa.pem -pubout -out /home/vanguard/.ssh/id_rsa.pub'
 fi
 
-exec gunicorn main:app --bind 0.0.0.0:8000 --workers 4
+# Run gunicorn as vanguard user
+exec su vanguard -c 'gunicorn main:app --bind 0.0.0.0:8000 --workers 4'

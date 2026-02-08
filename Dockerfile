@@ -20,9 +20,11 @@ COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 COPY . .
-RUN chown -R vanguard:vanguard /app
+RUN mkdir -p /app/data \
+    && chown -R vanguard:vanguard /app \
+    && chmod 755 /app/data
 
-USER vanguard
+# Don't switch user yet - entrypoint will handle it
 EXPOSE 8000
 
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
