@@ -16,7 +16,7 @@ BLOCK_REGISTRATION = True
 RSA_PUBLIC_KEY = ""
 RSA_PRIVATE_KEY = ""
 
-with open("settings.toml", "rb") as f:
+with open("data/settings.toml", "rb") as f:
     settings = tomllib.load(f)
 
 FTC_API_USERNAME = settings["ftc_api"]["username"]

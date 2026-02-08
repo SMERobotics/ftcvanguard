@@ -8,5 +8,4 @@ services:
     environment:
       PYTHONUNBUFFERED: "1"
     volumes:
-      - .:/app:ro
       - ./data:/app/data
