@@ -2141,6 +2141,16 @@ textarea:focus-visible {
     .classifier-cells {
         grid-template-columns: repeat(9, minmax(28px, 1fr));
     }
+
+    /* Strategy Tablet */
+    #strategy-match-select {
+        width: 300px;
+        min-width: 240px;
+    }
+
+    #strategy-match-title {
+        max-width: 160px;
+    }
 }
 
 /* Mobile breakpoint */
@@ -2534,6 +2544,94 @@ textarea:focus-visible {
     .about-content h2 {
         font-size: 24px;
     }
+
+    /* Strategy Mobile */
+    #strategy-container {
+        flex-direction: column;
+    }
+
+    #strategy-match-select {
+        width: 100%;
+        max-width: 100%;
+        max-height: 100%;
+        min-width: 0;
+        border-right: none;
+        border-bottom: 1px solid #333333;
+    }
+
+    #strategy-board-wrapper {
+        height: 100%;
+    }
+
+    #strategy-toolbar {
+        padding: 8px 10px;
+        gap: 6px;
+    }
+
+    .strategy-toolbar-row {
+        gap: 8px;
+        justify-content: center;
+    }
+
+    #strategy-match-title {
+        max-width: 100px;
+        font-size: 12px;
+        margin-left: 4px;
+    }
+
+    .strategy-phases {
+        padding: 2px;
+    }
+
+    .strategy-phase-btn {
+        padding: 4px 10px;
+        font-size: 11px;
+    }
+
+    .strategy-tool-btn,
+    .strategy-back-btn {
+        padding: 6px;
+        min-width: 34px;
+        min-height: 34px;
+    }
+
+    .strategy-color-btn {
+        width: 24px;
+        height: 24px;
+        min-width: 24px;
+    }
+
+    .strategy-color-picker {
+        margin-left: 2px;
+        padding-left: 8px;
+        gap: 4px;
+    }
+
+    .strategy-actions {
+        margin-left: 0;
+    }
+
+    .strategy-robot span {
+        font-size: 10px;
+    }
+
+    .strategy-robot-rotate-btn {
+        opacity: 1;
+        width: 24px;
+        height: 24px;
+        bottom: -28px;
+    }
+
+    .strategy-robot-rotate-btn svg {
+        width: 14px;
+        height: 14px;
+    }
+
+    .strategy-robot-arrow {
+        border-left-width: 6px;
+        border-right-width: 6px;
+        border-bottom-width: 7px;
+    }
 }
 
 /* Small mobile breakpoint */
@@ -2598,6 +2696,36 @@ textarea:focus-visible {
     .line-x-label {
         font-size: 9px;
     }
+
+    /* Strategy Small Mobile */
+    .strategy-toolbar-row {
+        gap: 6px;
+    }
+
+    #strategy-match-title {
+        max-width: 80px;
+        font-size: 11px;
+    }
+
+    .strategy-phase-btn {
+        padding: 4px 8px;
+        font-size: 10px;
+    }
+
+    .strategy-color-btn {
+        width: 22px;
+        height: 22px;
+        min-width: 22px;
+    }
+
+    .strategy-color-picker {
+        gap: 3px;
+        padding-left: 6px;
+    }
+
+    .strategy-robot span {
+        font-size: 9px;
+    }
 }
 
 /* Touch device optimizations */
@@ -2648,6 +2776,47 @@ textarea:focus-visible {
     .chart-bar:hover {
         opacity: 1;
     }
+
+    /* Strategy Touch */
+    .strategy-robot-rotate-btn {
+        opacity: 1;
+    }
+
+    .strategy-tool-btn:hover,
+    .strategy-back-btn:hover {
+        background-color: transparent;
+        color: #868686;
+        border-color: #3e3e42;
+    }
+
+    .strategy-tool-btn.active:hover {
+        background-color: #37373d;
+        color: #ffffff;
+        border-color: #0078d4;
+    }
+
+    .strategy-tool-btn:active,
+    .strategy-back-btn:active {
+        background-color: #2a2d2e;
+    }
+
+    .strategy-color-btn:hover {
+        transform: none;
+    }
+
+    .strategy-color-btn.active:hover {
+        transform: scale(1.15);
+    }
+
+    .strategy-phase-btn:hover {
+        background-color: transparent;
+        color: #868686;
+    }
+
+    .strategy-phase-btn.active:hover {
+        background-color: #0078d4;
+        color: #ffffff;
+    }
 }
 
 /* Landscape mobile */
@@ -2670,6 +2839,33 @@ textarea:focus-visible {
     #schedule-details,
     #notes-details {
         flex: 1;
+    }
+
+    /* Strategy Landscape */
+    #strategy-container {
+        flex-direction: row;
+    }
+
+    #strategy-match-select {
+        width: 40%;
+        max-width: 280px;
+        max-height: none;
+        height: 100%;
+        border-bottom: none;
+        border-right: 1px solid #333333;
+    }
+
+    #strategy-board-wrapper {
+        flex: 1;
+    }
+
+    #strategy-toolbar {
+        gap: 4px;
+        padding: 6px 10px;
+    }
+
+    .strategy-toolbar-row {
+        gap: 6px;
     }
 }
 
@@ -3247,7 +3443,6 @@ textarea:focus-visible {
 }
 
 #strategy-match-list {
-    width: 100%;
     flex: 1;
     overflow-y: auto;
     overflow-x: hidden;
@@ -3266,13 +3461,19 @@ textarea:focus-visible {
 
 #strategy-toolbar {
     display: flex;
-    align-items: center;
-    justify-content: space-between;
+    flex-direction: column;
+    gap: 8px;
     padding: 10px 16px;
     background-color: #1f1f1f;
     border-bottom: 1px solid #333333;
     flex-shrink: 0;
-    gap: 12px;
+}
+
+.strategy-toolbar-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
     flex-wrap: wrap;
 }
 
@@ -3313,7 +3514,7 @@ textarea:focus-visible {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    max-width: 180px;
+    max-width: 200px;
     margin-left: 6px;
 }
 
@@ -3351,6 +3552,11 @@ textarea:focus-visible {
 
 .strategy-tools {
     gap: 5px;
+}
+
+.strategy-actions {
+    gap: 5px;
+    margin-left: auto;
 }
 
 .strategy-tool-btn {
@@ -3590,95 +3796,4 @@ textarea:focus-visible {
 
 .strategy-phase-transition {
     animation: fadeIn 0.2s ease-out;
-}
-
-/* Mobile */
-
-@media (max-width: 768px) {
-    #strategy-container {
-        flex-direction: column;
-    }
-
-    #strategy-match-select {
-        width: 100%;
-        max-width: 100%;
-        max-height: 100%;
-        border-right: none;
-        border-bottom: 1px solid #333333;
-    }
-
-    #strategy-board-wrapper {
-        height: 100%;
-    }
-
-    #strategy-toolbar {
-        padding: 8px 10px;
-        gap: 6px;
-        justify-content: center;
-    }
-
-    #strategy-match-title {
-        max-width: 100px;
-        font-size: 12px;
-        margin-left: 4px;
-    }
-
-    .strategy-phases {
-        padding: 2px;
-    }
-
-    .strategy-phase-btn {
-        padding: 4px 10px;
-        font-size: 11px;
-    }
-
-    .strategy-tool-btn {
-        padding: 6px;
-        min-width: 32px;
-        min-height: 32px;
-    }
-
-    .strategy-back-btn {
-        padding: 6px;
-        min-width: 32px;
-        min-height: 32px;
-    }
-
-    .strategy-color-btn {
-        width: 22px;
-        height: 22px;
-        min-width: 22px;
-    }
-
-    .strategy-color-picker {
-        margin-left: 2px;
-        padding-left: 6px;
-        gap: 3px;
-    }
-
-    .strategy-robot span {
-        font-size: 10px;
-    }
-
-    .strategy-robot-rotate-btn {
-        opacity: 1;
-        width: 24px;
-        height: 24px;
-        bottom: -28px;
-    }
-
-    .strategy-robot-rotate-btn svg {
-        width: 14px;
-        height: 14px;
-    }
-
-    .strategy-robot-arrow {
-        border-left-width: 6px;
-        border-right-width: 6px;
-        border-bottom-width: 7px;
-    }
-
-    #strategy-canvas-container {
-        touch-action: none;
-    }
 }

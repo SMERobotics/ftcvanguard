@@ -130,38 +130,44 @@
                     </div>
                     <div id="strategy-board-wrapper" style="display: none;">
                         <div id="strategy-toolbar">
-                            <div class="strategy-toolbar-section">
-                                <button class="strategy-back-btn" id="strategy-back-btn" title="Back to matches">
-                                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M15 19L8 12L15 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                                </button>
-                                <span id="strategy-match-title">Strategy</span>
-                            </div>
-                            <div class="strategy-toolbar-section strategy-phases">
-                                <button class="strategy-phase-btn active" data-phase="auto">Auto</button>
-                                <button class="strategy-phase-btn" data-phase="teleop">Teleop</button>
-                                <button class="strategy-phase-btn" data-phase="endgame">Endgame</button>
-                            </div>
-                            <div class="strategy-toolbar-section strategy-tools">
-                                <button class="strategy-tool-btn active" id="strategy-draw-btn" title="Draw">
-                                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 21L5.5 18.5M21 3L13 11M5.5 18.5L11.5 12.5C12 12 13 11 13 11M5.5 18.5C5.5 18.5 4.5 19.5 3 21M13 11L16 8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                                </button>
-                                <button class="strategy-tool-btn" id="strategy-eraser-btn" title="Eraser">
-                                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M20 20H7.5M18 10L8 20H4L2 18L10 10M18 10L14 6M18 10L20 8L14 2L10 6M14 6L10 10M10 10L6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                                </button>
-                                <div class="strategy-color-picker">
-                                    <button class="strategy-color-btn active" data-color="#ffffff" style="background-color: #ffffff;" title="White"></button>
-                                    <button class="strategy-color-btn" data-color="#ff6b6b" style="background-color: #ff6b6b;" title="Red"></button>
-                                    <button class="strategy-color-btn" data-color="#4da6ff" style="background-color: #4da6ff;" title="Blue"></button>
-                                    <button class="strategy-color-btn" data-color="#4ec9b0" style="background-color: #4ec9b0;" title="Green"></button>
-                                    <button class="strategy-color-btn" data-color="#ffcc00" style="background-color: #ffcc00;" title="Yellow"></button>
-                                    <button class="strategy-color-btn" data-color="#c586c0" style="background-color: #c586c0;" title="Purple"></button>
+                            <div class="strategy-toolbar-row">
+                                <div class="strategy-toolbar-section">
+                                    <button class="strategy-back-btn" id="strategy-back-btn" title="Back to matches">
+                                        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M15 19L8 12L15 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                    </button>
+                                    <span id="strategy-match-title">Strategy</span>
                                 </div>
-                                <button class="strategy-tool-btn strategy-clear-btn" id="strategy-clear-btn" title="Clear drawing">
-                                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 6H5H21M8 6V4C8 3.44772 8.44772 3 9 3H15C15.5523 3 16 3.44772 16 4V6M19 6V20C19 20.5523 18.5523 21 18 21H6C5.44772 21 5 20.5523 5 20V6H19Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                                </button>
-                                <button class="strategy-tool-btn strategy-download-btn" id="strategy-download-btn" title="Download as PNG">
-                                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M21 15V19C21 19.5304 20.7893 20.0391 20.4142 20.4142C20.0391 20.7893 19.5304 21 19 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V15M7 10L12 15M12 15L17 10M12 15V3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                                </button>
+                                <div class="strategy-toolbar-section strategy-phases">
+                                    <button class="strategy-phase-btn active" data-phase="auto">Auto</button>
+                                    <button class="strategy-phase-btn" data-phase="teleop">Teleop</button>
+                                    <button class="strategy-phase-btn" data-phase="endgame">Endgame</button>
+                                </div>
+                            </div>
+                            <div class="strategy-toolbar-row">
+                                <div class="strategy-toolbar-section strategy-tools">
+                                    <button class="strategy-tool-btn active" id="strategy-draw-btn" title="Draw">
+                                        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 21L5.5 18.5M21 3L13 11M5.5 18.5L11.5 12.5C12 12 13 11 13 11M5.5 18.5C5.5 18.5 4.5 19.5 3 21M13 11L16 8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                    </button>
+                                    <button class="strategy-tool-btn" id="strategy-eraser-btn" title="Eraser">
+                                        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M20 20H7.5M18 10L8 20H4L2 18L10 10M18 10L14 6M18 10L20 8L14 2L10 6M14 6L10 10M10 10L6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                    </button>
+                                    <div class="strategy-color-picker">
+                                        <button class="strategy-color-btn active" data-color="#ffffff" style="background-color: #ffffff;" title="White"></button>
+                                        <button class="strategy-color-btn" data-color="#ff6b6b" style="background-color: #ff6b6b;" title="Red"></button>
+                                        <button class="strategy-color-btn" data-color="#4da6ff" style="background-color: #4da6ff;" title="Blue"></button>
+                                        <button class="strategy-color-btn" data-color="#4ec9b0" style="background-color: #4ec9b0;" title="Green"></button>
+                                        <button class="strategy-color-btn" data-color="#ffcc00" style="background-color: #ffcc00;" title="Yellow"></button>
+                                        <button class="strategy-color-btn" data-color="#c586c0" style="background-color: #c586c0;" title="Purple"></button>
+                                    </div>
+                                </div>
+                                <div class="strategy-toolbar-section strategy-actions">
+                                    <button class="strategy-tool-btn strategy-clear-btn" id="strategy-clear-btn" title="Clear drawing">
+                                        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 6H5H21M8 6V4C8 3.44772 8.44772 3 9 3H15C15.5523 3 16 3.44772 16 4V6M19 6V20C19 20.5523 18.5523 21 18 21H6C5.44772 21 5 20.5523 5 20V6H19Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                    </button>
+                                    <button class="strategy-tool-btn strategy-download-btn" id="strategy-download-btn" title="Download as PNG">
+                                        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M21 15V19C21 19.5304 20.7893 20.0391 20.4142 20.4142C20.0391 20.7893 19.5304 21 19 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V15M7 10L12 15M12 15L17 10M12 15V3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                    </button>
+                                </div>
                             </div>
                         </div>
                         <div id="strategy-canvas-container">
