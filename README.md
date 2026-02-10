@@ -22,4 +22,36 @@ unified ftc management infra. provide streamlined, real-time data, enabling rapi
 <img width="1920" height="1032" alt="image" src="https://github.com/user-attachments/assets/8a74ac29-2b67-4778-a063-950109a543d0" />
 
 ## setting up:
-*deleted all the instructions cuz ill just build a docker image <3*
+To set up Vanguard, you'll need a linux server operating system, `Docker`, and `Docker Compose`.
+```yaml
+services:
+  ftcvanguard:
+    image: milesmuehlbach/ftcvanguard:master
+    container_name: ftcvanguard
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      PYTHONUNBUFFERED: "1"
+    volumes:
+      - ./data:/app/data
+```
+Before starting, run `mkdir data` and copy this example settings file into that directory as `settings.toml`, making sure to fill out the relevant info.
+```toml
+[ftc_api]
+username = "GraciousProfessionalist"
+token = "67676767-6767-6767-6767-676767676767"
+
+[notifications]
+ntfy_server_url = "https://ntfy.sh"
+ntfy_topic = "FTC-{}"
+ntfy_teams = [26855, 6547]
+
+[server]
+vanguard_url = "https://ftc.technodot.org"
+
+[admin]
+admin_teams = [26855, 6547]
+admin_secret = "67676767676767676767676767676767"
+```
+After that, run `sudo docker compose up`, and you're good to go! Vanguard will be running on port `8000`, so feel free to expose that as you like.
