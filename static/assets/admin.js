@@ -348,7 +348,7 @@ async function vacuumDatabase() {
     }
 }
 function switchAdminSection(section) {
-    const sections = ["overview", "users", "notes", "notifications", "database"];
+    const sections = ["overview", "users", "notes", "notifications", "database", "offseason"]; // Added offseason
     sections.forEach(s => {
         const sectionEl = document.getElementById(`admin-section-${s}`);
         const navBtn = document.getElementById(`admin-nav-${s}`);
@@ -377,17 +377,122 @@ function switchAdminSection(section) {
     else if (section === "notifications") {
         loadAdminNotifications();
     }
+    else if (section === "offseason") { // Added handler
+        loadOffseasonEvents();
+    }
 }
 function showAdminMessage(message, type) {
     const messageEl = document.getElementById("admin-message");
-    messageEl.textContent = message;
-    messageEl.className = `admin-message admin-message-${type}`;
-    messageEl.style.display = "block";
+    // Also support status-message class used in HTML
+    const statusEls = document.querySelectorAll(".status-message");
+    
+    if (messageEl) {
+        messageEl.textContent = message;
+        messageEl.className = `admin-message admin-message-${type}`;
+        messageEl.style.display = "block";
+        setTimeout(() => {
+            messageEl.style.display = "none";
+        }, 5000);
+    }
+    
+    // Support per-section status messages
+    statusEls.forEach(el => {
+        if(el.style.display !== 'none' || el.id === 'offseason-status') { // Basic heuristic
+             el.textContent = message;
+             el.className = `status-message ${type}`;
+             el.style.display = "block";
+             setTimeout(() => {
+                el.style.display = "none";
+            }, 5000);
+        }
+    });
+}
+
+function showStatus(element, message, type) {
+    if(!element) return;
+    element.textContent = message;
+    element.className = `status-message ${type}`;
+    element.style.display = 'block';
     setTimeout(() => {
-        messageEl.style.display = "none";
+        element.style.display = 'none';
     }, 5000);
 }
-function formatBytes(bytes) {
+
+async function createOffseasonEvent() {
+    const name = document.getElementById('new-event-name').value;
+    const code = document.getElementById('new-event-code').value;
+    const statusDiv = document.getElementById('offseason-status');
+    const keyDisplay = document.getElementById('new-event-key-display');
+    const keyValue = document.getElementById('event-key-value');
+
+    if (!name || !code) {
+        showStatus(statusDiv, 'Please fill in all fields', 'error');
+        return;
+    }
+
+    try {
+        const response = await adminFetch('/api/v1/admin/offseason', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ name, code })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            showStatus(statusDiv, 'Event created successfully', 'success');
+            document.getElementById('new-event-name').value = '';
+            document.getElementById('new-event-code').value = '';
+            
+            keyValue.textContent = data.eventKey;
+            keyDisplay.style.display = 'block';
+            
+            // logActivity(`Created offseason event: ${name} (${code})`, 'success');
+        } else {
+            showStatus(statusDiv, data.error || 'Failed to create event', 'error');
+            // logActivity(`Failed to create event: ${data.error}`, 'error');
+        }
+    } catch (error) {
+        console.error('Error creating event:', error);
+        showStatus(statusDiv, 'Network error occurred', 'error');
+    }
+}
+
+async function loadOffseasonEvents() {
+    try {
+        const response = await adminFetch("/api/v1/admin/offseason");
+        if (!response.ok) {
+            throw new Error("Failed to load events");
+        }
+        const data = await response.json();
+        const events = data.events;
+        const tbody = document.getElementById("offseason-tbody");
+        tbody.innerHTML = "";
+        
+        if (events.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" style="text-align: center;">No offseason events found</td></tr>';
+            return;
+        }
+
+        for (const event of events) {
+            const row = document.createElement("tr");
+            row.innerHTML = `
+                <td>${escapeHtml(event.code)}</td>
+                <td>${escapeHtml(event.name)}</td>
+                <td><span class="status-badge status-${event.status.toLowerCase()}">${escapeHtml(event.status)}</span></td>
+                <td>${new Date(event.updatedAt * 1000).toLocaleString()}</td>
+            `;
+            tbody.appendChild(row);
+        }
+    } catch (error) {
+        console.error("Error loading events:", error);
+        showAdminMessage("Failed to load events", "error");
+    }
+}
+
+async function loadRegisteredTeams() {
     if (bytes === 0)
         return "0 Bytes";
     const k = 1024;
@@ -411,6 +516,7 @@ window.resetPassword = resetPassword;
 window.deleteNote = deleteNote;
 window.sendNotification = sendNotification;
 window.clearNotificationHistory = clearNotificationHistory;
+window.createOffseasonEvent = createOffseasonEvent;
 window.vacuumDatabase = vacuumDatabase;
 window.switchAdminSection = switchAdminSection;
 if (typeof window !== "undefined") {
