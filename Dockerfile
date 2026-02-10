@@ -24,7 +24,6 @@ RUN mkdir -p /app/data \
     && chown -R vanguard:vanguard /app \
     && chmod 755 /app/data
 
-# Don't switch user yet - entrypoint will handle it
 EXPOSE 8000
 
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
