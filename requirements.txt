@@ -4,5 +4,6 @@ flask>=3.1.2
 gunicorn>=23.0.0
 pyjwt[crypto]>=2.10.1
 pyotp>=2.9.0
-requests>=2.32.5flask-socketio
+requests>=2.32.5
+flask-socketio
 eventlet
