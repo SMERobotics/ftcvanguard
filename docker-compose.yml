@@ -1,6 +1,6 @@
 services:
   ftcvanguard:
-    image: milesmuehlbach/ftcvanguard:latest
+    image: milesmuehlbach/ftcvanguard:master
     container_name: ftcvanguard
     restart: unless-stopped
     ports:
