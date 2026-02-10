@@ -717,286 +717,6 @@ async function fetchOPRData(teamNumbers: number[]): Promise<TeamOPR[]> {
     return results;
 }
 
-async function initHomepage() {
-    const canvasOPR = document.getElementById("home-collage-opr-chart") as HTMLCanvasElement;
-    const canvasWinrate = document.getElementById("home-collage-winrate-chart") as HTMLCanvasElement;
-    const canvasDraw = document.getElementById("home-collage-draw-canvas") as HTMLCanvasElement;
-    
-    if (canvasOPR) {
-        const ctx = canvasOPR.getContext("2d");
-        if (ctx) {
-            new (window as any).Chart(ctx, {
-                type: "line",
-                data: {
-                    labels: ["Week 1", "Week 2", "Week 3", "Week 4", "Week 5", "Week 6", "Week 7", "Week 8"],
-                    datasets: [{
-                        label: "Team 12345 OPR",
-                        data: [85, 92, 98, 105, 112, 118, 125, 132],
-                        borderColor: "#4ec9b0",
-                        backgroundColor: "#4ec9b0",
-                        pointRadius: 4,
-                        pointHoverRadius: 6,
-                        tension: 0.4,
-                        borderWidth: 2,
-                        fill: false
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            display: false
-                        },
-                        tooltip: {
-                            enabled: true,
-                            backgroundColor: "rgba(24, 24, 24, 0.95)",
-                            titleColor: "#e0e0e0",
-                            bodyColor: "#e0e0e0",
-                            borderWidth: 2,
-                            borderColor: "#4ec9b0",
-                            padding: 8,
-                            titleFont: {
-                                family: "'JetBrains Mono', monospace",
-                                size: 11
-                            },
-                            bodyFont: {
-                                family: "'JetBrains Mono', monospace",
-                                size: 11
-                            },
-                            callbacks: {
-                                label: function(context: any) {
-                                    return `OPR: ${context.parsed.y}`;
-                                }
-                            }
-                        }
-                    },
-                    scales: {
-                        x: {
-                            grid: {
-                                color: "rgba(255, 255, 255, 0.05)"
-                            },
-                            ticks: {
-                                color: "#a0a0a0",
-                                font: {
-                                    family: "'JetBrains Mono', monospace",
-                                    size: 9
-                                }
-                            }
-                        },
-                        y: {
-                            grid: {
-                                color: "rgba(255, 255, 255, 0.05)"
-                            },
-                            ticks: {
-                                color: "#a0a0a0",
-                                font: {
-                                    family: "'JetBrains Mono', monospace",
-                                    size: 9
-                                }
-                            },
-                            beginAtZero: true
-                        }
-                    }
-                }
-            });
-        }
-    }
-    
-    if (canvasWinrate) {
-        const ctx = canvasWinrate.getContext("2d");
-        if (ctx) {
-            new (window as any).Chart(ctx, {
-                type: "doughnut",
-                data: {
-                    labels: ["Wins", "Losses"],
-                    datasets: [{
-                        data: [8, 2],
-                        backgroundColor: ["#ff6b6b", "#2d2d30"],
-                        borderColor: ["#ff6b6b", "#2d2d30"],
-                        borderWidth: 2
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            display: false
-                        },
-                        tooltip: {
-                            enabled: true,
-                            backgroundColor: "rgba(24, 24, 24, 0.95)",
-                            titleColor: "#e0e0e0",
-                            bodyColor: "#e0e0e0",
-                            borderWidth: 2,
-                            padding: 8,
-                            titleFont: {
-                                family: "'JetBrains Mono', monospace",
-                                size: 11
-                            },
-                            bodyFont: {
-                                family: "'JetBrains Mono', monospace",
-                                size: 11
-                            },
-                            callbacks: {
-                                label: function(context: any) {
-                                    return `${context.label}: ${context.parsed}`;
-                                }
-                            }
-                        }
-                    }
-                }
-            });
-        }
-    }
-    
-    if (canvasDraw) {
-        const ctx = canvasDraw.getContext("2d");
-        if (ctx) {
-            canvasDraw.width = canvasDraw.offsetWidth;
-            canvasDraw.height = canvasDraw.offsetHeight;
-            
-            ctx.fillStyle = "#1a1a1a";
-            ctx.fillRect(0, 0, canvasDraw.width, canvasDraw.height);
-            
-            // Draw grid with nice tech aesthetic
-            ctx.strokeStyle = "rgba(255, 255, 255, 0.05)";
-            ctx.lineWidth = 1;
-            const gridSize = 20;
-            
-            // Grid lines
-            for (let x = 0; x <= canvasDraw.width; x += gridSize) {
-                ctx.beginPath();
-                ctx.moveTo(x, 0);
-                ctx.lineTo(x, canvasDraw.height);
-                ctx.stroke();
-            }
-            for (let y = 0; y <= canvasDraw.height; y += gridSize) {
-                ctx.beginPath();
-                ctx.moveTo(0, y);
-                ctx.lineTo(canvasDraw.width, y);
-                ctx.stroke();
-            }
-
-            // Tech markings
-            ctx.strokeStyle = "rgba(255, 255, 255, 0.15)";
-            ctx.lineWidth = 2;
-            
-            // Center cross
-            ctx.beginPath();
-            ctx.moveTo(canvasDraw.width / 2 - 10, canvasDraw.height / 2);
-            ctx.lineTo(canvasDraw.width / 2 + 10, canvasDraw.height / 2);
-            ctx.moveTo(canvasDraw.width / 2, canvasDraw.height / 2 - 10);
-            ctx.lineTo(canvasDraw.width / 2, canvasDraw.height / 2 + 10);
-            ctx.stroke();
-
-            // Corner brackets
-            const bracketSize = 15;
-            const padding = 10;
-            
-            // Top-left
-            ctx.beginPath();
-            ctx.moveTo(padding, padding + bracketSize);
-            ctx.lineTo(padding, padding);
-            ctx.lineTo(padding + bracketSize, padding);
-            ctx.stroke();
-
-            // Top-right
-            ctx.beginPath();
-            ctx.moveTo(canvasDraw.width - padding - bracketSize, padding);
-            ctx.lineTo(canvasDraw.width - padding, padding);
-            ctx.lineTo(canvasDraw.width - padding, padding + bracketSize);
-            ctx.stroke();
-
-            // Bottom-left
-            ctx.beginPath();
-            ctx.moveTo(padding, canvasDraw.height - padding - bracketSize);
-            ctx.lineTo(padding, canvasDraw.height - padding);
-            ctx.lineTo(padding + bracketSize, canvasDraw.height - padding);
-            ctx.stroke();
-
-            // Bottom-right
-            ctx.beginPath();
-            ctx.moveTo(canvasDraw.width - padding - bracketSize, canvasDraw.height - padding);
-            ctx.lineTo(canvasDraw.width - padding, canvasDraw.height - padding);
-            ctx.lineTo(canvasDraw.width - padding, canvasDraw.height - padding - bracketSize);
-            ctx.stroke();
-            
-            let isDrawing = false;
-            let lastX = 0;
-            let lastY = 0;
-            
-            const getCoords = (e: MouseEvent | TouchEvent) => {
-                const rect = canvasDraw.getBoundingClientRect();
-                const scaleX = canvasDraw.width / rect.width;
-                const scaleY = canvasDraw.height / rect.height;
-                
-                if (e instanceof TouchEvent) {
-                    return {
-                        x: (e.touches[0].clientX - rect.left) * scaleX,
-                        y: (e.touches[0].clientY - rect.top) * scaleY
-                    };
-                } else {
-                    return {
-                        x: (e.clientX - rect.left) * scaleX,
-                        y: (e.clientY - rect.top) * scaleY
-                    };
-                }
-            };
-            
-            const startDrawing = (e: MouseEvent | TouchEvent) => {
-                isDrawing = true;
-                const coords = getCoords(e);
-                lastX = coords.x;
-                lastY = coords.y;
-                e.preventDefault();
-            };
-            
-            const draw = (e: MouseEvent | TouchEvent) => {
-                if (!isDrawing) return;
-                
-                const coords = getCoords(e);
-                
-                // Glow effect for the path
-                ctx.shadowBlur = 10;
-                ctx.shadowColor = "#4ec9b0";
-                
-                ctx.strokeStyle = "#4ec9b0";
-                ctx.lineWidth = 3;
-                ctx.lineCap = "round";
-                ctx.lineJoin = "round";
-                
-                ctx.beginPath();
-                ctx.moveTo(lastX, lastY);
-                ctx.lineTo(coords.x, coords.y);
-                ctx.stroke();
-                
-                // Reset shadow to avoid affecting other elements if redrawn
-                ctx.shadowBlur = 0;
-                
-                lastX = coords.x;
-                lastY = coords.y;
-                e.preventDefault();
-            };
-
-            
-            const stopDrawing = () => {
-                isDrawing = false;
-            };
-            
-            canvasDraw.addEventListener("mousedown", startDrawing);
-            canvasDraw.addEventListener("mousemove", draw);
-            canvasDraw.addEventListener("mouseup", stopDrawing);
-            canvasDraw.addEventListener("mouseleave", stopDrawing);
-            
-            canvasDraw.addEventListener("touchstart", startDrawing);
-            canvasDraw.addEventListener("touchmove", draw);
-            canvasDraw.addEventListener("touchend", stopDrawing);
-        }
-    }
-}
-
 async function loadSchedule(eventCode: string) {
     const token = localStorage.getItem("token");
     if (!token) return;
@@ -1982,7 +1702,6 @@ async function checkAdminStatus(): Promise<void> {
 }
 
 function updateAdminViewState(): void {
-    const adminButton = document.getElementById("button-admin");
     const adminLogin = document.getElementById("admin-login");
     const adminContainer = document.getElementById("admin-container");
     
@@ -2072,20 +1791,6 @@ function hideLogin() {
     }
 }
 
-function showHomepage() {
-    const homepageView = document.getElementById("homepage");
-    if (homepageView) {
-        homepageView.style.display = "flex";
-    }
-}
-
-function hideHomepage() {
-    const homepageView = document.getElementById("homepage");
-    if (homepageView) {
-        homepageView.style.display = "none";
-    }
-}
-
 async function handleLogin(event: Event) {
     event.preventDefault();
     const idInput = document.getElementById("login-id") as HTMLInputElement;
@@ -2117,7 +1822,6 @@ async function handleLogin(event: Event) {
             currentUserScopes = ["user"];
             isAdminAuthenticated = false;
             hideLogin();
-            hideHomepage();
             await checkAdminStatus();
             updateAdminViewState();
             loadEvents();
@@ -4822,8 +4526,7 @@ function handleLogout() {
     const insightsContent = document.getElementById("insights-content");
     if (insightsContent) insightsContent.innerHTML = "";
 
-    showHomepage();
-    initHomepage();
+    showLogin();
 }
 
 async function restoreStateFromUrl() {
@@ -5114,39 +4817,16 @@ document.addEventListener("DOMContentLoaded", async () => {
         const isValid = await verifyToken(token);
         if (isValid) {
             hideLogin();
-            hideHomepage();
             await checkAdminStatus();
             updateAdminViewState();
             await restoreStateFromUrl();
             await loadEventsWithStateRestore();
         } else {
             localStorage.removeItem("token");
-            hideLogin();
-            showHomepage();
-            initHomepage();
+            showLogin();
         }
     } else {
-        hideLogin();
-        showHomepage();
-        initHomepage();
-    }
-    
-    // Homepage login button
-    const homeLoginBtn = document.getElementById("home-login-btn");
-    if (homeLoginBtn) {
-        homeLoginBtn.addEventListener("click", () => {
-            hideHomepage();
-            showLogin();
-        });
-    }
-    
-    // Login back button
-    const loginBackBtn = document.getElementById("login-back-btn");
-    if (loginBackBtn) {
-        loginBackBtn.addEventListener("click", () => {
-            hideLogin();
-            showHomepage();
-        });
+        showLogin();
     }
 });
 
