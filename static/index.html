@@ -190,7 +190,7 @@
                         <h2>Vanguard</h2>
                         <p id="version-number" style="cursor: pointer; user-select: none;" title="👀">v1.0</p>
                         <br>
-                        <p class="team-credit">Made with 🤍 by <a href="/app/?view=insights&insights=26855" target="_self" class="team-highlight team-26855">26855</a> in collaboration with <a href="/app/?view=insights&insights=6547" target="_self" class="team-highlight team-6547">6547</a>.</p>
+                        <p class="team-credit">Made with 🤍 by <a href="/app/?view=insights&insights=26855" target="_self" class="team-highlight team-26855">26855</a> in collaboration with <a href="/app?view=insights&insights=6547" target="_self" class="team-highlight team-6547">6547</a>.</p>
                         <p>Built with TypeScript, Flask, and the FIRST and FTCScout APIs.</p>
                         <p id="easter-egg" style="opacity: 0; transition: opacity 0.8s ease-in, transform 0.8s ease-in; transform: translateY(-10px); margin-top: 20px; font-style: italic; color: #9cdcfe;">shoutout to elliot bc hes the best</p>
                     </div>
@@ -209,8 +209,11 @@
                                 <label for="admin-otp">One-Time Password</label>
                                 <input type="text" inputmode="numeric" pattern="[0-9]*" id="admin-otp" name="otp" required placeholder="000000" maxlength="6" autocomplete="one-time-code">
                             </div>
-                            <button type="submit" id="admin-login-button">Authenticate</button>
-                            <p id="admin-login-error"></p>
+                             <button type="submit" id="admin-login-button">Authenticate</button>
+                             <div class="login-footer-links">
+                                <a href="#" onclick="showView('schedule'); return false;" class="login-return-button">Return to App</a>
+                             </div>
+                             <p id="admin-login-error"></p>
                         </form>
                     </div>
                 </div>
@@ -382,8 +385,12 @@
                         <label for="login-password">Password</label>
                         <input type="password" id="login-password" name="password" required placeholder="••••••••">
                     </div>
-                    <button type="submit" id="login-button">Login</button>
-                    <p id="login-error"></p>
+                     <button type="submit" id="login-button">Login</button>
+                     <div class="login-footer-links">
+                        <a href="https://forms.gle/rRjURwjXiKNLW5Ao7" target="_blank" class="login-register-button">Register Team</a>
+                        <a href="/" class="login-return-button">Return Home</a>
+                     </div>
+                     <p id="login-error"></p>
                 </form>
             </div>
         </div>
