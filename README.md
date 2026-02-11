@@ -11,7 +11,7 @@ unified ftc management infra. provide streamlined, real-time data, enabling rapi
 
 ## gallery
 
-<img width="1920" height="1032" alt="image" src="https://github.com/user-attachments/assets/bf083187-b846-4d1e-8c04-ea05e409cca5" />
+<img width="1920" height="1032" alt="image" src="https://github.com/user-attachments/assets/ebd263c9-4a35-4783-af09-49b00bf96da6" />
 <table>
   <tr>
     <td><img src="https://github.com/user-attachments/assets/18934e8c-0413-448e-9c28-e5cf33ccfadc" width="756" /></td>
