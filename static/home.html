@@ -2,9 +2,437 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Title</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vanguard - FTC Competition Intelligence</title>
+    <meta name="description" content="Real-time match tracking, collaborative scouting, and performance analytics for FIRST Tech Challenge teams at ftc.technodot.org.">
+    <meta name="theme-color" content="#181818">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" type="text/css" href="/assets/style.css">
 </head>
-<body>
+<body class="home-page">
 
+    <!-- NAV -->
+    <nav class="home-nav" id="home-navbar">
+        <a href="#" class="home-nav-logo">Vanguard</a>
+        <div class="home-nav-links">
+            <a href="#features">Features</a>
+            <a href="#showcase">Showcase</a>
+            <a href="/app" class="home-nav-cta">Launch App</a>
+        </div>
+        <button class="home-nav-mobile" id="home-nav-mobile" aria-label="Open menu">
+            <svg viewBox="0 0 24 24" fill="none"><path d="M4 6H20M4 12H20M4 18H20" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </button>
+    </nav>
+
+    <!-- MOBILE NAV -->
+    <div class="home-mobile-overlay" id="home-mobile-overlay">
+        <div class="home-mobile-panel" id="home-mobile-panel">
+            <a href="#features" onclick="closeMobileNav()">Features</a>
+            <a href="#showcase" onclick="closeMobileNav()">Showcase</a>
+            <a href="https://github.com/SMERobotics/ftcvanguard" target="_blank" onclick="closeMobileNav()">GitHub</a>
+            <a href="/app" onclick="closeMobileNav()">Launch App</a>
+        </div>
+    </div>
+
+    <!-- HERO -->
+    <section class="home-hero">
+        <div class="home-hero-grid"></div>
+        <div class="home-hero-glow"></div>
+        <div class="home-hero-content">
+            <div class="home-hero-badge">
+                <span class="home-dot"></span>
+                <span>Live at ftc.technodot.org</span>
+            </div>
+            <h1>Your Competition<br><span class="home-accent">Command Center</span></h1>
+            <p class="home-hero-sub">Real-time match tracking, collaborative scouting, and performance analytics built for FTC teams who want every edge at competition.</p>
+            <div class="home-hero-actions">
+                <a href="/app" class="home-btn home-btn-primary">
+                    Launch Vanguard
+                    <svg viewBox="0 0 24 24" fill="none"><path d="M5 12H19M19 12L13 6M19 12L13 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </a>
+                <a href="https://github.com/SMERobotics/ftcvanguard" target="_blank" class="home-btn home-btn-secondary">
+                    <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M12 0C5.374 0 0 5.373 0 12c0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.509 11.509 0 0112 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z"/></svg>
+                    GitHub
+                </a>
+            </div>
+            <div class="home-hero-stats">
+                <div class="home-stat">
+                    <div class="home-stat-value home-counter" data-target="6">0</div>
+                    <div class="home-stat-label">Core Modules</div>
+                </div>
+                <div class="home-stat-divider"></div>
+                <div class="home-stat">
+                    <div class="home-stat-value home-counter" data-target="30" data-suffix="s">0s</div>
+                    <div class="home-stat-label">Auto Refresh</div>
+                </div>
+                <div class="home-stat-divider"></div>
+                <div class="home-stat">
+                    <div class="home-stat-value">Live</div>
+                    <div class="home-stat-label">Real-Time Data</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- FEATURES -->
+    <section id="features" class="home-section home-section-alt">
+        <div class="home-section-header home-reveal">
+            <div class="home-section-label">Capabilities</div>
+            <h2>Everything You Need at the Competition</h2>
+            <p>Six integrated modules designed for the speed and pressure of live FTC events.</p>
+        </div>
+        <div class="home-features-grid">
+            <div class="home-feature-card home-reveal home-reveal-d1">
+                <div class="home-feature-icon">
+                    <svg viewBox="0 0 24 24" fill="none"><path d="M12 1A11 11 0 1023 12 11.013 11.013 0 0012 1zm0 20a9 9 0 119-9 9.01 9.01 0 01-9 9zm6-9a1 1 0 01-1 1H12a1 1 0 01-1-1V6a1 1 0 012 0v5h4a1 1 0 011 1z" fill="currentColor"/></svg>
+                </div>
+                <h3>Live Schedule</h3>
+                <p>See your upcoming matches with countdown timers, live scores, and detailed score breakdowns with composition charts.</p>
+            </div>
+            <div class="home-feature-card home-reveal home-reveal-d2">
+                <div class="home-feature-icon">
+                    <svg viewBox="0 0 24 24" fill="none"><path d="M9 7H4.6c-.56 0-.84 0-1.054.109a1 1 0 00-.437.437C3 7.76 3 8.04 3 8.6v10.8c0 .56 0 .84.109 1.054a1 1 0 00.437.437C3.76 21 4.04 21 4.6 21H9m0 0h6m-6 0V4.6c0-.56 0-.84.109-1.054a1 1 0 01.437-.437C9.76 3 10.04 3 10.6 3h2.8c.56 0 .84 0 1.054.109a1 1 0 01.437.437C15 3.76 15 4.04 15 4.6V21m0-10h4.4c.56 0 .84 0 1.054.109a1 1 0 01.437.437C21 11.76 21 12.04 21 12.6v6.8c0 .56 0 .84-.109 1.054a1 1 0 01-.437.437C20.24 21 19.96 21 19.4 21H15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </div>
+                <h3>Rankings</h3>
+                <p>Sortable leaderboard with Ranking Score, OPR, Match Points, Auto Points, High Score, and Win-Loss-Tie records.</p>
+            </div>
+            <div class="home-feature-card home-reveal home-reveal-d3">
+                <div class="home-feature-icon">
+                    <svg viewBox="0 0 24 24" fill="none"><path d="M7 12C6.44772 12 6 11.5523 6 11C6 10.4477 6.44772 10 7 10H17C17.5523 10 18 10.4477 18 11C18 11.5523 17.5523 12 17 12L7 12Z M6 15C6 15.5523 6.44772 16 7 16H13C13.5523 16 14 15.5523 14 15C14 14.4477 13.5523 14 13 14H7C6.44772 14 6 14.4477 6 15Z M7 1C6.44772 1 6 1.44772 6 2V3H4C2.89543 3 2 3.89543 2 5V19C2 21.2091 3.79086 23 6 23H18C20.2091 23 22 21.2091 22 19V5C22 3.89543 21.1046 3 20 3H18V2C18 1.44772 17.5523 1 17 1C16.4477 1 16 1.44772 16 2V3H13V2C13 1.44772 12.5523 1 12 1C11.4477 1 11 1.44772 11 2V3H8V2C8 1.44772 7.55228 1 7 1Z" fill="currentColor" fill-rule="evenodd" clip-rule="evenodd"/></svg>
+                </div>
+                <h3>Scouting Notes</h3>
+                <p>Collaborative per-team scouting with auto, teleop, and general fields. Auto-saves with stale-note indicators across your whole team.</p>
+            </div>
+            <div class="home-feature-card home-reveal home-reveal-d1">
+                <div class="home-feature-icon">
+                    <svg viewBox="0 0 24 24" fill="none"><path d="M21 21H4.6c-.56 0-.84 0-1.054-.109a1 1 0 01-.437-.437C3 20.24 3 19.96 3 19.4V3m4 13l4-5 4 3 6-8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </div>
+                <h3>Team Insights</h3>
+                <p>Performance analytics with interactive charts showing score trends, auto vs teleop breakdowns, and cross-event history for any team.</p>
+            </div>
+            <div class="home-feature-card home-reveal home-reveal-d2">
+                <div class="home-feature-icon">
+                    <svg viewBox="0 0 16 16" fill="currentColor"><g transform="scale(0.67) translate(0,0)"><path d="M8.293 3.707L1 11v4h4l7.293-7.293-4-4z"/><path d="M9.707 2.293l4 4 1.465-1.465a2.828 2.828 0 10-4-4L9.707 2.293z"/></g></svg>
+                </div>
+                <h3>Strategy Planner</h3>
+                <p>Canvas-based field drawing tool with per-phase strategy boards, draggable robot tokens, color picker, and exportable PNG output.</p>
+            </div>
+            <div class="home-feature-card home-reveal home-reveal-d3">
+                <div class="home-feature-icon">
+                    <svg viewBox="0 0 24 24" fill="none"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </div>
+                <h3>Push Notifications</h3>
+                <p>Automatic alerts for match queueing, 5-minute warnings, and schedule availability sent directly to your device via ntfy.sh.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- SHOWCASE -->
+    <section id="showcase" class="home-section">
+        <div class="home-section-header home-reveal">
+            <div class="home-section-label">Interface</div>
+            <h2>Built for the Pits</h2>
+            <p>A dark, information-dense interface designed for rapid data access under competition pressure.</p>
+        </div>
+        <div class="home-bento-grid">
+            <!-- Schedule Card -->
+            <div class="home-bento-card home-bento-wide home-reveal">
+                <div class="home-bento-inner">
+                    <div class="home-bento-label">Schedule</div>
+                    <h3>Live Match Tracker</h3>
+                    <p>Real-time queueing with countdown timers and score breakdowns.</p>
+                    <div class="home-bento-visual">
+                        <div class="home-ticker" id="home-live-ticker">
+                            <div class="home-ticker-row">
+                                <span class="home-ticker-match">Q-12</span>
+                                <span class="home-ticker-teams">26855 + 8103</span>
+                                <span class="home-ticker-score red">142</span>
+                                <span class="home-ticker-vs">vs</span>
+                                <span class="home-ticker-score blue">138</span>
+                                <span class="home-ticker-status final"><span class="home-ticker-pulse"></span> Final</span>
+                            </div>
+                            <div class="home-ticker-row">
+                                <span class="home-ticker-match">Q-13</span>
+                                <span class="home-ticker-teams">6547 + 15203</span>
+                                <span class="home-ticker-score red">--</span>
+                                <span class="home-ticker-vs">vs</span>
+                                <span class="home-ticker-score blue">--</span>
+                                <span class="home-ticker-status queuing"><span class="home-ticker-pulse"></span> Queuing</span>
+                            </div>
+                            <div class="home-ticker-row">
+                                <span class="home-ticker-match">Q-14</span>
+                                <span class="home-ticker-teams">19442 + 7209</span>
+                                <span class="home-ticker-score red">--</span>
+                                <span class="home-ticker-vs">vs</span>
+                                <span class="home-ticker-score blue">--</span>
+                                <span class="home-ticker-status upcoming">3:45 PM</span>
+                            </div>
+                            <div class="home-ticker-row">
+                                <span class="home-ticker-match">Q-15</span>
+                                <span class="home-ticker-teams">11260 + 4892</span>
+                                <span class="home-ticker-score red">--</span>
+                                <span class="home-ticker-vs">vs</span>
+                                <span class="home-ticker-score blue">--</span>
+                                <span class="home-ticker-status upcoming">4:00 PM</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Rankings Card -->
+            <div class="home-bento-card home-bento-narrow home-reveal home-reveal-d1">
+                <div class="home-bento-inner">
+                    <div class="home-bento-label">Rankings</div>
+                    <h3>Live Standings</h3>
+                    <p>Sortable, real-time leaderboard.</p>
+                    <div class="home-bento-visual">
+                        <div class="home-mini-rankings">
+                            <table>
+                                <thead>
+                                    <tr><th>#</th><th>Team</th><th>RS</th><th>OPR</th></tr>
+                                </thead>
+                                <tbody>
+                                    <tr><td class="home-rank-num">1</td><td>26855</td><td>4.67</td><td>142.3</td></tr>
+                                    <tr><td class="home-rank-num">2</td><td>6547</td><td>4.33</td><td>138.7</td></tr>
+                                    <tr><td class="home-rank-num">3</td><td>8103</td><td>4.00</td><td>131.2</td></tr>
+                                    <tr><td class="home-rank-num">4</td><td>15203</td><td>3.67</td><td>127.8</td></tr>
+                                    <tr><td class="home-rank-num">5</td><td>19442</td><td>3.33</td><td>118.5</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Insights Card -->
+            <div class="home-bento-card home-bento-half home-reveal">
+                <div class="home-bento-inner">
+                    <div class="home-bento-label">Insights</div>
+                    <h3>Performance Analytics</h3>
+                    <p>Track score trends and breakdowns with interactive charts.</p>
+                    <div class="home-bento-visual">
+                        <div class="home-chart-bars" id="home-insight-bars">
+                            <div class="home-chart-bar-group">
+                                <div class="home-chart-bar auto" data-h="65%"></div>
+                                <div class="home-chart-bar-label">M1</div>
+                            </div>
+                            <div class="home-chart-bar-group">
+                                <div class="home-chart-bar teleop" data-h="78%"></div>
+                                <div class="home-chart-bar-label">M2</div>
+                            </div>
+                            <div class="home-chart-bar-group">
+                                <div class="home-chart-bar auto" data-h="52%"></div>
+                                <div class="home-chart-bar-label">M3</div>
+                            </div>
+                            <div class="home-chart-bar-group">
+                                <div class="home-chart-bar teleop" data-h="90%"></div>
+                                <div class="home-chart-bar-label">M4</div>
+                            </div>
+                            <div class="home-chart-bar-group">
+                                <div class="home-chart-bar auto" data-h="71%"></div>
+                                <div class="home-chart-bar-label">M5</div>
+                            </div>
+                            <div class="home-chart-bar-group">
+                                <div class="home-chart-bar teleop" data-h="85%"></div>
+                                <div class="home-chart-bar-label">M6</div>
+                            </div>
+                            <div class="home-chart-bar-group">
+                                <div class="home-chart-bar auto" data-h="95%"></div>
+                                <div class="home-chart-bar-label">M7</div>
+                            </div>
+                            <div class="home-chart-bar-group">
+                                <div class="home-chart-bar teleop" data-h="60%"></div>
+                                <div class="home-chart-bar-label">M8</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Strategy Card -->
+            <div class="home-bento-card home-bento-half home-reveal home-reveal-d1">
+                <div class="home-bento-inner">
+                    <div class="home-bento-label">Strategy</div>
+                    <h3>Field Planner</h3>
+                    <p>Canvas-based drawing with robot tokens and phase boards.</p>
+                    <div class="home-bento-visual">
+                        <div class="home-strategy-visual">
+                            <svg class="home-strategy-lines" viewBox="0 0 400 160">
+                                <rect x="10" y="10" width="380" height="140" rx="4"/>
+                                <line x1="200" y1="10" x2="200" y2="150"/>
+                                <rect x="10" y="45" width="60" height="70" rx="4"/>
+                                <rect x="330" y="45" width="60" height="70" rx="4"/>
+                                <circle cx="200" cy="80" r="25" stroke-dasharray="4 3"/>
+                            </svg>
+                            <svg class="home-strategy-path" viewBox="0 0 400 160" style="position:absolute;inset:0;">
+                                <path d="M 60 120 C 100 90, 140 50, 180 60" stroke="#ff6b6b" opacity="0.7"/>
+                                <path d="M 340 40 C 300 50, 260 90, 220 80" stroke="#4da6ff" opacity="0.7"/>
+                            </svg>
+                            <div class="home-strategy-dot" style="top:70%;left:12%;border-color:#ff6b6b;background:rgba(255,107,107,0.2);"></div>
+                            <div class="home-strategy-dot" style="top:22%;left:82%;border-color:#4da6ff;background:rgba(77,166,255,0.2);"></div>
+                            <div class="home-strategy-dot" style="top:48%;left:45%;border-color:#4ec9b0;background:rgba(78,201,176,0.2);"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA -->
+    <section class="home-cta home-section-alt">
+        <div class="home-cta-glow"></div>
+        <div class="home-cta-content home-reveal">
+            <h2>Ready for Your Next Event?</h2>
+            <p>Log in with your team credentials and get instant access to live match data, scouting tools, and performance analytics.</p>
+            <div class="home-cta-actions">
+                <a href="/app" class="home-btn home-btn-primary">
+                    Launch Vanguard
+                    <svg viewBox="0 0 24 24" fill="none"><path d="M5 12H19M19 12L13 6M19 12L13 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </a>
+                <a href="https://github.com/SMERobotics/ftcvanguard" target="_blank" class="home-btn home-btn-secondary">
+                    View on GitHub
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- FOOTER -->
+    <footer class="home-footer">
+        <div class="home-footer-left">
+            <span>Vanguard v1.0</span>
+            <span class="home-team-tag t1">26855</span>
+            <span class="home-team-tag t2">6547</span>
+        </div>
+        <div class="home-footer-links">
+            <a href="https://github.com/SMERobotics/ftcvanguard" target="_blank">GitHub</a>
+            <a href="https://ftc.technodot.org" target="_blank">ftc.technodot.org</a>
+        </div>
+    </footer>
+
+    <script>
+        /* --- MOBILE NAV --- */
+        var mobileOverlay = document.getElementById("home-mobile-overlay");
+        document.getElementById("home-nav-mobile").addEventListener("click", function() {
+            mobileOverlay.classList.add("open");
+        });
+        mobileOverlay.addEventListener("click", function(e) {
+            if (e.target === mobileOverlay) closeMobileNav();
+        });
+        function closeMobileNav() {
+            mobileOverlay.classList.remove("open");
+        }
+
+        /* --- SCROLL REVEAL --- */
+        (function() {
+            var reveals = document.querySelectorAll(".home-reveal");
+            var observer = new IntersectionObserver(function(entries) {
+                entries.forEach(function(entry) {
+                    if (entry.isIntersecting) {
+                        entry.target.classList.add("visible");
+                    }
+                });
+            }, { threshold: 0.1, rootMargin: "0px 0px -30px 0px" });
+            reveals.forEach(function(el) { observer.observe(el); });
+        })();
+
+        /* --- ANIMATED COUNTERS --- */
+        (function() {
+            var counters = document.querySelectorAll(".home-counter");
+            var started = false;
+            var observer = new IntersectionObserver(function(entries) {
+                entries.forEach(function(entry) {
+                    if (entry.isIntersecting && !started) {
+                        started = true;
+                        counters.forEach(function(counter) {
+                            var target = parseInt(counter.getAttribute("data-target"));
+                            var suffix = counter.getAttribute("data-suffix") || "";
+                            if (isNaN(target)) return;
+                            var current = 0;
+                            var duration = 1200;
+                            var step = target / (duration / 16);
+                            var timer = setInterval(function() {
+                                current += step;
+                                if (current >= target) {
+                                    current = target;
+                                    clearInterval(timer);
+                                }
+                                counter.textContent = Math.round(current) + suffix;
+                            }, 16);
+                        });
+                    }
+                });
+            }, { threshold: 0.5 });
+            counters.forEach(function(c) { observer.observe(c); });
+        })();
+
+        /* --- CHART BAR ANIMATION --- */
+        (function() {
+            var container = document.getElementById("home-insight-bars");
+            if (!container) return;
+            var observer = new IntersectionObserver(function(entries) {
+                entries.forEach(function(entry) {
+                    if (entry.isIntersecting) {
+                        var bars = entry.target.querySelectorAll(".home-chart-bar[data-h]");
+                        bars.forEach(function(bar, i) {
+                            setTimeout(function() {
+                                bar.style.height = bar.getAttribute("data-h");
+                            }, i * 70);
+                        });
+                    }
+                });
+            }, { threshold: 0.3 });
+            observer.observe(container);
+        })();
+
+        /* --- TICKER SCORE ANIMATION --- */
+        (function() {
+            var ticker = document.getElementById("home-live-ticker");
+            if (!ticker) return;
+            var rows = ticker.querySelectorAll(".home-ticker-row");
+            setInterval(function() {
+                rows.forEach(function(row) {
+                    var scores = row.querySelectorAll(".home-ticker-score");
+                    scores.forEach(function(score) {
+                        if (score.textContent !== "--") {
+                            var val = parseInt(score.textContent);
+                            var delta = Math.floor(Math.random() * 5) - 2;
+                            var newVal = Math.max(80, Math.min(200, val + delta));
+                            score.textContent = newVal;
+                            score.style.transition = "transform 0.15s ease";
+                            score.style.transform = "scale(1.1)";
+                            setTimeout(function() {
+                                score.style.transform = "scale(1)";
+                            }, 150);
+                        }
+                    });
+                });
+            }, 3000);
+        })();
+
+        /* --- SMOOTH SCROLL --- */
+        document.querySelectorAll("a[href^=\"#\"]").forEach(function(anchor) {
+            anchor.addEventListener("click", function(e) {
+                var target = document.querySelector(this.getAttribute("href"));
+                if (target) {
+                    e.preventDefault();
+                    target.scrollIntoView({ behavior: "smooth", block: "start" });
+                }
+            });
+        });
+
+        /* --- KEYBOARD HINT (Ctrl+K) --- */
+        (function() {
+            var badge = document.querySelector(".home-hero-badge");
+            if (badge) {
+                badge.title = "Press Ctrl+K to navigate";
+                badge.style.cursor = "pointer";
+            }
+        })();
+    </script>
 </body>
 </html>
