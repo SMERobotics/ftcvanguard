@@ -1150,6 +1150,34 @@ body {
     transform: scale(0.98);
 }
 
+.login-return-button {
+    color: #868686;
+}
+
+.login-return-button:hover {
+    color: #ffffff;
+    background-color: rgba(255, 255, 255, 0.05);
+    border-color: #3e3e42;
+}
+.login-footer-links {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.login-return-button, .login-register-button {
+    text-align: center;
+    font-size: 13px;
+    text-decoration: none;
+    padding: 10px;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+    border: 1px solid transparent;
+    display: block;
+    width: 100%;
+}
+
 .login-register-link {
     color: #ffffff;
     text-decoration: underline;
