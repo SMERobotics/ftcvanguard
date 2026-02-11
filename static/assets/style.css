@@ -1152,6 +1152,8 @@ body {
 
 .login-return-button {
     color: #868686;
+    display: block;
+    width: 100%;
 }
 
 .login-return-button:hover {
@@ -1159,6 +1161,7 @@ body {
     background-color: rgba(255, 255, 255, 0.05);
     border-color: #3e3e42;
 }
+
 .login-footer-links {
     display: flex;
     flex-direction: column;
@@ -1174,21 +1177,21 @@ body {
     border-radius: 6px;
     transition: all 0.2s ease;
     border: 1px solid transparent;
-    display: block;
-    width: 100%;
 }
 
 .login-register-link {
-    color: #ffffff;
-    text-decoration: underline;
+    color: #a0a0a0;
+    text-decoration: none;
     text-align: center;
     font-size: 13px;
     display: block;
-    transition: opacity 0.2s;
+    width: 100%;
+    transition: color 0.2s;
 }
 
 .login-register-link:hover {
-    opacity: 0.8;
+    color: #ffffff;
+    text-decoration: underline;
 }
 
 #login-error {
