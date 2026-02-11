@@ -27,9 +27,68 @@ NTFY_TEAMS = settings["notifications"]["ntfy_teams"]
 VANGUARD_URL = settings["server"]["vanguard_url"]
 ADMIN_TEAMS = settings["admin"]["admin_teams"]
 ADMIN_SECRET = settings["admin"]["admin_secret"]
+SCHEDULE_OFFSET_MINUTES_MIN = -180
+SCHEDULE_OFFSET_MINUTES_MAX = 180
 
 get_db = lambda: sqlite3.connect("data/default.db", check_same_thread=True)
 get_totp = lambda: pyotp.TOTP(ADMIN_SECRET)
+
+
+def clamp_schedule_offset(offset_minutes: int) -> int:
+    return max(SCHEDULE_OFFSET_MINUTES_MIN, min(SCHEDULE_OFFSET_MINUTES_MAX, offset_minutes))
+
+
+def get_team_schedule_offset(team_id: int) -> tuple[int, int]:
+    now_ts = int(datetime.now().timestamp())
+    db = get_db()
+    cursor = db.cursor()
+    cursor.execute(
+        "SELECT time_offset_minutes, updated_at FROM team_schedule_settings WHERE team_id = ?",
+        (team_id,),
+    )
+    row = cursor.fetchone()
+    if row is None:
+        cursor.execute(
+            "INSERT INTO team_schedule_settings (team_id, time_offset_minutes, updated_at) VALUES (?, ?, ?)",
+            (team_id, 0, now_ts),
+        )
+        db.commit()
+        cursor.close()
+        db.close()
+        return 0, now_ts
+
+    stored_offset = int(row[0] or 0)
+    safe_offset = clamp_schedule_offset(stored_offset)
+    updated_at = int(row[1] or now_ts)
+    if safe_offset != stored_offset:
+        cursor.execute(
+            "UPDATE team_schedule_settings SET time_offset_minutes = ?, updated_at = ? WHERE team_id = ?",
+            (safe_offset, now_ts, team_id),
+        )
+        db.commit()
+        updated_at = now_ts
+
+    cursor.close()
+    db.close()
+    return safe_offset, updated_at
+
+
+def set_team_schedule_offset(team_id: int, offset_minutes: int) -> tuple[int, int]:
+    safe_offset = clamp_schedule_offset(offset_minutes)
+    updated_at = int(datetime.now().timestamp())
+    db = get_db()
+    cursor = db.cursor()
+    cursor.execute(
+        """INSERT INTO team_schedule_settings (team_id, time_offset_minutes, updated_at)
+           VALUES (?, ?, ?)
+           ON CONFLICT(team_id)
+           DO UPDATE SET time_offset_minutes = excluded.time_offset_minutes, updated_at = excluded.updated_at""",
+        (team_id, safe_offset, updated_at),
+    )
+    db.commit()
+    cursor.close()
+    db.close()
+    return safe_offset, updated_at
 
 
 def get_active_event(team_id: int) -> str | None:
@@ -50,7 +109,7 @@ def get_active_event(team_id: int) -> str | None:
 
 
 def get_next_match(
-    schedule: list[dict], team_id: int, now: datetime
+    schedule: list[dict], team_id: int, now: datetime, offset_minutes: int = 0
 ) -> tuple[str, str, datetime] | None:
     next_match: tuple[str, str, datetime] | None = None
 
@@ -64,21 +123,31 @@ def get_next_match(
 
         queue_time: datetime | None = None
 
+        match_start_str = match.get("startTime")
+        if not match_start_str:
+            continue
+
+        match_start = datetime.fromisoformat(match_start_str) + timedelta(
+            minutes=offset_minutes
+        )
+
         if match.get("matchNumber") == 1:
-            queue_time = datetime.fromisoformat(match.get("startTime")) - timedelta(
-                minutes=10
-            )
+            queue_time = match_start - timedelta(minutes=10)
         else:
             prev_match = None
             for prev in schedule[:i]:
                 if prev.get("field") == match.get("field") and prev.get("teams"):
                     prev_match = prev
             if prev_match:
-                queue_time = datetime.fromisoformat(prev_match.get("startTime"))
+                prev_start_str = prev_match.get("startTime")
+                if not prev_start_str:
+                    queue_time = match_start - timedelta(minutes=10)
+                else:
+                    queue_time = datetime.fromisoformat(prev_start_str) + timedelta(
+                        minutes=offset_minutes
+                    )
             else:
-                queue_time = datetime.fromisoformat(match.get("startTime")) - timedelta(
-                    minutes=10
-                )
+                queue_time = match_start - timedelta(minutes=10)
 
         if queue_time <= now:
             continue
@@ -158,7 +227,8 @@ def notification_callback():
         )
 
         schedule = r.json().get("schedule", [])
-        match_info = get_next_match(schedule, team_id, now)
+        offset_minutes, _ = get_team_schedule_offset(team_id)
+        match_info = get_next_match(schedule, team_id, now, offset_minutes)
         if not match_info:
             continue
 
@@ -252,6 +322,11 @@ cursor.execute("""CREATE TABLE IF NOT EXISTS strategy (
     robots_data TEXT,
     updated_at INTEGER NOT NULL,
     UNIQUE(team_id, event_code, match_description, phase)
+)""")
+cursor.execute("""CREATE TABLE IF NOT EXISTS team_schedule_settings (
+    team_id INTEGER PRIMARY KEY,
+    time_offset_minutes INTEGER NOT NULL DEFAULT 0,
+    updated_at INTEGER NOT NULL
 )""")
 
 # Migration: add match_description column if it doesn't exist
@@ -481,6 +556,65 @@ def _api_v1_schedule():
     merged_schedule = qual_schedule + playoff_schedule
 
     return {"schedule": merged_schedule}, 200
+
+
+@app.route("/api/v1/schedule/offset", methods=["GET"])
+def _api_v1_schedule_offset_get():
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return {"status": "fuck", "error": "no auth"}, 401
+
+    token = auth_header.split(" ")[1]
+    try:
+        payload = jwt.decode(token, RSA_PUBLIC_KEY, algorithms=["RS256"])
+        team_id = payload.get("id")
+    except jwt.ExpiredSignatureError:
+        return {"status": "fuck", "error": "token expired"}, 401
+    except jwt.InvalidTokenError:
+        return {"status": "fuck", "error": "invalid token"}, 401
+
+    offset_minutes, updated_at = get_team_schedule_offset(team_id)
+    return {
+        "status": "success",
+        "offsetMinutes": offset_minutes,
+        "updatedAt": updated_at,
+        "minOffsetMinutes": SCHEDULE_OFFSET_MINUTES_MIN,
+        "maxOffsetMinutes": SCHEDULE_OFFSET_MINUTES_MAX,
+    }, 200
+
+
+@app.route("/api/v1/schedule/offset", methods=["PUT"])
+def _api_v1_schedule_offset_put():
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return {"status": "fuck", "error": "no auth"}, 401
+
+    token = auth_header.split(" ")[1]
+    try:
+        payload = jwt.decode(token, RSA_PUBLIC_KEY, algorithms=["RS256"])
+        team_id = payload.get("id")
+    except jwt.ExpiredSignatureError:
+        return {"status": "fuck", "error": "token expired"}, 401
+    except jwt.InvalidTokenError:
+        return {"status": "fuck", "error": "invalid token"}, 401
+
+    data = request.json
+    if not data or "offsetMinutes" not in data:
+        return {"status": "fuck", "error": "missing offsetMinutes"}, 400
+
+    try:
+        offset_minutes = int(data.get("offsetMinutes"))
+    except (TypeError, ValueError):
+        return {"status": "fuck", "error": "offsetMinutes must be integer"}, 400
+
+    saved_offset, updated_at = set_team_schedule_offset(team_id, offset_minutes)
+    return {
+        "status": "success",
+        "offsetMinutes": saved_offset,
+        "updatedAt": updated_at,
+        "minOffsetMinutes": SCHEDULE_OFFSET_MINUTES_MIN,
+        "maxOffsetMinutes": SCHEDULE_OFFSET_MINUTES_MAX,
+    }, 200
 
 
 @app.route("/api/v1/matches", methods=["GET"])
