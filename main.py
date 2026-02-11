@@ -2,13 +2,10 @@ import argon2
 from argon2 import PasswordHasher
 from datetime import datetime, timedelta
 from flask import Flask, request, send_from_directory
-from flask_socketio import SocketIO, emit, join_room
 import jwt
-import json
 import os
 import pyotp
 import requests
-import secrets
 import sqlite3
 import threading
 import time
@@ -33,47 +30,6 @@ ADMIN_SECRET = settings["admin"]["admin_secret"]
 
 get_db = lambda: sqlite3.connect("data/default.db", check_same_thread=True)
 get_totp = lambda: pyotp.TOTP(ADMIN_SECRET)
-
-
-def get_offseason_data(event_code):
-    db = get_db()
-    cursor = db.cursor()
-    cursor.execute("SELECT data FROM offseason_events WHERE code = ?", (event_code,))
-    row = cursor.fetchone()
-    cursor.close()
-    db.close()
-
-    if row and row[0]:
-        return json.loads(row[0])
-    return None
-
-
-def get_all_offseason_events():
-    db = get_db()
-    cursor = db.cursor()
-    cursor.execute("SELECT code, name FROM offseason_events WHERE status = 'active'")
-    rows = cursor.fetchall()
-    cursor.close()
-    db.close()
-
-    events = []
-    for row in rows:
-        events.append(
-            {
-                "code": row[0],
-                "name": row[1],
-                "dateStart": datetime.now().isoformat(),
-                "dateEnd": datetime.now().isoformat(),
-                "venue": "Vanguard Offseason",
-                "city": "N/A",
-                "stateprov": "N/A",
-                "country": "N/A",
-                "website": "",
-                "timezone": "UTC",
-                "type": "OFFSEASON",
-            }
-        )
-    return events
 
 
 def get_active_event(team_id: int) -> str | None:
@@ -248,7 +204,6 @@ def notification_loop():
 
 
 app = Flask(__name__)
-socketio = SocketIO(app, cors_allowed_origins="*")
 
 ph = PasswordHasher()
 s = requests.Session()
@@ -297,14 +252,6 @@ cursor.execute("""CREATE TABLE IF NOT EXISTS strategy (
     robots_data TEXT,
     updated_at INTEGER NOT NULL,
     UNIQUE(team_id, event_code, match_description, phase)
-)""")
-cursor.execute("""CREATE TABLE IF NOT EXISTS offseason_events (
-    code TEXT PRIMARY KEY,
-    name TEXT NOT NULL,
-    event_key TEXT NOT NULL,
-    status TEXT DEFAULT 'active',
-    data TEXT,
-    updated_at INTEGER NOT NULL
 )""")
 
 # Migration: add match_description column if it doesn't exist
@@ -455,16 +402,7 @@ def _api_v1_events():
     year = now.year
 
     r = s.get(f"{FTC_API_URL}/{year}/events?teamNumber={team_id}")
-
-    events = []
-    if r.status_code == 200:
-        events = r.json().get("events", [])
-
-    # Add offseason events
-    offseason = get_all_offseason_events()
-    events.extend(offseason)
-
-    return {"events": events}, 200
+    return r.json(), r.status_code
 
 
 @app.route("/api/v1/event", methods=["GET"])
@@ -488,13 +426,7 @@ def _api_v1_event():
     except:
         return {"status": "fuck", "error": "bad request"}, 400
 
-    offseason_data = get_offseason_data(event)
-    if offseason_data is not None:
-        # Assuming payload has 'matches' key which is the schedule list
-        return {"schedule": offseason_data.get("matches", [])}, 200
-
     now = datetime.now() - timedelta(weeks=34)
-
     year = now.year
 
     r = s.get(f"{FTC_API_URL}/{year}/events?eventCode={event}")
@@ -570,13 +502,8 @@ def _api_v1_matches():
     if not event:
         return {"status": "fuck", "error": "missing event"}, 400
 
-    offseason_data = get_offseason_data(event)
-    if offseason_data is not None:
-        return {"matches": offseason_data.get("matches", [])}, 200
-
     level = request.args.get("level")
     now = datetime.now() - timedelta(weeks=34)
-
     year = now.year
 
     url = f"{FTC_API_URL}/{year}/matches/{event}"
@@ -655,10 +582,6 @@ def _api_v1_rankings():
 
     if not event:
         return {"status": "fuck", "error": "missing event"}, 400
-
-    offseason_data = get_offseason_data(event)
-    if offseason_data is not None:
-        return {"rankings": offseason_data.get("rankings", [])}, 200
 
     now = datetime.now() - timedelta(weeks=34)
     year = now.year
@@ -1271,92 +1194,6 @@ def _api_v1_admin_reset_password(user_id):
         return {"status": "fuck", "error": "idk"}, 500
 
 
-@app.route("/api/v1/admin/offseason", methods=["GET"])
-def _api_v1_admin_list_offseason():
-    auth_header = request.headers.get("Authorization")
-    if not auth_header or not auth_header.startswith("Bearer "):
-        return {"status": "fuck", "error": "no auth"}, 401
-
-    token = auth_header.split(" ")[1]
-    try:
-        payload = jwt.decode(token, RSA_PUBLIC_KEY, algorithms=["RS256"])
-        if "admin" not in payload.get("scope", []):
-            return {"status": "fuck", "error": "unauthorized"}, 403
-    except jwt.ExpiredSignatureError:
-        return {"status": "fuck", "error": "token expired"}, 401
-    except jwt.InvalidTokenError:
-        return {"status": "fuck", "error": "invalid token"}, 401
-
-    try:
-        db = get_db()
-        cursor = db.cursor()
-        cursor.execute(
-            "SELECT code, name, status, updated_at FROM offseason_events ORDER BY updated_at DESC"
-        )
-        rows = cursor.fetchall()
-        cursor.close()
-        db.close()
-
-        events = [
-            {"code": row[0], "name": row[1], "status": row[2], "updatedAt": row[3]}
-            for row in rows
-        ]
-
-        return {"status": "success", "events": events}, 200
-    except Exception as e:
-        print(e)
-        return {"status": "fuck", "error": "idk"}, 500
-
-
-@app.route("/api/v1/admin/offseason", methods=["POST"])
-def _api_v1_admin_create_offseason():
-    auth_header = request.headers.get("Authorization")
-    if not auth_header or not auth_header.startswith("Bearer "):
-        return {"status": "fuck", "error": "no auth"}, 401
-
-    token = auth_header.split(" ")[1]
-    try:
-        payload = jwt.decode(token, RSA_PUBLIC_KEY, algorithms=["RS256"])
-        if "admin" not in payload.get("scope", []):
-            return {"status": "fuck", "error": "unauthorized"}, 403
-    except jwt.ExpiredSignatureError:
-        return {"status": "fuck", "error": "token expired"}, 401
-    except jwt.InvalidTokenError:
-        return {"status": "fuck", "error": "invalid token"}, 401
-
-    data = request.json
-    name = data.get("name")
-    code = data.get("code")
-
-    if not name or not code:
-        return {"status": "fuck", "error": "missing name or code"}, 400
-
-    event_key = secrets.token_urlsafe(16)
-    updated_at = int(datetime.now().timestamp())
-
-    try:
-        db = get_db()
-        cursor = db.cursor()
-
-        # Check if code exists
-        cursor.execute("SELECT code FROM offseason_events WHERE code = ?", (code,))
-        if cursor.fetchone() is not None:
-            return {"status": "fuck", "error": "event code exists"}, 409
-
-        cursor.execute(
-            "INSERT INTO offseason_events (code, name, event_key, updated_at, data) VALUES (?, ?, ?, ?, ?)",
-            (code, name, event_key, updated_at, "{}"),
-        )
-        db.commit()
-        cursor.close()
-        db.close()
-
-        return {"status": "success", "eventKey": event_key}, 201
-    except Exception as e:
-        print(e)
-        return {"status": "fuck", "error": "idk"}, 500
-
-
 @app.route("/api/v1/admin/notes", methods=["GET"])
 def _api_v1_admin_notes():
     auth_header = request.headers.get("Authorization")
@@ -1579,75 +1416,5 @@ def _api_v1_admin_vacuum():
         return {"status": "fuck", "error": "idk"}, 500
 
 
-@socketio.on("connect")
-def _handle_connect(auth):
-    event_key = request.headers.get("Event-Key") or (auth and auth.get("key"))
-
-    if not event_key:
-        return False
-
-    db = get_db()
-    cursor = db.cursor()
-    cursor.execute(
-        "SELECT code FROM offseason_events WHERE event_key = ?", (event_key,)
-    )
-    row = cursor.fetchone()
-    cursor.close()
-    db.close()
-
-    if row:
-        join_room(row[0])
-        print(f"Middleman connected for event {row[0]}")
-        return True
-
-    return False
-
-
-@socketio.on("update_data")
-def _handle_update_data(data):
-    # data should contain event_key to identify which event (or we use context)
-    # But since we joined a room based on event code, we can use that if we track it.
-    # Simpler: pass event_key in data or rely on initial auth.
-    # Let's rely on the room.
-
-    # Actually, getting the room from context in socketio is tricky without session.
-    # Let's just ask the client to send the key again or the code.
-
-    event_key = data.get("key")
-    payload = data.get("payload")
-
-    if not event_key or not payload:
-        return
-
-    db = get_db()
-    cursor = db.cursor()
-    cursor.execute(
-        "SELECT code, data FROM offseason_events WHERE event_key = ?", (event_key,)
-    )
-    row = cursor.fetchone()
-
-    if row:
-        code = row[0]
-        current_data = json.loads(row[1]) if row[1] else {}
-
-        # Merge payload into current_data
-        # Payload keys: 'teams', 'matches', 'rankings', 'scores'
-        for k, v in payload.items():
-            current_data[k] = v
-
-        updated_at = int(datetime.now().timestamp())
-        cursor.execute(
-            "UPDATE offseason_events SET data = ?, updated_at = ? WHERE code = ?",
-            (json.dumps(current_data), updated_at, code),
-        )
-        db.commit()
-
-        # Emit to frontend clients watching this event?
-        # socketio.emit("event_update", {"event": code}, room=f"frontend_{code}")
-
-    cursor.close()
-    db.close()
-
-
 if __name__ == "__main__":
-    socketio.run(app, host="0.0.0.0", port=8080, allow_unsafe_werkzeug=True)
+    app.run(host="0.0.0.0", port=8080)
