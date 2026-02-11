@@ -956,6 +956,19 @@ body {
     transform: scale(0.98);
 }
 
+.login-register-link {
+    color: #ffffff;
+    text-decoration: underline;
+    text-align: center;
+    font-size: 13px;
+    display: block;
+    transition: opacity 0.2s;
+}
+
+.login-register-link:hover {
+    opacity: 0.8;
+}
+
 #login-error {
     color: #ff4d4d;
     font-size: 13px;
