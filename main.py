@@ -272,9 +272,12 @@ if len(NTFY_TEAMS) > 0:
     thread = threading.Thread(target=notification_loop, daemon=True)
     thread.start()
 
-
-@app.route("/", methods=["GET"])
+@app.route('/', methods=["GET"])
 def _root():
+    return app.send_static_file("home.html")
+
+@app.route("/app", methods=["GET"])
+def _app():
     return send_from_directory("static", "index.html")
 
 
