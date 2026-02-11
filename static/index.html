@@ -197,7 +197,30 @@
                 </div>
             </div>
             <div class="view" id="view-settings" style="display: none;">
-                <span>Settings</span>
+                <div id="settings-container">
+                    <div class="settings-header">
+                        <h1>Settings</h1>
+                    </div>
+
+                    <div class="settings-nav">
+                        <button id="settings-nav-notifications" class="settings-nav-btn settings-nav-active" onclick="switchSettingsSection('notifications')">Notifications</button>
+                        <button id="settings-nav-management" class="settings-nav-btn" onclick="switchSettingsSection('management')">Management</button>
+                    </div>
+
+                    <div id="settings-section-notifications" class="settings-section">
+                        <h2>Notifications</h2>
+                        <div class="settings-card">
+                            <p class="settings-card-description">Notification preferences coming soon.</p>
+                        </div>
+                    </div>
+
+                    <div id="settings-section-management" class="settings-section" style="display: none;">
+                        <h2>Management</h2>
+                        <div class="settings-card">
+                            <p class="settings-card-description">Management options coming soon.</p>
+                        </div>
+                    </div>
+                </div>
             </div>
             <div class="view" id="view-admin" style="display: none;">
                 <div id="admin-login">
@@ -385,16 +408,13 @@
                         <label for="login-password">Password</label>
                         <input type="password" id="login-password" name="password" required placeholder="••••••••">
                     </div>
-                     <button type="submit" id="login-button">Login</button>
-                     <div class="login-footer-links">
-                        <a href="https://forms.gle/rRjURwjXiKNLW5Ao7" target="_blank" class="login-register-button">Register Team</a>
-                        <a href="/" class="login-return-button">Return Home</a>
-                     </div>
-                     <p id="login-error"></p>
+                    <button type="submit" id="login-button">Login</button>
+                    <p id="login-error"></p>
+                    <a href="https://forms.gle/AgSDjL4PfxtQoCee8" target="_blank" class="login-register-link">Register</a>
+                    <a href="/" class="login-return-button">Return Home</a>
                 </form>
             </div>
         </div>
         <script src="/assets/app.js"></script>
-        <script src="/assets/admin.js"></script>
     </body>
 </html>

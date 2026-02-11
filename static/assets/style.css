@@ -956,6 +956,15 @@ body {
     transform: scale(0.98);
 }
 
+.login-return-button {
+    color: #868686;
+}
+
+.login-return-button:hover {
+    color: #ffffff;
+    background-color: rgba(255, 255, 255, 0.05);
+    border-color: #3e3e42;
+}
 .login-footer-links {
     display: flex;
     flex-direction: column;
@@ -975,27 +984,17 @@ body {
     width: 100%;
 }
 
-.login-register-button {
-    color: #4ec9b0;
-    background-color: rgba(78, 201, 176, 0.05);
-    border-color: rgba(78, 201, 176, 0.2);
-    font-weight: 600;
-}
-
-.login-register-button:hover {
-    background-color: rgba(78, 201, 176, 0.1);
-    border-color: #4ec9b0;
+.login-register-link {
     color: #ffffff;
+    text-decoration: underline;
+    text-align: center;
+    font-size: 13px;
+    display: block;
+    transition: opacity 0.2s;
 }
 
-.login-return-button {
-    color: #868686;
-}
-
-.login-return-button:hover {
-    color: #ffffff;
-    background-color: rgba(255, 255, 255, 0.05);
-    border-color: #3e3e42;
+.login-register-link:hover {
+    opacity: 0.8;
 }
 
 #login-error {
@@ -4760,5 +4759,107 @@ body.home-page {
 
     .home-stat-value {
         font-size: 20px;
+    }
+}
+
+/* Settings Panel Styles */
+#settings-container {
+    padding: 24px;
+    overflow-y: auto;
+    height: 100%;
+    box-sizing: border-box;
+}
+
+.settings-header {
+    margin-bottom: 24px;
+}
+
+.settings-header h1 {
+    font-size: 28px;
+    font-weight: 600;
+    color: #ffffff;
+    margin: 0 0 16px 0;
+}
+
+.settings-nav {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 32px;
+    border-bottom: 1px solid #333333;
+    padding-bottom: 0;
+    flex-wrap: wrap;
+}
+
+.settings-nav-btn {
+    background-color: transparent;
+    color: #868686;
+    border: none;
+    border-bottom: 2px solid transparent;
+    padding: 12px 16px;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: color 0.2s, border-color 0.2s;
+}
+
+.settings-nav-btn:hover {
+    color: #cccccc;
+}
+
+.settings-nav-btn.settings-nav-active {
+    color: #ffffff;
+    border-bottom-color: #0078d4;
+}
+
+.settings-section {
+    animation: fadeInUp 0.3s ease-out;
+}
+
+.settings-section h2 {
+    font-size: 20px;
+    font-weight: 600;
+    color: #ffffff;
+    margin: 0 0 24px 0;
+}
+
+.settings-card {
+    background-color: #252526;
+    border: 1px solid #333333;
+    border-radius: 6px;
+    padding: 20px;
+    margin-bottom: 24px;
+}
+
+.settings-card h3 {
+    font-size: 16px;
+    font-weight: 600;
+    color: #cccccc;
+    margin: 0 0 16px 0;
+}
+
+.settings-card-description {
+    color: #868686;
+    font-size: 13px;
+    line-height: 1.5;
+    margin: 0 0 16px 0;
+}
+
+@media (max-width: 768px) {
+    #settings-container {
+        padding: 16px;
+    }
+
+    .settings-header h1 {
+        font-size: 24px;
+    }
+
+    .settings-nav {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .settings-nav-btn {
+        flex-shrink: 0;
     }
 }
