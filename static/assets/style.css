@@ -143,11 +143,13 @@ body {
 }
 
 #schedule-controls {
-    padding: 12px 16px;
+    padding: 10px 16px;
     border-bottom: 1px solid #333333;
     background-color: #1f1f1f;
     display: flex;
     align-items: center;
+    justify-content: space-between;
+    gap: 12px;
     flex-shrink: 0;
 }
 
@@ -159,6 +161,144 @@ body {
     color: #cccccc;
     font-size: 13px;
     user-select: none;
+}
+
+.schedule-offset-dropdown {
+    position: relative;
+    margin-left: auto;
+    flex-shrink: 0;
+}
+
+.schedule-offset-toggle {
+    width: 24px;
+    height: 24px;
+    border-radius: 0;
+    border: none;
+    background-color: transparent;
+    color: #8f959e;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    transition: color 160ms ease, transform 160ms ease;
+}
+
+.schedule-offset-toggle:hover {
+    color: #eceff4;
+    transform: scale(0.92);
+}
+
+.schedule-offset-toggle:active {
+    transform: scale(0.84);
+}
+
+.schedule-offset-toggle:focus-visible {
+    outline: 2px solid #0078d4;
+    outline-offset: 1px;
+}
+
+.schedule-offset-toggle svg {
+    width: 18px;
+    height: 18px;
+    display: block;
+    fill: currentColor;
+}
+
+.schedule-offset-menu {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    width: 290px;
+    border-radius: 10px;
+    border: 1px solid #3b3b42;
+    background-color: #252526;
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.45);
+    padding: 12px;
+    z-index: 25;
+}
+
+.schedule-offset-title {
+    color: #f3f3f3;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.schedule-offset-help {
+    color: #b0b0b0;
+    font-size: 12px;
+    line-height: 1.35;
+    margin-top: 4px;
+}
+
+.schedule-offset-label {
+    display: block;
+    margin-top: 10px;
+    color: #c8c8c8;
+    font-size: 12px;
+}
+
+.schedule-offset-input-row {
+    margin-top: 6px;
+    display: grid;
+    grid-template-columns: 48px 1fr 48px;
+    gap: 8px;
+}
+
+.schedule-offset-step,
+.schedule-offset-save,
+.schedule-offset-reset {
+    border-radius: 6px;
+    border: 1px solid #45454d;
+    background-color: #2f2f33;
+    color: #d6d6d6;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    height: 32px;
+}
+
+.schedule-offset-step:hover,
+.schedule-offset-save:hover,
+.schedule-offset-reset:hover {
+    background-color: #3a3a40;
+}
+
+.schedule-offset-input {
+    width: 100%;
+    height: 32px;
+    border-radius: 6px;
+    border: 1px solid #4b4b53;
+    background-color: #1f1f1f;
+    color: #f2f2f2;
+    text-align: center;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 0 8px;
+}
+
+.schedule-offset-effect {
+    margin-top: 8px;
+    color: #cccccc;
+    font-size: 12px;
+}
+
+.schedule-offset-actions {
+    margin-top: 10px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+}
+
+.schedule-offset-save {
+    background-color: #0078d4;
+    border-color: #0078d4;
+    color: #ffffff;
+}
+
+.schedule-offset-save:hover {
+    background-color: #1788db;
 }
 
 .schedule-checkbox-container input[type="checkbox"] {
@@ -326,16 +466,70 @@ body {
     padding-bottom: 16px;
 }
 
+.details-header-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 8px;
+}
+
 .details-title {
     font-size: 24px;
     font-weight: 600;
     color: #ffffff;
-    margin-bottom: 8px;
+    margin-bottom: 0;
 }
 
 .details-time {
     color: #868686;
     font-size: 14px;
+}
+
+.details-calibrate-btn {
+    border: 1px solid #3f3f46;
+    background-color: #252526;
+    color: #c9ced6;
+    border-radius: 6px;
+    height: 32px;
+    padding: 0 10px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: color 160ms ease, border-color 160ms ease, background-color 160ms ease;
+}
+
+.details-calibrate-btn:hover:not(:disabled) {
+    color: #f5f7fb;
+    border-color: #5a5a64;
+    background-color: #2f2f33;
+}
+
+.details-calibrate-btn:focus-visible {
+    outline: 2px solid #0078d4;
+    outline-offset: 1px;
+}
+
+.details-calibrate-btn:disabled {
+    opacity: 0.75;
+    cursor: default;
+}
+
+.details-calibrate-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.details-calibrate-icon svg {
+    width: 14px;
+    height: 14px;
+    display: block;
 }
 
 .alliance-container {
@@ -958,6 +1152,8 @@ body {
 
 .login-return-button {
     color: #868686;
+    display: block;
+    width: 100%;
 }
 
 .login-return-button:hover {
@@ -965,6 +1161,7 @@ body {
     background-color: rgba(255, 255, 255, 0.05);
     border-color: #3e3e42;
 }
+
 .login-footer-links {
     display: flex;
     flex-direction: column;
@@ -980,21 +1177,21 @@ body {
     border-radius: 6px;
     transition: all 0.2s ease;
     border: 1px solid transparent;
-    display: block;
-    width: 100%;
 }
 
 .login-register-link {
-    color: #ffffff;
-    text-decoration: underline;
+    color: #a0a0a0;
+    text-decoration: none;
     text-align: center;
     font-size: 13px;
     display: block;
-    transition: opacity 0.2s;
+    width: 100%;
+    transition: color 0.2s;
 }
 
 .login-register-link:hover {
-    opacity: 0.8;
+    color: #ffffff;
+    text-decoration: underline;
 }
 
 #login-error {
@@ -2334,7 +2531,7 @@ textarea:focus-visible {
     }
 
     #schedule-controls {
-        padding: 14px 16px;
+        padding: 12px 16px;
     }
 
     .schedule-checkbox-container {
@@ -2353,6 +2550,11 @@ textarea:focus-visible {
     .schedule-checkbox-container input[type="checkbox"]:checked::after {
         width: 4px;
         height: 8px;
+    }
+
+    .schedule-offset-menu {
+        width: min(290px, calc(100vw - 32px));
+        right: 0;
     }
 
     /* Score Breakdown Mobile */
@@ -2441,6 +2643,27 @@ textarea:focus-visible {
     .details-header {
         margin-bottom: 16px;
         padding-bottom: 12px;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .details-header-top {
+        display: contents;
+    }
+
+    .details-header .details-title {
+        order: 1;
+        margin-bottom: 8px;
+    }
+
+    .details-header .details-time {
+        order: 2;
+    }
+
+    .details-header .details-calibrate-btn {
+        order: 3;
+        align-self: flex-start;
+        margin-top: 10px;
     }
     
     .details-title {
@@ -2704,6 +2927,17 @@ textarea:focus-visible {
     
     .details-title {
         font-size: 18px;
+    }
+
+    .details-calibrate-btn {
+        height: 30px;
+        padding: 0 9px;
+        font-size: 11px;
+    }
+
+    .details-calibrate-icon svg {
+        width: 13px;
+        height: 13px;
     }
     
     .alliance-title {

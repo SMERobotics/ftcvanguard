@@ -37,6 +37,12 @@ let currentUserScopes = [];
 let currentSettingsSection = "notifications";
 let adminToken = null;
 let currentAdminSection = "overview";
+let scheduleOffsetMinutes = 0;
+let scheduleOffsetUpdatedAt = null;
+let scheduleOffsetMinMinutes = -180;
+let scheduleOffsetMaxMinutes = 180;
+let scheduleOffsetSyncInterval = null;
+let scheduleOffsetMenuOpen = false;
 let currentRankingSortColumn = "rankingScore";
 let currentRankingSortDirection = "desc";
 function getViewNameFromId(viewId) {
@@ -110,6 +116,248 @@ async function assertAuthorized(response) {
 async function authFetch(input, init) {
     const res = await fetch(input, init);
     return assertAuthorized(res);
+}
+function clampScheduleOffset(value) {
+    if (value < scheduleOffsetMinMinutes)
+        return scheduleOffsetMinMinutes;
+    if (value > scheduleOffsetMaxMinutes)
+        return scheduleOffsetMaxMinutes;
+    return value;
+}
+function getOffsetAdjustedDate(rawTime) {
+    if (!rawTime)
+        return null;
+    const base = new Date(rawTime);
+    if (Number.isNaN(base.getTime()))
+        return null;
+    return new Date(base.getTime() + scheduleOffsetMinutes * 60 * 1000);
+}
+function formatScheduleOffset(value) {
+    if (value === 0)
+        return "0m";
+    return `${value > 0 ? "+" : ""}${value}m`;
+}
+function buildScheduleOffsetEffectText(value) {
+    if (value === 0)
+        return "Current: 0m (on official schedule)";
+    const minuteLabel = Math.abs(value) === 1 ? "minute" : "minutes";
+    if (value > 0)
+        return `Current: ${formatScheduleOffset(value)} (${Math.abs(value)} ${minuteLabel} delayed)`;
+    return `Current: ${formatScheduleOffset(value)} (${Math.abs(value)} ${minuteLabel} ahead)`;
+}
+function updateScheduleOffsetUI() {
+    const input = document.getElementById("schedule-offset-input");
+    const effect = document.getElementById("schedule-offset-effect");
+    const toggle = document.getElementById("schedule-offset-toggle");
+    if (input) {
+        input.min = scheduleOffsetMinMinutes.toString();
+        input.max = scheduleOffsetMaxMinutes.toString();
+        input.value = scheduleOffsetMinutes.toString();
+    }
+    if (effect) {
+        effect.textContent = buildScheduleOffsetEffectText(scheduleOffsetMinutes);
+    }
+    if (toggle) {
+        toggle.title = `Adjust schedule time offset (${formatScheduleOffset(scheduleOffsetMinutes)})`;
+    }
+}
+function closeScheduleOffsetMenu() {
+    const menu = document.getElementById("schedule-offset-menu");
+    const toggle = document.getElementById("schedule-offset-toggle");
+    if (!menu || !toggle)
+        return;
+    menu.hidden = true;
+    toggle.setAttribute("aria-expanded", "false");
+    scheduleOffsetMenuOpen = false;
+}
+function openScheduleOffsetMenu() {
+    const menu = document.getElementById("schedule-offset-menu");
+    const toggle = document.getElementById("schedule-offset-toggle");
+    if (!menu || !toggle)
+        return;
+    menu.hidden = false;
+    toggle.setAttribute("aria-expanded", "true");
+    scheduleOffsetMenuOpen = true;
+}
+function rerenderMatchTimesForOffset() {
+    if (currentMatches.length === 0)
+        return;
+    renderSchedule(currentMatches, currentRankings, currentTeams);
+    if (currentSelectedMatch !== null) {
+        restoreMatchSelection();
+    }
+    renderStrategyMatchList();
+}
+function applyScheduleOffsetResponse(data, rerenderIfChanged) {
+    const nextMin = typeof data.minOffsetMinutes === "number" ? data.minOffsetMinutes : scheduleOffsetMinMinutes;
+    const nextMax = typeof data.maxOffsetMinutes === "number" ? data.maxOffsetMinutes : scheduleOffsetMaxMinutes;
+    scheduleOffsetMinMinutes = nextMin;
+    scheduleOffsetMaxMinutes = nextMax;
+    const rawOffset = typeof data.offsetMinutes === "number" ? data.offsetMinutes : 0;
+    const clampedOffset = clampScheduleOffset(Math.round(rawOffset));
+    const changed = clampedOffset !== scheduleOffsetMinutes;
+    scheduleOffsetMinutes = clampedOffset;
+    scheduleOffsetUpdatedAt = typeof data.updatedAt === "number" ? data.updatedAt : scheduleOffsetUpdatedAt;
+    updateScheduleOffsetUI();
+    if (changed && rerenderIfChanged) {
+        rerenderMatchTimesForOffset();
+    }
+}
+async function loadScheduleOffset(rerenderIfChanged = false) {
+    const token = localStorage.getItem("token");
+    if (!token)
+        return;
+    try {
+        const response = await authFetch("/api/v1/schedule/offset", {
+            method: "GET",
+            headers: {
+                "Authorization": `Bearer ${token}`
+            }
+        });
+        if (!response.ok)
+            return;
+        const data = await response.json();
+        applyScheduleOffsetResponse(data, rerenderIfChanged);
+    }
+    catch (error) {
+        console.error("Failed to load schedule offset:", error);
+    }
+}
+async function saveScheduleOffset(offsetMinutes) {
+    const token = localStorage.getItem("token");
+    if (!token)
+        return false;
+    try {
+        const response = await authFetch("/api/v1/schedule/offset", {
+            method: "PUT",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${token}`
+            },
+            body: JSON.stringify({ offsetMinutes })
+        });
+        if (!response.ok) {
+            return false;
+        }
+        const data = await response.json();
+        applyScheduleOffsetResponse(data, true);
+        return true;
+    }
+    catch (error) {
+        console.error("Failed to save schedule offset:", error);
+        return false;
+    }
+}
+async function calibrateScheduleOffsetFromMatch(match) {
+    const officialStart = new Date(match.startTime);
+    if (Number.isNaN(officialStart.getTime())) {
+        return false;
+    }
+    const offsetMinutes = Math.round((Date.now() - officialStart.getTime()) / (60 * 1000));
+    return saveScheduleOffset(offsetMinutes);
+}
+function startScheduleOffsetSync() {
+    if (scheduleOffsetSyncInterval !== null) {
+        window.clearInterval(scheduleOffsetSyncInterval);
+    }
+    scheduleOffsetSyncInterval = window.setInterval(() => {
+        loadScheduleOffset(true);
+    }, 15000);
+}
+function stopScheduleOffsetSync() {
+    if (scheduleOffsetSyncInterval !== null) {
+        window.clearInterval(scheduleOffsetSyncInterval);
+        scheduleOffsetSyncInterval = null;
+    }
+}
+function initializeScheduleOffsetControls() {
+    const toggle = document.getElementById("schedule-offset-toggle");
+    const menu = document.getElementById("schedule-offset-menu");
+    const input = document.getElementById("schedule-offset-input");
+    const minus = document.getElementById("schedule-offset-minus");
+    const plus = document.getElementById("schedule-offset-plus");
+    const save = document.getElementById("schedule-offset-save");
+    const reset = document.getElementById("schedule-offset-reset");
+    if (!toggle || !menu || !input || !minus || !plus || !save || !reset)
+        return;
+    const getInputValue = () => {
+        const parsed = parseInt(input.value, 10);
+        if (Number.isNaN(parsed))
+            return scheduleOffsetMinutes;
+        return clampScheduleOffset(parsed);
+    };
+    const setInputValue = (next) => {
+        input.value = clampScheduleOffset(next).toString();
+    };
+    const updatePreview = () => {
+        const effect = document.getElementById("schedule-offset-effect");
+        const value = getInputValue();
+        if (!effect)
+            return;
+        effect.textContent = buildScheduleOffsetEffectText(value);
+    };
+    toggle.addEventListener("click", (event) => {
+        event.stopPropagation();
+        if (scheduleOffsetMenuOpen) {
+            closeScheduleOffsetMenu();
+            return;
+        }
+        openScheduleOffsetMenu();
+        setInputValue(scheduleOffsetMinutes);
+        updatePreview();
+        input.focus();
+        input.select();
+    });
+    menu.addEventListener("click", (event) => {
+        event.stopPropagation();
+    });
+    minus.addEventListener("click", () => {
+        setInputValue(getInputValue() - 5);
+        updatePreview();
+    });
+    plus.addEventListener("click", () => {
+        setInputValue(getInputValue() + 5);
+        updatePreview();
+    });
+    input.addEventListener("input", () => {
+        updatePreview();
+    });
+    input.addEventListener("blur", () => {
+        setInputValue(getInputValue());
+        updatePreview();
+    });
+    input.addEventListener("keydown", async (event) => {
+        if (event.key === "Enter") {
+            event.preventDefault();
+            const success = await saveScheduleOffset(getInputValue());
+            if (success) {
+                closeScheduleOffsetMenu();
+            }
+        }
+    });
+    save.addEventListener("click", async () => {
+        const success = await saveScheduleOffset(getInputValue());
+        if (success) {
+            closeScheduleOffsetMenu();
+        }
+    });
+    reset.addEventListener("click", async () => {
+        setInputValue(0);
+        updatePreview();
+        const success = await saveScheduleOffset(0);
+        if (success) {
+            closeScheduleOffsetMenu();
+        }
+    });
+    document.addEventListener("click", (event) => {
+        if (!scheduleOffsetMenuOpen)
+            return;
+        const target = event.target;
+        if (menu.contains(target) || toggle.contains(target))
+            return;
+        closeScheduleOffsetMenu();
+    });
+    updateScheduleOffsetUI();
 }
 function toggleMobileMenu(open) {
     const sidebar = document.getElementById("sidebar");
@@ -768,6 +1016,7 @@ async function loadScheduleWithStateRestore(eventCode, urlState) {
     const token = localStorage.getItem("token");
     if (!token)
         return;
+    await loadScheduleOffset(false);
     const detailsContainer = document.getElementById("schedule-details");
     if (detailsContainer) {
         detailsContainer.innerHTML = '<div class="empty-state">Select a match to view details</div>';
@@ -952,6 +1201,7 @@ async function loadSchedule(eventCode) {
     const token = localStorage.getItem("token");
     if (!token)
         return;
+    await loadScheduleOffset(false);
     // Reset details view
     const detailsContainer = document.getElementById("schedule-details");
     if (detailsContainer) {
@@ -1029,7 +1279,8 @@ function parseScore(value) {
 }
 function getMatchStartTimestamp(match) {
     const time = match.actualStartTime || match.startTime;
-    const timestamp = time ? new Date(time).getTime() : 0;
+    const adjusted = getOffsetAdjustedDate(time);
+    const timestamp = adjusted ? adjusted.getTime() : 0;
     return Number.isNaN(timestamp) ? 0 : timestamp;
 }
 function buildMatchKey(match) {
@@ -1272,40 +1523,52 @@ function renderSchedule(matches, rankings, teams) {
         let queueClass = "";
         let queueTimeAttr = "";
         const now = new Date();
-        const matchStart = new Date(match.actualStartTime || match.startTime);
+        const matchStart = getOffsetAdjustedDate(match.actualStartTime || match.startTime);
         const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
         const hasScores = match.scoreRedFinal !== undefined || match.scoreBlueFinal !== undefined;
-        const isOld = matchStart < oneHourAgo;
-        if (!hasScores && !isOld) {
+        const isOld = matchStart ? matchStart < oneHourAgo : false;
+        if (!hasScores && matchStart && !isOld) {
             const matchIndexInFull = currentMatches.indexOf(match);
             const prevMatch = matchIndexInFull > 0 ? currentMatches[matchIndexInFull - 1] : null;
-            let queueTime;
+            let queueTime = null;
             if (prevMatch) {
-                queueTime = new Date(prevMatch.actualStartTime || prevMatch.startTime);
+                queueTime = getOffsetAdjustedDate(prevMatch.actualStartTime || prevMatch.startTime);
             }
             else {
-                queueTime = new Date(match.startTime);
-                queueTime.setMinutes(queueTime.getMinutes() - 10);
+                const firstQueueTime = getOffsetAdjustedDate(match.startTime);
+                if (firstQueueTime) {
+                    firstQueueTime.setMinutes(firstQueueTime.getMinutes() - 10);
+                    queueTime = firstQueueTime;
+                }
             }
-            queueTimeAttr = `data-queue-time="${queueTime.getTime()}"`;
-            const diffMs = queueTime.getTime() - now.getTime();
-            const diffMins = Math.floor(diffMs / (1000 * 60));
-            const diffSecs = Math.ceil((diffMs % (1000 * 60)) / 1000);
-            if (diffMs <= 0) {
-                queueText = "Queueing Now";
-                queueClass = "queueing";
+            if (queueTime) {
+                queueTimeAttr = `data-queue-time="${queueTime.getTime()}"`;
+                const diffMs = queueTime.getTime() - now.getTime();
+                const diffMins = Math.floor(diffMs / (1000 * 60));
+                const diffSecs = Math.ceil((diffMs % (1000 * 60)) / 1000);
+                if (diffMs <= 0) {
+                    queueText = "Queueing Now";
+                    queueClass = "queueing";
+                }
+                else {
+                    queueText = `Queueing in ${diffMins}m ${diffSecs}s`;
+                }
             }
             else {
-                queueText = `Queueing in ${diffMins}m ${diffSecs}s`;
+                queueText = "TBD";
             }
+        }
+        else if (!matchStart) {
+            queueText = "TBD";
         }
         else {
             queueText = "Concluded";
         }
-        const fieldInfo = match.field ? ` • Field ${match.field}` : '';
-        const fieldInfoAttr = fieldInfo ? `data-field-info="${fieldInfo}"` : '';
+        const fieldInfo = match.field ? ` • Field ${match.field}` : "";
+        const fieldInfoAttr = fieldInfo ? `data-field-info="${fieldInfo}"` : "";
         const resultIndicator = getMatchResultIndicator(match);
-        const matchTime = new Date(match.startTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+        const scheduledStart = getOffsetAdjustedDate(match.startTime);
+        const matchTime = scheduledStart ? scheduledStart.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "TBD";
         item.innerHTML = `
             <div class="match-header">
                 <span class="match-title">${match.description}</span>
@@ -1687,6 +1950,9 @@ async function renderMatchDetails(match, rankings, teams) {
     const blueScoreText = blueScore !== null ? ` - ${blueScore}${blueWon ? " 👑" : ""}` : "";
     const redAllianceTitle = `Red Alliance${redScoreText}`;
     const blueAllianceTitle = `Blue Alliance${blueScoreText}`;
+    const scheduledStart = getOffsetAdjustedDate(match.startTime);
+    const actualStart = getOffsetAdjustedDate(match.actualStartTime);
+    const canCalibrateOffset = !Number.isNaN(new Date(match.startTime).getTime());
     const notesLoadingSection = validTeams.length > 0 ? `
         <div class="notes-display-container" id="notes-section">
             <div class="notes-display-title">Scouting Notes</div>
@@ -1696,10 +1962,20 @@ async function renderMatchDetails(match, rankings, teams) {
     detailsContainer.innerHTML = `
         <div class="details-animate">
             <div class="details-header">
-                <div class="details-title">${match.description}</div>
-                <div class="details-time">Scheduled: ${new Date(match.startTime).toLocaleString()}</div>
-                ${match.actualStartTime ? `<div class="details-time">Actual: ${new Date(match.actualStartTime).toLocaleString()}</div>` : ''}
-                ${match.field ? `<div class="details-time">Field: ${match.field}</div>` : ''}
+                <div class="details-header-top">
+                    <div class="details-title">${match.description}</div>
+                    <button id="details-calibrate-offset-btn" class="details-calibrate-btn" type="button" title="Set schedule offset so this match is starting now" ${canCalibrateOffset ? "" : "disabled"}>
+                        <span class="details-calibrate-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M12 14V11M12 6C7.85786 6 4.5 9.35786 4.5 13.5C4.5 17.6421 7.85786 21 12 21C16.1421 21 19.5 17.6421 19.5 13.5C19.5 11.5561 18.7605 9.78494 17.5474 8.4525M12 6C14.1982 6 16.1756 6.94572 17.5474 8.4525M12 6V3M19.5 6.5L17.5474 8.4525M12 3H9M12 3H15" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+                            </svg>
+                        </span>
+                        <span class="details-calibrate-label">Calibrate Offset</span>
+                    </button>
+                </div>
+                <div class="details-time">Scheduled: ${scheduledStart ? scheduledStart.toLocaleString() : "TBD"}</div>
+                ${actualStart ? `<div class="details-time">Actual: ${actualStart.toLocaleString()}</div>` : ""}
+                ${match.field ? `<div class="details-time">Field: ${match.field}</div>` : ""}
             </div>
             
             <div class="alliance-container">
@@ -1718,6 +1994,22 @@ async function renderMatchDetails(match, rankings, teams) {
             ${notesLoadingSection}
         </div>
     `;
+    const calibrateButton = document.getElementById("details-calibrate-offset-btn");
+    if (calibrateButton) {
+        calibrateButton.addEventListener("click", async () => {
+            calibrateButton.disabled = true;
+            const label = calibrateButton.querySelector(".details-calibrate-label");
+            if (label) {
+                label.textContent = "Calibrating...";
+            }
+            const success = await calibrateScheduleOffsetFromMatch(match);
+            if (!success || calibrateButton.isConnected) {
+                if (label)
+                    label.textContent = "Calibrate Offset";
+                calibrateButton.disabled = false;
+            }
+        });
+    }
     chartJobs.forEach(job => job());
     if (validTeams.length > 0) {
         const teamNumbers = validTeams.map(t => t.teamNumber);
@@ -1925,6 +2217,8 @@ async function handleLogin(event) {
             currentUserScopes = ["user"];
             isAdminAuthenticated = false;
             hideLogin();
+            await loadScheduleOffset(false);
+            startScheduleOffsetSync();
             await checkAdminStatus();
             updateAdminViewState();
             loadEvents();
@@ -3461,7 +3755,8 @@ function renderStrategyMatchList() {
             const valid = teamNums.filter(t => t && t > 0);
             return valid.length === 0 ? "TBD" : valid.join(", ");
         };
-        const matchTime = new Date(match.startTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+        const scheduledStart = getOffsetAdjustedDate(match.startTime);
+        const matchTime = scheduledStart ? scheduledStart.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "TBD";
         item.innerHTML = `
             <div class="match-header">
                 <span class="match-title">${match.description}</span>
@@ -4273,6 +4568,8 @@ function initStrategyEventListeners() {
     });
 }
 function handleLogout() {
+    stopScheduleOffsetSync();
+    closeScheduleOffsetMenu();
     localStorage.removeItem("token");
     loggedInTeamId = null;
     currentMatches = [];
@@ -4283,6 +4580,11 @@ function handleLogout() {
     currentSelectedMatch = null;
     currentSelectedNotesTeam = null;
     currentInsightsTeam = null;
+    scheduleOffsetMinutes = 0;
+    scheduleOffsetUpdatedAt = null;
+    scheduleOffsetMinMinutes = -180;
+    scheduleOffsetMaxMinutes = 180;
+    updateScheduleOffsetUI();
     // Clear strategy state
     strategyCurrentMatch = null;
     strategyCurrentPhase = "auto";
@@ -4464,7 +4766,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
     // Close menu on escape key
     document.addEventListener("keydown", (e) => {
-        if (e.key === "Escape" && isMobileMenuOpen) {
+        if (e.key !== "Escape")
+            return;
+        if (scheduleOffsetMenuOpen) {
+            closeScheduleOffsetMenu();
+        }
+        if (isMobileMenuOpen) {
             closeMobileMenu();
         }
     });
@@ -4485,6 +4792,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
     // Rankings sort initialization
     initRankingSortHandlers();
+    initializeScheduleOffsetControls();
     // Keyboard shortcuts for navigation
     document.addEventListener("keydown", (e) => {
         // Only trigger if not typing in an input field
@@ -4574,6 +4882,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         const isValid = await verifyToken(token);
         if (isValid) {
             hideLogin();
+            await loadScheduleOffset(false);
+            startScheduleOffsetSync();
             await checkAdminStatus();
             updateAdminViewState();
             initializeAdmin();
