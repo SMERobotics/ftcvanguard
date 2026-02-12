@@ -350,6 +350,11 @@ body {
     overflow-y: auto;
     background-color: #1f1f1f;
     min-width: 0;
+    transition: box-shadow 0.35s ease;
+}
+
+#schedule-details.realtime-updated {
+    box-shadow: inset 0 0 0 1px rgba(0, 120, 212, 0.55);
 }
 
 .match-item {
@@ -372,6 +377,14 @@ body {
     background-color: #37373d;
     border-left: 3px solid #0078d4;
     padding-left: 13px;
+}
+
+.match-item.schedule-item-updated {
+    background-color: rgba(0, 120, 212, 0.18);
+}
+
+.match-item.active.schedule-item-updated {
+    background-color: #3d4452;
 }
 
 .match-header {
