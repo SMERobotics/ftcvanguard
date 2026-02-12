@@ -1,18 +1,11 @@
-# This workflow uses actions that are not certified by GitHub.
-# They are provided by a third-party and are governed by
-# separate terms of service, privacy policy, and support
-# documentation.
-
-# GitHub recommends pinning actions to a commit SHA.
-# To get a newer version, you will need to update the SHA.
-# You can also reference a tag or branch, but the action may change without warning.
-
 name: Publish Docker image
 
 on:
   push:
     branches:
       - "master"
+  release:
+    types: [published]
 
 jobs:
   push_to_registry:
@@ -23,6 +16,7 @@ jobs:
       contents: read
       attestations: write
       id-token: write
+
     steps:
       - name: Check out the repo
         uses: actions/checkout@v5
@@ -38,6 +32,13 @@ jobs:
         uses: docker/metadata-action@9ec57ed1fcdbf14dcef7dfbe97b2010124a938b7
         with:
           images: milesmuehlbach/ftcvanguard
+          tags: |
+            # Tag with branch name on push (e.g., master)
+            type=ref,event=branch
+            # Tag with release tag (e.g., v1.2.3)
+            type=ref,event=tag
+            # Optional: add latest only for master branch
+            type=raw,value=latest,enable={{is_default_branch}}
 
       - name: Build and push Docker image
         id: push
