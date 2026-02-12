@@ -44,6 +44,7 @@ let scheduleOffsetMinMinutes = -180;
 let scheduleOffsetMaxMinutes = 180;
 let scheduleOffsetSyncInterval = null;
 let scheduleOffsetMenuOpen = false;
+let scheduleOffsetEventCode = "";
 let realtimeEventSyncInterval = null;
 let realtimeEventSyncInFlight = false;
 let isScheduleLoadInProgress = false;
@@ -336,6 +337,9 @@ function rerenderMatchTimesForOffset() {
     }
     renderStrategyMatchList();
 }
+function normalizeEventCode(eventCode) {
+    return (eventCode || "").trim().toUpperCase();
+}
 function applyScheduleOffsetResponse(data, rerenderIfChanged) {
     const nextMin = typeof data.minOffsetMinutes === "number" ? data.minOffsetMinutes : scheduleOffsetMinMinutes;
     const nextMax = typeof data.maxOffsetMinutes === "number" ? data.maxOffsetMinutes : scheduleOffsetMaxMinutes;
@@ -346,23 +350,29 @@ function applyScheduleOffsetResponse(data, rerenderIfChanged) {
     const changed = clampedOffset !== scheduleOffsetMinutes;
     scheduleOffsetMinutes = clampedOffset;
     scheduleOffsetUpdatedAt = typeof data.updatedAt === "number" ? data.updatedAt : scheduleOffsetUpdatedAt;
+    scheduleOffsetEventCode = normalizeEventCode(data.eventCode) || scheduleOffsetEventCode;
     updateScheduleOffsetUI();
     if (changed && rerenderIfChanged) {
         rerenderMatchTimesForOffset();
     }
 }
-async function loadScheduleOffset(rerenderIfChanged = false) {
+async function loadScheduleOffset(rerenderIfChanged = false, eventCode = currentEventCode) {
     const token = localStorage.getItem("token");
     if (!token)
         return;
+    const normalizedEventCode = normalizeEventCode(eventCode);
+    if (!normalizedEventCode)
+        return;
     try {
-        const response = await authFetch("/api/v1/schedule/offset", {
+        const response = await authFetch(`/api/v1/schedule/offset?event=${encodeURIComponent(normalizedEventCode)}`, {
             method: "GET",
             headers: {
                 "Authorization": `Bearer ${token}`
             }
         });
         if (!response.ok)
+            return;
+        if (normalizeEventCode(currentEventCode) !== normalizedEventCode)
             return;
         const data = await response.json();
         applyScheduleOffsetResponse(data, rerenderIfChanged);
@@ -371,12 +381,15 @@ async function loadScheduleOffset(rerenderIfChanged = false) {
         console.error("Failed to load schedule offset:", error);
     }
 }
-async function saveScheduleOffset(offsetMinutes) {
+async function saveScheduleOffset(offsetMinutes, eventCode = currentEventCode) {
     const token = localStorage.getItem("token");
     if (!token)
         return false;
+    const normalizedEventCode = normalizeEventCode(eventCode);
+    if (!normalizedEventCode)
+        return false;
     try {
-        const response = await authFetch("/api/v1/schedule/offset", {
+        const response = await authFetch(`/api/v1/schedule/offset?event=${encodeURIComponent(normalizedEventCode)}`, {
             method: "PUT",
             headers: {
                 "Content-Type": "application/json",
@@ -387,6 +400,8 @@ async function saveScheduleOffset(offsetMinutes) {
         if (!response.ok) {
             return false;
         }
+        if (normalizeEventCode(currentEventCode) !== normalizedEventCode)
+            return false;
         const data = await response.json();
         applyScheduleOffsetResponse(data, true);
         return true;
@@ -1293,7 +1308,7 @@ async function loadScheduleWithStateRestore(eventCode, urlState) {
     const token = localStorage.getItem("token");
     if (!token)
         return;
-    await loadScheduleOffset(false);
+    await loadScheduleOffset(false, eventCode);
     const detailsContainer = document.getElementById("schedule-details");
     if (detailsContainer) {
         detailsContainer.innerHTML = '<div class="empty-state">Select a match to view details</div>';
@@ -1474,7 +1489,7 @@ async function loadSchedule(eventCode) {
     const token = localStorage.getItem("token");
     if (!token)
         return;
-    await loadScheduleOffset(false);
+    await loadScheduleOffset(false, eventCode);
     // Reset details view
     const detailsContainer = document.getElementById("schedule-details");
     if (detailsContainer) {
@@ -4923,6 +4938,7 @@ function handleLogout() {
     scheduleOffsetUpdatedAt = null;
     scheduleOffsetMinMinutes = -180;
     scheduleOffsetMaxMinutes = 180;
+    scheduleOffsetEventCode = "";
     updateScheduleOffsetUI();
     if (queueInterval) {
         clearInterval(queueInterval);

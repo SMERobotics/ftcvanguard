@@ -38,19 +38,27 @@ def clamp_schedule_offset(offset_minutes: int) -> int:
     return max(SCHEDULE_OFFSET_MINUTES_MIN, min(SCHEDULE_OFFSET_MINUTES_MAX, offset_minutes))
 
 
-def get_team_schedule_offset(team_id: int) -> tuple[int, int]:
+def normalize_event_code(event_code: str | None) -> str:
+    return (event_code or "").strip().upper()
+
+
+def get_team_schedule_offset(team_id: int, event_code: str) -> tuple[int, int]:
+    normalized_event_code = normalize_event_code(event_code)
     now_ts = int(datetime.now().timestamp())
+    if not normalized_event_code:
+        return 0, now_ts
+
     db = get_db()
     cursor = db.cursor()
     cursor.execute(
-        "SELECT time_offset_minutes, updated_at FROM team_schedule_settings WHERE team_id = ?",
-        (team_id,),
+        "SELECT time_offset_minutes, updated_at FROM schedule_offsets WHERE team_id = ? AND event_code = ?",
+        (team_id, normalized_event_code),
     )
     row = cursor.fetchone()
     if row is None:
         cursor.execute(
-            "INSERT INTO team_schedule_settings (team_id, time_offset_minutes, updated_at) VALUES (?, ?, ?)",
-            (team_id, 0, now_ts),
+            "INSERT INTO schedule_offsets (team_id, event_code, time_offset_minutes, updated_at) VALUES (?, ?, ?, ?)",
+            (team_id, normalized_event_code, 0, now_ts),
         )
         db.commit()
         cursor.close()
@@ -62,8 +70,8 @@ def get_team_schedule_offset(team_id: int) -> tuple[int, int]:
     updated_at = int(row[1] or now_ts)
     if safe_offset != stored_offset:
         cursor.execute(
-            "UPDATE team_schedule_settings SET time_offset_minutes = ?, updated_at = ? WHERE team_id = ?",
-            (safe_offset, now_ts, team_id),
+            "UPDATE schedule_offsets SET time_offset_minutes = ?, updated_at = ? WHERE team_id = ? AND event_code = ?",
+            (safe_offset, now_ts, team_id, normalized_event_code),
         )
         db.commit()
         updated_at = now_ts
@@ -73,17 +81,21 @@ def get_team_schedule_offset(team_id: int) -> tuple[int, int]:
     return safe_offset, updated_at
 
 
-def set_team_schedule_offset(team_id: int, offset_minutes: int) -> tuple[int, int]:
+def set_team_schedule_offset(team_id: int, event_code: str, offset_minutes: int) -> tuple[int, int]:
+    normalized_event_code = normalize_event_code(event_code)
+    if not normalized_event_code:
+        return 0, int(datetime.now().timestamp())
+
     safe_offset = clamp_schedule_offset(offset_minutes)
     updated_at = int(datetime.now().timestamp())
     db = get_db()
     cursor = db.cursor()
     cursor.execute(
-        """INSERT INTO team_schedule_settings (team_id, time_offset_minutes, updated_at)
-           VALUES (?, ?, ?)
-           ON CONFLICT(team_id)
+        """INSERT INTO schedule_offsets (team_id, event_code, time_offset_minutes, updated_at)
+           VALUES (?, ?, ?, ?)
+           ON CONFLICT(team_id, event_code)
            DO UPDATE SET time_offset_minutes = excluded.time_offset_minutes, updated_at = excluded.updated_at""",
-        (team_id, safe_offset, updated_at),
+        (team_id, normalized_event_code, safe_offset, updated_at),
     )
     db.commit()
     cursor.close()
@@ -227,7 +239,7 @@ def notification_callback():
         )
 
         schedule = r.json().get("schedule", [])
-        offset_minutes, _ = get_team_schedule_offset(team_id)
+        offset_minutes, _ = get_team_schedule_offset(team_id, event)
         match_info = get_next_match(schedule, team_id, now, offset_minutes)
         if not match_info:
             continue
@@ -323,12 +335,6 @@ cursor.execute("""CREATE TABLE IF NOT EXISTS strategy (
     updated_at INTEGER NOT NULL,
     UNIQUE(team_id, event_code, match_description, phase)
 )""")
-cursor.execute("""CREATE TABLE IF NOT EXISTS team_schedule_settings (
-    team_id INTEGER PRIMARY KEY,
-    time_offset_minutes INTEGER NOT NULL DEFAULT 0,
-    updated_at INTEGER NOT NULL
-)""")
-
 # Migration: add match_description column if it doesn't exist
 cursor.execute("PRAGMA table_info(strategy)")
 columns = [col[1] for col in cursor.fetchall()]
@@ -340,6 +346,68 @@ if "match_description" not in columns:
         "UPDATE strategy SET match_description = 'Match ' || match_number WHERE match_description = ''"
     )
     db.commit()
+
+# Migration: convert schedule_offsets to event-scoped keys
+cursor.execute(
+    "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'schedule_offsets'"
+)
+schedule_offsets_exists = cursor.fetchone() is not None
+
+if not schedule_offsets_exists:
+    cursor.execute("""CREATE TABLE schedule_offsets (
+        team_id INTEGER NOT NULL,
+        event_code TEXT NOT NULL,
+        time_offset_minutes INTEGER NOT NULL DEFAULT 0,
+        updated_at INTEGER NOT NULL,
+        PRIMARY KEY(team_id, event_code)
+    )""")
+else:
+    cursor.execute("PRAGMA table_info(schedule_offsets)")
+    team_schedule_columns = cursor.fetchall()
+    team_schedule_column_names = [col[1] for col in team_schedule_columns]
+    team_id_pk_position = next(
+        (col[5] for col in team_schedule_columns if col[1] == "team_id"), 0
+    )
+    event_code_pk_position = next(
+        (col[5] for col in team_schedule_columns if col[1] == "event_code"), 0
+    )
+    has_event_scoped_pk = team_id_pk_position == 1 and event_code_pk_position == 2
+
+    if "event_code" not in team_schedule_column_names or not has_event_scoped_pk:
+        print("Migrating schedule_offsets table to event-scoped offsets")
+        cursor.execute(
+            "ALTER TABLE schedule_offsets RENAME TO schedule_offsets_legacy"
+        )
+        cursor.execute("""CREATE TABLE schedule_offsets (
+            team_id INTEGER NOT NULL,
+            event_code TEXT NOT NULL,
+            time_offset_minutes INTEGER NOT NULL DEFAULT 0,
+            updated_at INTEGER NOT NULL,
+            PRIMARY KEY(team_id, event_code)
+        )""")
+
+        cursor.execute("PRAGMA table_info(schedule_offsets_legacy)")
+        legacy_columns = [col[1] for col in cursor.fetchall()]
+        if "event_code" in legacy_columns:
+            cursor.execute(
+                """INSERT OR REPLACE INTO schedule_offsets (team_id, event_code, time_offset_minutes, updated_at)
+                   SELECT team_id,
+                          COALESCE(NULLIF(UPPER(TRIM(event_code)), ''), '__LEGACY__'),
+                          time_offset_minutes,
+                          updated_at
+                   FROM schedule_offsets_legacy"""
+            )
+        else:
+            cursor.execute(
+                """INSERT OR REPLACE INTO schedule_offsets (team_id, event_code, time_offset_minutes, updated_at)
+                   SELECT team_id,
+                          '__LEGACY__',
+                          time_offset_minutes,
+                          updated_at
+                   FROM schedule_offsets_legacy"""
+            )
+        cursor.execute("DROP TABLE schedule_offsets_legacy")
+
 db.commit()
 db.close()
 
@@ -573,9 +641,14 @@ def _api_v1_schedule_offset_get():
     except jwt.InvalidTokenError:
         return {"status": "fuck", "error": "invalid token"}, 401
 
-    offset_minutes, updated_at = get_team_schedule_offset(team_id)
+    event_code = normalize_event_code(request.args.get("event"))
+    if not event_code:
+        return {"status": "fuck", "error": "missing event"}, 400
+
+    offset_minutes, updated_at = get_team_schedule_offset(team_id, event_code)
     return {
         "status": "success",
+        "eventCode": event_code,
         "offsetMinutes": offset_minutes,
         "updatedAt": updated_at,
         "minOffsetMinutes": SCHEDULE_OFFSET_MINUTES_MIN,
@@ -598,6 +671,10 @@ def _api_v1_schedule_offset_put():
     except jwt.InvalidTokenError:
         return {"status": "fuck", "error": "invalid token"}, 401
 
+    event_code = normalize_event_code(request.args.get("event"))
+    if not event_code:
+        return {"status": "fuck", "error": "missing event"}, 400
+
     data = request.json
     if not data or "offsetMinutes" not in data:
         return {"status": "fuck", "error": "missing offsetMinutes"}, 400
@@ -607,9 +684,10 @@ def _api_v1_schedule_offset_put():
     except (TypeError, ValueError):
         return {"status": "fuck", "error": "offsetMinutes must be integer"}, 400
 
-    saved_offset, updated_at = set_team_schedule_offset(team_id, offset_minutes)
+    saved_offset, updated_at = set_team_schedule_offset(team_id, event_code, offset_minutes)
     return {
         "status": "success",
+        "eventCode": event_code,
         "offsetMinutes": saved_offset,
         "updatedAt": updated_at,
         "minOffsetMinutes": SCHEDULE_OFFSET_MINUTES_MIN,
