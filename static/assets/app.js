@@ -23,6 +23,7 @@ let loggedInTeamId = null;
 let notesAutoSaveTimeout = null;
 let activeViewId = tabs[0]?.viewId || "view-schedule";
 let currentEventStartTimestamp = null;
+let currentEventEndTimestamp = null;
 let isMobileMenuOpen = false;
 let currentSelectedMatch = null;
 let currentSelectedNotesTeam = null;
@@ -43,6 +44,12 @@ let scheduleOffsetMinMinutes = -180;
 let scheduleOffsetMaxMinutes = 180;
 let scheduleOffsetSyncInterval = null;
 let scheduleOffsetMenuOpen = false;
+let realtimeEventSyncInterval = null;
+let realtimeEventSyncInFlight = false;
+let isScheduleLoadInProgress = false;
+let currentScheduleSnapshot = "";
+let currentRankingsSnapshot = "";
+let currentScoresSnapshot = "";
 let currentRankingSortColumn = "rankingScore";
 let currentRankingSortDirection = "desc";
 function getViewNameFromId(viewId) {
@@ -116,6 +123,147 @@ async function assertAuthorized(response) {
 async function authFetch(input, init) {
     const res = await fetch(input, init);
     return assertAuthorized(res);
+}
+const DAY_IN_MS = 24 * 60 * 60 * 1000;
+const REALTIME_POLL_INTERVAL_MS = 15000;
+const REALTIME_UI_FLASH_MS = 850;
+function parseEventBoundaryTimestamp(rawValue, isEnd) {
+    if (!rawValue)
+        return null;
+    const timestamp = new Date(rawValue).getTime();
+    if (Number.isNaN(timestamp))
+        return null;
+    const hasExplicitTime = rawValue.includes("T");
+    if (isEnd && !hasExplicitTime) {
+        return timestamp + DAY_IN_MS - 1;
+    }
+    return timestamp;
+}
+function applyCurrentEventWindow(event) {
+    currentEventStartTimestamp = parseEventBoundaryTimestamp(event?.dateStart, false);
+    const explicitEnd = parseEventBoundaryTimestamp(event?.dateEnd, true);
+    if (explicitEnd !== null) {
+        currentEventEndTimestamp = explicitEnd;
+        return;
+    }
+    currentEventEndTimestamp = currentEventStartTimestamp !== null ? currentEventStartTimestamp + (4 * DAY_IN_MS) : null;
+}
+function isCurrentEventActive(nowMs = Date.now()) {
+    if (currentEventStartTimestamp === null) {
+        return false;
+    }
+    const eventEnd = currentEventEndTimestamp ?? (currentEventStartTimestamp + (4 * DAY_IN_MS));
+    return nowMs >= currentEventStartTimestamp && nowMs <= eventEnd;
+}
+function buildTeamSnapshot(teams) {
+    return teams
+        .map(team => `${team.station || ""}:${team.teamNumber || 0}:${team.surrogate ? 1 : 0}`)
+        .join(",");
+}
+function buildMatchSnapshot(match) {
+    const scoreRed = parseScore(match.scoreRedFinal);
+    const scoreBlue = parseScore(match.scoreBlueFinal);
+    const series = typeof match.series === "number" ? match.series : 0;
+    return [
+        normalizeLevel(match.tournamentLevel),
+        series,
+        match.matchNumber,
+        match.description || "",
+        match.startTime || "",
+        match.actualStartTime || "",
+        match.field || "",
+        scoreRed === null ? "n" : scoreRed.toString(),
+        scoreBlue === null ? "n" : scoreBlue.toString(),
+        buildTeamSnapshot(match.teams || [])
+    ].join("|");
+}
+function buildScheduleSnapshot(matches) {
+    return matches.map(buildMatchSnapshot).join("||");
+}
+function buildRankingSnapshot(rank) {
+    if (!rank)
+        return "";
+    return [
+        rank.rank,
+        rank.teamNumber,
+        rank.teamName || "",
+        rank.wins,
+        rank.losses,
+        rank.ties,
+        rank.matchesPlayed,
+        rank.matchesCounted,
+        rank.sortOrder1,
+        rank.sortOrder2,
+        rank.sortOrder3,
+        rank.sortOrder4,
+        rank.sortOrder5,
+        rank.sortOrder6
+    ].join("|");
+}
+function buildRankingsSnapshot(rankings) {
+    const normalized = [...rankings].sort((a, b) => a.teamNumber - b.teamNumber);
+    return normalized.map(buildRankingSnapshot).join("||");
+}
+function getScoreSortKey(score) {
+    const series = typeof score.matchSeries === "number" ? score.matchSeries : 0;
+    return `${normalizeLevel(score.matchLevel)}-${series}-${score.matchNumber}`;
+}
+function buildScoresSnapshot(scoreMatches) {
+    const normalized = [...scoreMatches]
+        .sort((a, b) => getScoreSortKey(a).localeCompare(getScoreSortKey(b)))
+        .map(score => ({
+        matchLevel: normalizeLevel(score.matchLevel),
+        matchSeries: typeof score.matchSeries === "number" ? score.matchSeries : 0,
+        matchNumber: score.matchNumber,
+        randomization: score.randomization,
+        alliances: [...(score.alliances || [])].sort((a, b) => (a.alliance || "").localeCompare(b.alliance || ""))
+    }));
+    return JSON.stringify(normalized);
+}
+function updateRealtimeSnapshots() {
+    currentScheduleSnapshot = buildScheduleSnapshot(currentMatches);
+    currentRankingsSnapshot = buildRankingsSnapshot(currentRankings);
+    currentScoresSnapshot = buildScoresSnapshot(currentScoreMatches);
+}
+function buildSelectedScoreSnapshot(match, scoreMatches) {
+    if (!match)
+        return "";
+    const score = scoreMatches.find(entry => buildScoreKeyFromScore(entry) === buildScoreKeyFromSchedule(match));
+    if (!score)
+        return "";
+    return JSON.stringify({
+        matchLevel: normalizeLevel(score.matchLevel),
+        matchSeries: typeof score.matchSeries === "number" ? score.matchSeries : 0,
+        matchNumber: score.matchNumber,
+        randomization: score.randomization,
+        alliances: [...(score.alliances || [])].sort((a, b) => (a.alliance || "").localeCompare(b.alliance || ""))
+    });
+}
+function didRankingsAffectMatchTeams(match, previousRankings, nextRankings) {
+    const previousMap = new Map(previousRankings.map(rank => [rank.teamNumber, rank]));
+    const nextMap = new Map(nextRankings.map(rank => [rank.teamNumber, rank]));
+    return match.teams.some(team => {
+        if (!team.teamNumber || team.teamNumber <= 0)
+            return false;
+        return buildRankingSnapshot(previousMap.get(team.teamNumber)) !== buildRankingSnapshot(nextMap.get(team.teamNumber));
+    });
+}
+function renderCurrentRankings() {
+    const sortedRankings = sortRankings(currentRankings, currentRankingSortColumn, currentRankingSortDirection);
+    renderRankings(sortedRankings);
+}
+function hydrateMissingOPRData() {
+    const missingTeams = currentRankings
+        .map(rank => rank.teamNumber)
+        .filter(teamNumber => !currentOPRData.has(teamNumber));
+    if (missingTeams.length === 0)
+        return;
+    fetchOPRData(missingTeams).then(results => {
+        results.forEach(result => {
+            currentOPRData.set(result.teamNumber, result.opr);
+        });
+        renderCurrentRankings();
+    });
 }
 function clampScheduleOffset(value) {
     if (value < scheduleOffsetMinMinutes)
@@ -268,6 +416,135 @@ function stopScheduleOffsetSync() {
     if (scheduleOffsetSyncInterval !== null) {
         window.clearInterval(scheduleOffsetSyncInterval);
         scheduleOffsetSyncInterval = null;
+    }
+}
+function startRealtimeEventSync() {
+    if (realtimeEventSyncInterval !== null) {
+        window.clearInterval(realtimeEventSyncInterval);
+    }
+    realtimeEventSyncInterval = window.setInterval(() => {
+        void pollRealtimeEventUpdates();
+    }, REALTIME_POLL_INTERVAL_MS);
+}
+function stopRealtimeEventSync() {
+    if (realtimeEventSyncInterval !== null) {
+        window.clearInterval(realtimeEventSyncInterval);
+        realtimeEventSyncInterval = null;
+    }
+    realtimeEventSyncInFlight = false;
+    currentScheduleSnapshot = "";
+    currentRankingsSnapshot = "";
+    currentScoresSnapshot = "";
+}
+async function pollRealtimeEventUpdates() {
+    if (realtimeEventSyncInFlight || isScheduleLoadInProgress) {
+        return;
+    }
+    if (!currentEventCode || !isCurrentEventActive()) {
+        return;
+    }
+    const token = localStorage.getItem("token");
+    if (!token)
+        return;
+    realtimeEventSyncInFlight = true;
+    try {
+        const previousRankings = currentRankings;
+        const previousSelectedMatch = currentSelectedMatch !== null
+            ? currentMatches.find(match => match.matchNumber === currentSelectedMatch) || null
+            : null;
+        const previousSelectedMatchSnapshot = previousSelectedMatch ? buildMatchSnapshot(previousSelectedMatch) : "";
+        const previousSelectedScoreSnapshot = buildSelectedScoreSnapshot(previousSelectedMatch, currentScoreMatches);
+        const previousSelectedTeamsSnapshot = previousSelectedMatch ? buildTeamSnapshot(previousSelectedMatch.teams || []) : "";
+        const headers = { "Authorization": `Bearer ${token}` };
+        const [scheduleRes, rankingsRes, qualScoresRes, playoffScoresRes] = await Promise.all([
+            authFetch(`/api/v1/schedule?event=${currentEventCode}`, { headers }),
+            authFetch(`/api/v1/rankings?event=${currentEventCode}`, { headers }),
+            authFetch(`/api/v1/scores/${currentEventCode}/qual`, { headers }),
+            authFetch(`/api/v1/scores/${currentEventCode}/playoff`, { headers })
+        ]);
+        if (!scheduleRes.ok) {
+            return;
+        }
+        const scheduleData = await scheduleRes.json();
+        const rankingsData = rankingsRes.ok ? await rankingsRes.json() : { rankings: [] };
+        const qualScoresData = qualScoresRes.ok ? await qualScoresRes.json() : { matchScores: [] };
+        const playoffScoresData = playoffScoresRes.ok ? await playoffScoresRes.json() : { matchScores: [] };
+        const nextMatches = scheduleData.schedule || [];
+        nextMatches.sort((a, b) => getMatchStartTimestamp(a) - getMatchStartTimestamp(b));
+        const nextRankings = rankingsData.rankings || [];
+        const nextScoreMatches = [...(qualScoresData.matchScores || []), ...(playoffScoresData.matchScores || [])];
+        mergeScoresIntoScheduleMatches(nextMatches, nextScoreMatches);
+        const nextScheduleSnapshot = buildScheduleSnapshot(nextMatches);
+        const nextRankingsSnapshot = buildRankingsSnapshot(nextRankings);
+        const nextScoresSnapshot = buildScoresSnapshot(nextScoreMatches);
+        const scheduleChanged = nextScheduleSnapshot !== currentScheduleSnapshot;
+        const rankingsChanged = nextRankingsSnapshot !== currentRankingsSnapshot;
+        const scoresChanged = nextScoresSnapshot !== currentScoresSnapshot;
+        if (!scheduleChanged && !rankingsChanged && !scoresChanged) {
+            return;
+        }
+        currentMatches = nextMatches;
+        currentRankings = nextRankings;
+        currentScoreMatches = nextScoreMatches;
+        currentScheduleSnapshot = nextScheduleSnapshot;
+        currentRankingsSnapshot = nextRankingsSnapshot;
+        currentScoresSnapshot = nextScoresSnapshot;
+        if (scheduleChanged) {
+            applyRealtimeScheduleUpdates(currentMatches, currentRankings, currentTeams);
+        }
+        if (rankingsChanged) {
+            renderCurrentRankings();
+            hydrateMissingOPRData();
+        }
+        if (scheduleChanged && activeViewId === "view-strategy") {
+            renderStrategyMatchList();
+        }
+        if (currentSelectedMatch !== null) {
+            const selectedMatch = currentMatches.find(match => match.matchNumber === currentSelectedMatch) || null;
+            if (!selectedMatch) {
+                currentSelectedMatch = null;
+                const detailsContainer = document.getElementById("schedule-details");
+                if (detailsContainer) {
+                    detailsContainer.innerHTML = '<div class="empty-state">Select a match to view details</div>';
+                }
+                document.querySelectorAll(".match-item").forEach(item => item.classList.remove("active"));
+            }
+            else {
+                const selectedMatchSnapshot = buildMatchSnapshot(selectedMatch);
+                const selectedScoreSnapshot = buildSelectedScoreSnapshot(selectedMatch, currentScoreMatches);
+                const selectedTeamsSnapshot = buildTeamSnapshot(selectedMatch.teams || []);
+                const selectedMatchChanged = selectedMatchSnapshot !== previousSelectedMatchSnapshot;
+                const selectedScoreChanged = selectedScoreSnapshot !== previousSelectedScoreSnapshot;
+                const selectedRankingsChanged = rankingsChanged && didRankingsAffectMatchTeams(selectedMatch, previousRankings, currentRankings);
+                const selectedTeamsChanged = selectedTeamsSnapshot !== previousSelectedTeamsSnapshot;
+                if (activeViewId === "view-schedule" && (selectedMatchChanged || selectedScoreChanged || selectedRankingsChanged)) {
+                    await renderMatchDetails(selectedMatch, currentRankings, currentTeams, {
+                        showLoadingBar: false,
+                        loadNotes: selectedTeamsChanged
+                    });
+                    const detailsContainer = document.getElementById("schedule-details");
+                    if (detailsContainer) {
+                        detailsContainer.classList.add("realtime-updated");
+                        window.setTimeout(() => {
+                            detailsContainer.classList.remove("realtime-updated");
+                        }, REALTIME_UI_FLASH_MS);
+                    }
+                }
+                if (scheduleChanged) {
+                    const selectedItem = document.querySelector(`.match-item[data-match-number="${currentSelectedMatch}"]`);
+                    if (selectedItem) {
+                        document.querySelectorAll(".match-item").forEach(item => item.classList.remove("active"));
+                        selectedItem.classList.add("active");
+                    }
+                }
+            }
+        }
+    }
+    catch (error) {
+        console.error("Realtime refresh failed:", error);
+    }
+    finally {
+        realtimeEventSyncInFlight = false;
     }
 }
 function initializeScheduleOffsetControls() {
@@ -1021,6 +1298,7 @@ async function loadScheduleWithStateRestore(eventCode, urlState) {
     if (detailsContainer) {
         detailsContainer.innerHTML = '<div class="empty-state">Select a match to view details</div>';
     }
+    isScheduleLoadInProgress = true;
     showLoading();
     try {
         const eventRes = await authFetch(`/api/v1/event?event=${eventCode}`, { headers: { "Authorization": `Bearer ${token}` } });
@@ -1034,7 +1312,7 @@ async function loadScheduleWithStateRestore(eventCode, urlState) {
             console.error("Event not found");
             return;
         }
-        currentEventStartTimestamp = event.dateStart ? new Date(event.dateStart).getTime() : null;
+        applyCurrentEventWindow(event);
         const [scheduleRes, rankingsRes, teamsRes, qualScoresRes, playoffScoresRes] = await Promise.all([
             authFetch(`/api/v1/schedule?event=${eventCode}`, { headers: { "Authorization": `Bearer ${token}` } }),
             authFetch(`/api/v1/rankings?event=${eventCode}`, { headers: { "Authorization": `Bearer ${token}` } }),
@@ -1070,19 +1348,13 @@ async function loadScheduleWithStateRestore(eventCode, urlState) {
                 showAllCheckbox.checked = showAllMatches;
             }
             renderSchedule(currentMatches, currentRankings, currentTeams);
-            renderRankings(currentRankings);
+            renderCurrentRankings();
+            hydrateMissingOPRData();
+            updateRealtimeSnapshots();
             // Render strategy match list if on strategy tab
             const currentView = document.querySelector('.view:not([style*="display: none"])');
             if (currentView?.id === "view-strategy") {
                 renderStrategyMatchList();
-            }
-            // Fetch OPR data for all ranked teams
-            const rankedTeamNumbers = currentRankings.map(r => r.teamNumber);
-            if (rankedTeamNumbers.length > 0) {
-                fetchOPRData(rankedTeamNumbers).then(oprResults => {
-                    currentOPRData = new Map(oprResults.map(r => [r.teamNumber, r.opr]));
-                    renderRankings(currentRankings);
-                });
             }
             // Restore match selection from URL
             if (urlState.match !== undefined) {
@@ -1095,6 +1367,7 @@ async function loadScheduleWithStateRestore(eventCode, urlState) {
         console.error("Failed to load schedule/rankings/teams:", error);
     }
     finally {
+        isScheduleLoadInProgress = false;
         hideLoading();
     }
 }
@@ -1207,6 +1480,7 @@ async function loadSchedule(eventCode) {
     if (detailsContainer) {
         detailsContainer.innerHTML = '<div class="empty-state">Select a match to view details</div>';
     }
+    isScheduleLoadInProgress = true;
     showLoading();
     try {
         // First, fetch event details
@@ -1221,7 +1495,7 @@ async function loadSchedule(eventCode) {
             console.error("Event not found");
             return;
         }
-        currentEventStartTimestamp = event.dateStart ? new Date(event.dateStart).getTime() : null;
+        applyCurrentEventWindow(event);
         const [scheduleRes, rankingsRes, teamsRes, qualScoresRes, playoffScoresRes] = await Promise.all([
             authFetch(`/api/v1/schedule?event=${eventCode}`, { headers: { "Authorization": `Bearer ${token}` } }),
             authFetch(`/api/v1/rankings?event=${eventCode}`, { headers: { "Authorization": `Bearer ${token}` } }),
@@ -1246,15 +1520,9 @@ async function loadSchedule(eventCode) {
                 showAllCheckbox.checked = showAllMatches;
             }
             renderSchedule(currentMatches, currentRankings, currentTeams);
-            renderRankings(currentRankings);
-            // Fetch OPR data for all ranked teams
-            const rankedTeamNumbers = currentRankings.map(r => r.teamNumber);
-            if (rankedTeamNumbers.length > 0) {
-                fetchOPRData(rankedTeamNumbers).then(oprResults => {
-                    currentOPRData = new Map(oprResults.map(r => [r.teamNumber, r.opr]));
-                    renderRankings(currentRankings);
-                });
-            }
+            renderCurrentRankings();
+            hydrateMissingOPRData();
+            updateRealtimeSnapshots();
             if (activeViewId === "view-notes" && currentTeams.length > 0) {
                 await initializeNotesView(eventCode);
             }
@@ -1264,6 +1532,7 @@ async function loadSchedule(eventCode) {
         console.error("Failed to load schedule/rankings/teams:", error);
     }
     finally {
+        isScheduleLoadInProgress = false;
         hideLoading();
     }
 }
@@ -1489,6 +1758,142 @@ function initRankingSortHandlers() {
     });
     updateSortIndicators(currentRankingSortColumn, currentRankingSortDirection);
 }
+function getVisibleScheduleMatches(matches) {
+    return showAllMatches ? matches : matches.filter(match => match.teams.some(team => team.teamNumber === loggedInTeamId));
+}
+function buildMatchItemHtml(match) {
+    const redTeams = match.teams.filter(team => team.station.startsWith("Red")).map(team => team.teamNumber);
+    const blueTeams = match.teams.filter(team => team.station.startsWith("Blue")).map(team => team.teamNumber);
+    const formatTeamNumbers = (teamNumbers) => {
+        const validTeams = teamNumbers.filter(teamNumber => teamNumber && teamNumber > 0);
+        if (validTeams.length === 0)
+            return "TBD";
+        return validTeams.join(", ");
+    };
+    let queueText = "";
+    let queueClass = "";
+    let queueTimeAttr = "";
+    const now = new Date();
+    const matchStart = getOffsetAdjustedDate(match.actualStartTime || match.startTime);
+    const oneHourAgo = new Date(now.getTime() - (60 * 60 * 1000));
+    const hasScores = match.scoreRedFinal !== undefined || match.scoreBlueFinal !== undefined;
+    const isOld = matchStart ? matchStart < oneHourAgo : false;
+    if (!hasScores && matchStart && !isOld) {
+        const matchIndexInFull = currentMatches.findIndex(entry => buildMatchKey(entry) === buildMatchKey(match));
+        const prevMatch = matchIndexInFull > 0 ? currentMatches[matchIndexInFull - 1] : null;
+        let queueTime = null;
+        if (prevMatch) {
+            queueTime = getOffsetAdjustedDate(prevMatch.actualStartTime || prevMatch.startTime);
+        }
+        else {
+            const firstQueueTime = getOffsetAdjustedDate(match.startTime);
+            if (firstQueueTime) {
+                firstQueueTime.setMinutes(firstQueueTime.getMinutes() - 10);
+                queueTime = firstQueueTime;
+            }
+        }
+        if (queueTime) {
+            queueTimeAttr = `data-queue-time="${queueTime.getTime()}"`;
+            const diffMs = queueTime.getTime() - now.getTime();
+            const diffMins = Math.floor(diffMs / (1000 * 60));
+            const diffSecs = Math.ceil((diffMs % (1000 * 60)) / 1000);
+            if (diffMs <= 0) {
+                queueText = "Queueing Now";
+                queueClass = "queueing";
+            }
+            else {
+                queueText = `Queueing in ${diffMins}m ${diffSecs}s`;
+            }
+        }
+        else {
+            queueText = "TBD";
+        }
+    }
+    else if (!matchStart) {
+        queueText = "TBD";
+    }
+    else {
+        queueText = "Concluded";
+    }
+    const fieldInfo = match.field ? ` • Field ${match.field}` : "";
+    const fieldInfoAttr = fieldInfo ? `data-field-info="${fieldInfo}"` : "";
+    const resultIndicator = getMatchResultIndicator(match);
+    const scheduledStart = getOffsetAdjustedDate(match.startTime);
+    const matchTime = scheduledStart ? scheduledStart.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "TBD";
+    return `
+        <div class="match-header">
+            <span class="match-title">${match.description}</span>
+            <span class="match-time">${matchTime}</span>
+        </div>
+        <div class="match-teams">
+            <span class="team-red">${formatTeamNumbers(redTeams)}</span>
+            <span class="team-vs">vs</span>
+            <span class="team-blue">${formatTeamNumbers(blueTeams)}</span>
+        </div>
+        <div class="match-meta">
+            <span class="queue-status ${queueClass}" ${queueTimeAttr} ${fieldInfoAttr}>${queueText}${fieldInfo}</span>
+            ${resultIndicator ? `<span class="match-result match-${resultIndicator.variant}" title="${resultIndicator.tooltip}">${resultIndicator.label}</span>` : ""}
+        </div>
+    `;
+}
+function bindMatchItemHandlers(item, match) {
+    item.onclick = () => {
+        document.querySelectorAll(".match-item").forEach(element => element.classList.remove("active"));
+        item.classList.add("active");
+        currentSelectedMatch = match.matchNumber;
+        const latestMatch = currentMatches.find(entry => buildMatchKey(entry) === buildMatchKey(match)) || match;
+        renderMatchDetails(latestMatch, currentRankings, currentTeams);
+        updateUrl();
+    };
+}
+function applyMatchItemIdentity(item, match, index) {
+    item.classList.add("match-item");
+    item.dataset.matchNumber = match.matchNumber.toString();
+    item.dataset.tournamentLevel = match.tournamentLevel || "";
+    item.dataset.matchKey = buildMatchKey(match);
+    item.style.animationDelay = `${index * 0.03}s`;
+}
+function applyRealtimeScheduleUpdates(matches, rankings, teams) {
+    const listContainer = document.getElementById("schedule-list");
+    if (!listContainer)
+        return false;
+    const filteredMatches = getVisibleScheduleMatches(matches);
+    const existingItems = Array.from(listContainer.querySelectorAll(".match-item"));
+    const needsFullRerender = existingItems.length !== filteredMatches.length ||
+        existingItems.some((item, index) => item.dataset.matchKey !== buildMatchKey(filteredMatches[index]));
+    if (needsFullRerender) {
+        renderSchedule(matches, rankings, teams);
+        return true;
+    }
+    let changed = false;
+    filteredMatches.forEach((match, index) => {
+        const item = existingItems[index];
+        const nextSignature = buildMatchSnapshot(match);
+        const previousSignature = item.dataset.realtimeSignature || "";
+        if (previousSignature !== nextSignature) {
+            const wasActive = item.classList.contains("active");
+            applyMatchItemIdentity(item, match, index);
+            bindMatchItemHandlers(item, match);
+            item.innerHTML = buildMatchItemHtml(match);
+            item.dataset.realtimeSignature = nextSignature;
+            if (wasActive || (currentSelectedMatch !== null && match.matchNumber === currentSelectedMatch)) {
+                item.classList.add("active");
+            }
+            item.classList.add("schedule-item-updated");
+            window.setTimeout(() => {
+                item.classList.remove("schedule-item-updated");
+            }, REALTIME_UI_FLASH_MS);
+            changed = true;
+        }
+        else {
+            bindMatchItemHandlers(item, match);
+        }
+    });
+    if (changed) {
+        updateQueueTimers();
+    }
+    return changed;
+}
 function renderSchedule(matches, rankings, teams) {
     const listContainer = document.getElementById("schedule-list");
     if (!listContainer)
@@ -1496,94 +1901,13 @@ function renderSchedule(matches, rankings, teams) {
     if (queueInterval)
         clearInterval(queueInterval);
     listContainer.innerHTML = "";
-    const filteredMatches = showAllMatches ? matches : matches.filter(match => match.teams.some(team => team.teamNumber === loggedInTeamId));
+    const filteredMatches = getVisibleScheduleMatches(matches);
     filteredMatches.forEach((match, index) => {
         const item = document.createElement("div");
-        item.className = "match-item";
-        item.dataset.matchNumber = match.matchNumber.toString();
-        item.dataset.tournamentLevel = match.tournamentLevel || "";
-        item.style.animationDelay = `${index * 0.03}s`;
-        item.onclick = () => {
-            document.querySelectorAll(".match-item").forEach(el => el.classList.remove("active"));
-            item.classList.add("active");
-            currentSelectedMatch = match.matchNumber;
-            renderMatchDetails(match, rankings, teams);
-            updateUrl();
-        };
-        const redTeams = match.teams.filter(t => t.station.startsWith("Red")).map(t => t.teamNumber);
-        const blueTeams = match.teams.filter(t => t.station.startsWith("Blue")).map(t => t.teamNumber);
-        const formatTeamNumbers = (teamNums, colorClass) => {
-            const validTeams = teamNums.filter(t => t && t > 0);
-            if (validTeams.length === 0)
-                return "TBD";
-            return validTeams.join(", ");
-        };
-        // Queue logic
-        let queueText = "";
-        let queueClass = "";
-        let queueTimeAttr = "";
-        const now = new Date();
-        const matchStart = getOffsetAdjustedDate(match.actualStartTime || match.startTime);
-        const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
-        const hasScores = match.scoreRedFinal !== undefined || match.scoreBlueFinal !== undefined;
-        const isOld = matchStart ? matchStart < oneHourAgo : false;
-        if (!hasScores && matchStart && !isOld) {
-            const matchIndexInFull = currentMatches.indexOf(match);
-            const prevMatch = matchIndexInFull > 0 ? currentMatches[matchIndexInFull - 1] : null;
-            let queueTime = null;
-            if (prevMatch) {
-                queueTime = getOffsetAdjustedDate(prevMatch.actualStartTime || prevMatch.startTime);
-            }
-            else {
-                const firstQueueTime = getOffsetAdjustedDate(match.startTime);
-                if (firstQueueTime) {
-                    firstQueueTime.setMinutes(firstQueueTime.getMinutes() - 10);
-                    queueTime = firstQueueTime;
-                }
-            }
-            if (queueTime) {
-                queueTimeAttr = `data-queue-time="${queueTime.getTime()}"`;
-                const diffMs = queueTime.getTime() - now.getTime();
-                const diffMins = Math.floor(diffMs / (1000 * 60));
-                const diffSecs = Math.ceil((diffMs % (1000 * 60)) / 1000);
-                if (diffMs <= 0) {
-                    queueText = "Queueing Now";
-                    queueClass = "queueing";
-                }
-                else {
-                    queueText = `Queueing in ${diffMins}m ${diffSecs}s`;
-                }
-            }
-            else {
-                queueText = "TBD";
-            }
-        }
-        else if (!matchStart) {
-            queueText = "TBD";
-        }
-        else {
-            queueText = "Concluded";
-        }
-        const fieldInfo = match.field ? ` • Field ${match.field}` : "";
-        const fieldInfoAttr = fieldInfo ? `data-field-info="${fieldInfo}"` : "";
-        const resultIndicator = getMatchResultIndicator(match);
-        const scheduledStart = getOffsetAdjustedDate(match.startTime);
-        const matchTime = scheduledStart ? scheduledStart.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "TBD";
-        item.innerHTML = `
-            <div class="match-header">
-                <span class="match-title">${match.description}</span>
-                <span class="match-time">${matchTime}</span>
-            </div>
-            <div class="match-teams">
-                <span class="team-red">${formatTeamNumbers(redTeams, "team-red")}</span>
-                <span class="team-vs">vs</span>
-                <span class="team-blue">${formatTeamNumbers(blueTeams, "team-blue")}</span>
-            </div>
-            <div class="match-meta">
-                <span class="queue-status ${queueClass}" ${queueTimeAttr} ${fieldInfoAttr}>${queueText}${fieldInfo}</span>
-                ${resultIndicator ? `<span class="match-result match-${resultIndicator.variant}" title="${resultIndicator.tooltip}">${resultIndicator.label}</span>` : ""}
-            </div>
-        `;
+        applyMatchItemIdentity(item, match, index);
+        bindMatchItemHandlers(item, match);
+        item.innerHTML = buildMatchItemHtml(match);
+        item.dataset.realtimeSignature = buildMatchSnapshot(match);
         listContainer.appendChild(item);
     });
     queueInterval = window.setInterval(updateQueueTimers, 1000);
@@ -1856,11 +2180,16 @@ function renderScoreBreakdown(scoreMatch, chartJobs) {
     const classifier = renderClassifierSection(scoreMatch);
     return `<div class="score-breakdown"><div class="score-breakdown-title">Score Breakdown</div>${cards}${classifier}</div>`;
 }
-async function renderMatchDetails(match, rankings, teams) {
+async function renderMatchDetails(match, rankings, teams, options = {}) {
     const detailsContainer = document.getElementById("schedule-details");
     if (!detailsContainer)
         return;
-    showLoading();
+    const showLoadingBar = options.showLoadingBar ?? true;
+    const loadNotes = options.loadNotes ?? true;
+    const existingNotesContent = !loadNotes ? document.getElementById("notes-section")?.innerHTML || null : null;
+    if (showLoadingBar) {
+        showLoading();
+    }
     const redTeams = match.teams.filter(t => t.station.startsWith("Red"));
     const blueTeams = match.teams.filter(t => t.station.startsWith("Blue"));
     const allTeams = [...redTeams, ...blueTeams];
@@ -1953,10 +2282,12 @@ async function renderMatchDetails(match, rankings, teams) {
     const scheduledStart = getOffsetAdjustedDate(match.startTime);
     const actualStart = getOffsetAdjustedDate(match.actualStartTime);
     const canCalibrateOffset = !Number.isNaN(new Date(match.startTime).getTime());
+    const notesSectionContent = loadNotes
+        ? `<div class="notes-display-title">Scouting Notes</div><div class="notes-loading">Loading notes...</div>`
+        : (existingNotesContent || `<div class="notes-display-title">Scouting Notes</div><div class="notes-loading">Notes unchanged</div>`);
     const notesLoadingSection = validTeams.length > 0 ? `
         <div class="notes-display-container" id="notes-section">
-            <div class="notes-display-title">Scouting Notes</div>
-            <div class="notes-loading">Loading notes...</div>
+            ${notesSectionContent}
         </div>
     ` : "";
     detailsContainer.innerHTML = `
@@ -2011,7 +2342,7 @@ async function renderMatchDetails(match, rankings, teams) {
         });
     }
     chartJobs.forEach(job => job());
-    if (validTeams.length > 0) {
+    if (loadNotes && validTeams.length > 0) {
         const teamNumbers = validTeams.map(t => t.teamNumber);
         const notesMap = await loadNotesForTeams(teamNumbers);
         const notesSection = document.getElementById("notes-section");
@@ -2057,7 +2388,9 @@ async function renderMatchDetails(match, rankings, teams) {
             `;
         }
     }
-    hideLoading();
+    if (showLoadingBar) {
+        hideLoading();
+    }
 }
 async function verifyToken(token) {
     try {
@@ -2219,6 +2552,7 @@ async function handleLogin(event) {
             hideLogin();
             await loadScheduleOffset(false);
             startScheduleOffsetSync();
+            startRealtimeEventSync();
             await checkAdminStatus();
             updateAdminViewState();
             loadEvents();
@@ -4569,6 +4903,7 @@ function initStrategyEventListeners() {
 }
 function handleLogout() {
     stopScheduleOffsetSync();
+    stopRealtimeEventSync();
     closeScheduleOffsetMenu();
     localStorage.removeItem("token");
     loggedInTeamId = null;
@@ -4576,15 +4911,22 @@ function handleLogout() {
     currentRankings = [];
     currentTeams = [];
     currentEventCode = "";
+    currentEventStartTimestamp = null;
+    currentEventEndTimestamp = null;
+    currentOPRData = new Map();
     currentNotesStatus = {};
     currentSelectedMatch = null;
     currentSelectedNotesTeam = null;
     currentInsightsTeam = null;
+    isScheduleLoadInProgress = false;
     scheduleOffsetMinutes = 0;
     scheduleOffsetUpdatedAt = null;
     scheduleOffsetMinMinutes = -180;
     scheduleOffsetMaxMinutes = 180;
     updateScheduleOffsetUI();
+    if (queueInterval) {
+        clearInterval(queueInterval);
+    }
     // Clear strategy state
     strategyCurrentMatch = null;
     strategyCurrentPhase = "auto";
@@ -4884,6 +5226,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             hideLogin();
             await loadScheduleOffset(false);
             startScheduleOffsetSync();
+            startRealtimeEventSync();
             await checkAdminStatus();
             updateAdminViewState();
             initializeAdmin();

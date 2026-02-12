@@ -52,6 +52,7 @@ vanguard_url = "https://ftc.technodot.org"
 
 [admin]
 admin_teams = [26855, 6547]
+# TOTP Secret for accessing the admin panel as one of the specified teams
 admin_secret = "67676767676767676767676767676767"
 ```
-After that, run `sudo docker compose up`, and you're good to go! Vanguard will be running on port `8000`, so feel free to expose that as you like.
+After that, run `sudo docker compose up`, and you're good to go! Vanguard will be running on port `8000`, so feel free to expose that as you like. As vanguard does not have inbuilt ui based registration, you can register your specified admin user using `docker exec -it ftcvanguard python3 tests/register.py`
