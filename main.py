@@ -431,7 +431,21 @@ def _assets(path):
 
 @app.route("/api/v1/register", methods=["POST"])
 def _api_v1_register():
-    if BLOCK_REGISTRATION:
+    auth_header = request.headers.get("Authorization")
+    admin_scope = False
+
+    if auth_header and auth_header.startswith("Bearer "):
+        token = auth_header.split(" ")[1]
+        try:
+            payload = jwt.decode(token, RSA_PUBLIC_KEY, algorithms=["RS256"])
+            if "admin" in payload.get("scope", []):
+                admin_scope = True
+        except jwt.ExpiredSignatureError:
+            return {"status": "fuck", "error": "token expired"}, 401
+        except jwt.InvalidTokenError:
+            return {"status": "fuck", "error": "invalid token"}, 401
+
+    if BLOCK_REGISTRATION and not admin_scope:
         return {"status": "fuck", "error": "nrn try again ltr"}, 403
 
     data = request.json
