@@ -417,11 +417,11 @@ if len(NTFY_TEAMS) > 0:
 
 @app.route('/', methods=["GET"])
 def _root():
-    return app.send_static_file("home.html")
+    return app.send_static_file("index.html")
 
 @app.route("/app", methods=["GET"])
 def _app():
-    return send_from_directory("static", "index.html")
+    return app.send_static_file("app.html")
 
 
 @app.route("/assets/<path:path>", methods=["GET"])

@@ -1,0 +1,441 @@
+<html>
+    <head>
+        <title>Vanguard</title>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+        <meta name="theme-color" content="#181818">
+        <meta name="apple-mobile-web-app-capable" content="yes">
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+        <link rel="stylesheet" type="text/css" href="/assets/style.css">
+        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    </head>
+    <body>
+        <div id="header">
+            <div class="header-content">
+                <button id="mobile-menu-btn" class="mobile-menu-btn" aria-label="Menu">
+                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M4 6H20M4 12H20M4 18H20" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    </svg>
+                </button>
+                <select id="meet-selector"></select>
+            </div>
+        </div>
+        <div id="sidebar">
+            <div id="sidebar-overlay"></div>
+            <nav id="sidebar-nav">
+            <button class="sidebar-button sidebar-active" id="button-schedule" title="Schedule">
+                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><g id="SVGRepo_bgCarrier"></g><g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"></g><g id="SVGRepo_iconCarrier"><path stroke-width="0.1" d="M12,1A11,11,0,1,0,23,12,11.013,11.013,0,0,0,12,1Zm0,20a9,9,0,1,1,9-9A9.01,9.01,0,0,1,12,21Zm6-9a1,1,0,0,1-1,1H12a1,1,0,0,1-1-1V6a1,1,0,0,1,2,0v5h4A1,1,0,0,1,18,12Z"></path></g></svg>
+            </button>
+            <button class="sidebar-button" id="button-rankings" title="Rankings">
+                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="width: 2em; height: 2em;"><g id="SVGRepo_bgCarrier" stroke-width="0"></g><g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"></g><g id="SVGRepo_iconCarrier"><path d="M9 7H4.6C4.03995 7 3.75992 7 3.54601 7.10899C3.35785 7.20487 3.20487 7.35785 3.10899 7.54601C3 7.75992 3 8.03995 3 8.6V19.4C3 19.9601 3 20.2401 3.10899 20.454C3.20487 20.6422 3.35785 20.7951 3.54601 20.891C3.75992 21 4.03995 21 4.6 21H9M9 21H15M9 21L9 4.6C9 4.03995 9 3.75992 9.10899 3.54601C9.20487 3.35785 9.35785 3.20487 9.54601 3.10899C9.75992 3 10.0399 3 10.6 3L13.4 3C13.9601 3 14.2401 3 14.454 3.10899C14.6422 3.20487 14.7951 3.35785 14.891 3.54601C15 3.75992 15 4.03995 15 4.6V21M15 11H19.4C19.9601 11 20.2401 11 20.454 11.109C20.6422 11.2049 20.7951 11.3578 20.891 11.546C21 11.7599 21 12.0399 21 12.6V19.4C21 19.9601 21 20.2401 20.891 20.454C20.7951 20.6422 20.6422 20.7951 20.454 20.891C20.2401 21 19.9601 21 19.4 21H15" stroke="#181818" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"></path></g></svg>
+            </button>
+            <button class="sidebar-button" id="button-notes" title="Notes">
+                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" stroke-width="0"><g id="SVGRepo_bgCarrier" stroke-width="0"></g><g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"></g><g id="SVGRepo_iconCarrier"><path d="M7 12C6.44772 12 6 11.5523 6 11C6 10.4477 6.44772 10 7 10H17C17.5523 10 18 10.4477 18 11C18 11.5523 17.5523 12 17 12L7 12Z"></path><path d="M6 15C6 15.5523 6.44772 16 7 16H13C13.5523 16 14 15.5523 14 15C14 14.4477 13.5523 14 13 14H7C6.44772 14 6 14.4477 6 15Z"></path><path fill-rule="evenodd" clip-rule="evenodd" d="M7 1C6.44772 1 6 1.44772 6 2V3H4C2.89543 3 2 3.89543 2 5V19C2 21.2091 3.79086 23 6 23H18C20.2091 23 22 21.2091 22 19V5C22 3.89543 21.1046 3 20 3H18V2C18 1.44772 17.5523 1 17 1C16.4477 1 16 1.44772 16 2V3H13V2C13 1.44772 12.5523 1 12 1C11.4477 1 11 1.44772 11 2V3H8V2C8 1.44772 7.55228 1 7 1ZM16 5H13V6C13 6.55228 12.5523 7 12 7C11.4477 7 11 6.55228 11 6V5H8V6C8 6.55228 7.55228 7 7 7C6.44772 7 6 6.55228 6 6V5H5C4.44772 5 4 5.44772 4 6V19C4 20.1046 4.89543 21 6 21H18C19.1046 21 20 20.1046 20 19V6C20 5.44772 19.5523 5 19 5H18V6C18 6.55228 17.5523 7 17 7C16.4477 7 16 6.55228 16 6V5Z"></path></g></svg>
+            </button>
+            <button class="sidebar-button" id="button-insights" title="Insights">
+                <svg viewBox="0 0 1200 1200" fill="none" xmlns="http://www.w3.org/2000/svg"><g id="SVGRepo_bgCarrier" stroke-width="0"></g><g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"></g><g id="SVGRepo_iconCarrier"><path id="path10249" d="M1118.948,592.892H732.471l49.909,227.792h312.254L1118.948,592.892z M466.287,592.892H79.809l24.315,227.792h312.253L466.287,592.892z M1189.334,526.346c8.535,9.384,11.948,19.622,10.237,30.714 l-33.272,307.135c-4.563,20.081-18.878,35.561-38.393,35.832h-376.24c-20.231-1.346-33.639-14.035-37.111-31.993l-60.146-267.463 c-32.547-20.271-75.345-17.317-110.057-2.56l-60.147,270.022c-4.772,19.452-18.653,31.768-37.112,31.993H70.851 c-21.166-1.673-35.301-16.94-37.112-35.832L0.465,557.06c-1.706-11.943,1.28-22.182,8.958-30.714l432.548-222.673 c20.748-9.255,41.297-0.366,49.909,17.916c7.223,20.882,2.533,44.668-16.636,53.749L201.383,499.472h792.152L719.673,375.337 c-20.314-11.516-25.569-34.709-17.916-53.749c10.862-19.479,32.864-25.945,51.189-17.916L1189.334,526.346z"></path></g></svg>
+            </button>
+            <button class="sidebar-button" id="button-strategy" title="Strategy">
+                <svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" fill="currentColor" aria-hidden="true"><g transform="scale(0.75) translate(1.61.2)"><path d="M8.29289 3.70711L1 11V15H5L12.2929 7.70711L8.29289 3.70711Z"/><path d="M9.70711 2.29289L13.7071 6.29289L15.1716 4.82843C15.702 4.29799 16 3.57857 16 2.82843C16 1.26633 14.7337 0 13.1716 0C12.4214 0 11.702 0.297995 11.1716 0.828428L9.70711 2.29289Z"/></g></svg>
+            </button>
+<!--            <button class="sidebar-button" id="button-compare" title="Compare">-->
+<!--                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><g id="SVGRepo_bgCarrier" stroke-width="0"></g><g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"></g><g id="SVGRepo_iconCarrier"><path d="M1,8A1,1,0,0,1,2,7H9.586L7.293,4.707A1,1,0,1,1,8.707,3.293l4,4a1,1,0,0,1,0,1.414l-4,4a1,1,0,1,1-1.414-1.414L9.586,9H2A1,1,0,0,1,1,8Zm21,7H14.414l2.293-2.293a1,1,0,0,0-1.414-1.414l-4,4a1,1,0,0,0,0,1.414l4,4a1,1,0,0,0,1.414-1.414L14.414,17H22a1,1,0,0,0,0-2Z"></path></g></svg>-->
+<!--            </button>-->
+            <button class="sidebar-button" id="button-settings" title="Settings">
+                <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><g id="SVGRepo_bgCarrier" stroke-width="0"></g><g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"></g><g id="SVGRepo_iconCarrier"><g id="Page-1" stroke-width="1.608" fill="none" fill-rule="evenodd"><g id="Settings"><circle id="Oval" stroke-width="1.608" stroke-linecap="round" cx="12" cy="12" r="3"></circle><path d="M10.069,3.36281 C10.7151,1.54573 13.2849,1.54573 13.931,3.3628 C14.338,4.5071 15.6451,5.04852 16.742,4.52713 C18.4837,3.69918 20.3008,5.51625 19.4729,7.25803 C18.9515,8.35491 19.4929,9.66203 20.6372,10.069 C22.4543,10.7151 22.4543,13.2849 20.6372,13.931 C19.4929,14.338 18.9515,15.6451 19.4729,16.742 C20.3008,18.4837 18.4837,20.3008 16.742,19.4729 C15.6451,18.9515 14.338,19.4929 13.931,20.6372 C13.2849,22.4543 10.7151,22.4543 10.069,20.6372 C9.66203,19.4929 8.35491,18.9515 7.25803,19.4729 C5.51625,20.3008 3.69918,18.4837 4.52713,16.742 C5.04852,15.6451 4.5071,14.338 3.3628,13.931 C1.54573,13.2849 1.54573,10.7151 3.36281,10.069 C4.5071,9.66203 5.04852,8.35491 4.52713,7.25803 C3.69918,5.51625 5.51625,3.69918 7.25803,4.52713 C8.35491,5.04852 9.66203,4.5071 10.069,3.36281 Z" id="Path" stroke-width="1.608" stroke-linecap="round"></path></g></g></g></svg>
+            </button>
+            <button class="sidebar-button" id="button-about" title="About">
+                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><g id="SVGRepo_bgCarrier" stroke-width="0"></g><g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"></g><g id="SVGRepo_iconCarrier"> <path d="M12 16V12M12 8H12.01M7.8 21H16.2C17.8802 21 18.7202 21 19.362 20.673C19.9265 20.3854 20.3854 19.9265 20.673 19.362C21 18.7202 21 17.8802 21 16.2V7.8C21 6.11984 21 5.27976 20.673 4.63803C20.3854 4.07354 19.9265 3.6146 19.362 3.32698C18.7202 3 17.8802 3 16.2 3H7.8C6.11984 3 5.27976 3 4.63803 3.32698C4.07354 3.6146 3.6146 4.07354 3.32698 4.63803C3 5.27976 3 6.11984 3 7.8V16.2C3 17.8802 3 18.7202 3.32698 19.362C3.6146 19.9265 4.07354 20.3854 4.63803 20.673C5.27976 21 6.11984 21 7.8 21Z" stroke="#181818" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path> </g></svg>
+            </button>
+            <button class="sidebar-button" id="button-admin" title="Admin" style="display: none;">
+                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><g id="SVGRepo_bgCarrier" stroke-width="0"></g><g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"></g><g id="SVGRepo_iconCarrier"> <path fill-rule="evenodd" clip-rule="evenodd" d="M8.00001 5V8.00415C7.50208 8.01124 7.05704 8.03041 6.67222 8.08214C6.0167 8.17028 5.38835 8.36902 4.87869 8.87868C4.36902 9.38835 4.17028 10.0167 4.08215 10.6722C3.99991 11.2839 3.99995 12.0477 4 12.9342V17.0658C3.99995 17.9523 3.99991 18.7161 4.08215 19.3278C4.17028 19.9833 4.36902 20.6117 4.87869 21.1213C5.38835 21.631 6.0167 21.8297 6.67222 21.9179C7.28387 22.0001 8.0477 22.0001 8.93417 22H15.0659C15.9523 22.0001 16.7161 22.0001 17.3278 21.9179C17.9833 21.8297 18.6117 21.631 19.1213 21.1213C19.631 20.6117 19.8297 19.9833 19.9179 19.3278C20.0001 18.7161 20.0001 17.9523 20 17.0658V12.9342C20.0001 12.0477 20.0001 11.2839 19.9179 10.6722C19.8297 10.0167 19.631 9.38835 19.1213 8.87868C18.6117 8.36902 17.9833 8.17028 17.3278 8.08215C16.943 8.03041 16.4979 8.01124 16 8.00415V5C16 3.34315 14.6569 2 13 2H11C9.34316 2 8.00001 3.34315 8.00001 5ZM11 4C10.4477 4 10 4.44772 10 5V8L14 8V5C14 4.44772 13.5523 4 13 4H11ZM12 13C10.8954 13 10 13.8954 10 15C10 16.1046 10.8954 17 12 17C13.1046 17 14 16.1046 14 15C14 13.8954 13.1046 13 12 13Z"></path></g></svg>
+            </button>
+            <button class="sidebar-button" id="button-logout" title="Logout">
+                <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><g id="SVGRepo_bgCarrier" stroke-width="0"></g><g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"></g><g id="SVGRepo_iconCarrier" stroke-width="0.5"><path d="M7.707,8.707,5.414,11H17a1,1,0,0,1,0,2H5.414l2.293,2.293a1,1,0,1,1-1.414,1.414l-4-4a1,1,0,0,1,0-1.414l4-4A1,1,0,1,1,7.707,8.707ZM21,1H13a1,1,0,0,0,0,2h7V21H13a1,1,0,0,0,0,2h8a1,1,0,0,0,1-1V2A1,1,0,0,0,21,1Z"></path></g></svg>
+            </button>
+            </nav>
+        </div>
+        <div id="main">
+            <div class="view" id="view-schedule" style="display: none;">
+                <div id="schedule-container">
+                    <div id="schedule-sidebar">
+                        <div id="schedule-controls">
+                            <label class="schedule-checkbox-container">
+                                <input type="checkbox" id="show-all-matches">
+                                <span class="schedule-checkbox-label">Show All Matches</span>
+                            </label>
+                            <div class="schedule-offset-dropdown">
+                                <button id="schedule-offset-toggle" class="schedule-offset-toggle" type="button" aria-label="Adjust schedule time offset" aria-expanded="false" aria-haspopup="true" title="Adjust schedule time offset">
+                                    <svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                                        <path d="M12.15 28.012v-0.85c0.019-0.069 0.050-0.131 0.063-0.2 0.275-1.788 1.762-3.2 3.506-3.319 1.95-0.137 3.6 0.975 4.137 2.787 0.069 0.238 0.119 0.488 0.181 0.731v0.85c-0.019 0.056-0.050 0.106-0.056 0.169-0.269 1.65-1.456 2.906-3.081 3.262-0.125 0.025-0.25 0.063-0.375 0.094h-0.85c-0.056-0.019-0.113-0.050-0.169-0.056-1.625-0.262-2.862-1.419-3.237-3.025-0.037-0.156-0.081-0.3-0.119-0.444zM20.038 3.988l-0 0.85c-0.019 0.069-0.050 0.131-0.056 0.2-0.281 1.8-1.775 3.206-3.538 3.319-1.944 0.125-3.588-1-4.119-2.819-0.069-0.231-0.119-0.469-0.175-0.7v-0.85c0.019-0.056 0.050-0.106 0.063-0.162 0.3-1.625 1.244-2.688 2.819-3.194 0.206-0.069 0.425-0.106 0.637-0.162h0.85c0.056 0.019 0.113 0.050 0.169 0.056 1.631 0.269 2.863 1.419 3.238 3.025 0.038 0.15 0.075 0.294 0.113 0.437zM20.037 15.575v0.85c-0.019 0.069-0.050 0.131-0.063 0.2-0.281 1.794-1.831 3.238-3.581 3.313-1.969 0.087-3.637-1.1-4.106-2.931-0.050-0.194-0.094-0.387-0.137-0.581v-0.85c0.019-0.069 0.050-0.131 0.063-0.2 0.275-1.794 1.831-3.238 3.581-3.319 1.969-0.094 3.637 1.1 4.106 2.931 0.050 0.2 0.094 0.394 0.137 0.588z"></path>
+                                    </svg>
+                                </button>
+                                <div id="schedule-offset-menu" class="schedule-offset-menu" hidden>
+                                    <div class="schedule-offset-title">Schedule Time Offset</div>
+                                    <div class="schedule-offset-help">+ offset moves the schedule later.<br>- offset moves the schedule earlier.</div>
+                                    <label class="schedule-offset-label" for="schedule-offset-input">Offset (minutes)</label>
+                                    <div class="schedule-offset-input-row">
+                                        <button id="schedule-offset-minus" class="schedule-offset-step" type="button">-5</button>
+                                        <input id="schedule-offset-input" class="schedule-offset-input" type="number" inputmode="numeric" min="-180" max="180" step="1" value="0">
+                                        <button id="schedule-offset-plus" class="schedule-offset-step" type="button">+5</button>
+                                    </div>
+                                    <div id="schedule-offset-effect" class="schedule-offset-effect">Current: 0m (on official schedule)</div>
+                                    <div class="schedule-offset-actions">
+                                        <button id="schedule-offset-save" class="schedule-offset-save" type="button">Apply</button>
+                                        <button id="schedule-offset-reset" class="schedule-offset-reset" type="button">Reset</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="schedule-list"></div>
+                    </div>
+                    <div id="schedule-details">
+                        <div class="empty-state">Select a match to view details</div>
+                    </div>
+                </div>
+            </div>
+            <div class="view" id="view-rankings" style="display: none;">
+                <div id="rankings-container">
+                    <table class="stats-table" id="rankings-table">
+                        <thead>
+                            <tr>
+                                <th>Rank</th>
+                                <th>Team</th>
+                                <th>Name</th>
+                                <th class="sortable" data-sort="rankingScore">Ranking Score</th>
+                                <th class="sortable" data-sort="opr">OPR</th>
+                                <th class="sortable" data-sort="matchPoints">Match Points</th>
+                                <th class="sortable" data-sort="basePoints">Base Points</th>
+                                <th class="sortable" data-sort="autoPoints">Auto Points</th>
+                                <th class="sortable" data-sort="highScore">High Score</th>
+                                <th class="sortable" data-sort="wlt">W-L-T</th>
+                                <th class="sortable" data-sort="played">Played</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="view" id="view-notes" style="display: none;">
+                <div id="notes-container">
+                    <div id="notes-list"></div>
+                    <div id="notes-details">
+                        <div class="empty-state">Select a team to view or edit notes</div>
+                    </div>
+                </div>
+            </div>
+            <div class="view" id="view-insights" style="display: none;">
+                <div id="insights-container">
+                    <div id="insights-input">
+                        <div class="insights-header">
+                            <h2>Team Insights</h2>
+                            <p>Enter a team number to view detailed performance analytics</p>
+                        </div>
+                        <div class="insights-form">
+                            <input type="text" inputmode="numeric" pattern="[0-9]*" id="insights-team-input" placeholder="Enter team number (e.g., 12345)" />
+                            <button id="insights-analyze-btn">Analyze</button>
+                        </div>
+                    </div>
+                    <div id="insights-content"></div>
+                </div>
+            </div>
+            <div class="view" id="view-strategy" style="display: none;">
+                <div id="strategy-container">
+                    <div id="strategy-match-select">
+                        <div id="strategy-match-controls">
+                            <label class="schedule-checkbox-container">
+                                <input type="checkbox" id="strategy-show-all">
+                                <span class="schedule-checkbox-label">Show All Matches</span>
+                            </label>
+                        </div>
+                        <div id="strategy-match-list"></div>
+                    </div>
+                    <div id="strategy-board-wrapper" style="display: none;">
+                        <div id="strategy-toolbar">
+                            <div class="strategy-toolbar-row">
+                                <div class="strategy-toolbar-section">
+                                    <button class="strategy-back-btn" id="strategy-back-btn" title="Back to matches">
+                                        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M15 19L8 12L15 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                    </button>
+                                    <span id="strategy-match-title">Strategy</span>
+                                </div>
+                                <div class="strategy-toolbar-section strategy-phases">
+                                    <button class="strategy-phase-btn active" data-phase="auto">Auto</button>
+                                    <button class="strategy-phase-btn" data-phase="teleop">Teleop</button>
+                                    <button class="strategy-phase-btn" data-phase="endgame">Endgame</button>
+                                </div>
+                            </div>
+                            <div class="strategy-toolbar-row">
+                                <div class="strategy-toolbar-section strategy-tools">
+                                    <button class="strategy-tool-btn active" id="strategy-draw-btn" title="Draw">
+                                        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 21L5.5 18.5M21 3L13 11M5.5 18.5L11.5 12.5C12 12 13 11 13 11M5.5 18.5C5.5 18.5 4.5 19.5 3 21M13 11L16 8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                    </button>
+                                    <button class="strategy-tool-btn" id="strategy-eraser-btn" title="Eraser">
+                                        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M20 20H7.5M18 10L8 20H4L2 18L10 10M18 10L14 6M18 10L20 8L14 2L10 6M14 6L10 10M10 10L6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                    </button>
+                                    <div class="strategy-color-picker">
+                                        <button class="strategy-color-btn active" data-color="#ffffff" style="background-color: #ffffff;" title="White"></button>
+                                        <button class="strategy-color-btn" data-color="#ff6b6b" style="background-color: #ff6b6b;" title="Red"></button>
+                                        <button class="strategy-color-btn" data-color="#4da6ff" style="background-color: #4da6ff;" title="Blue"></button>
+                                        <button class="strategy-color-btn" data-color="#4ec9b0" style="background-color: #4ec9b0;" title="Green"></button>
+                                        <button class="strategy-color-btn" data-color="#ffcc00" style="background-color: #ffcc00;" title="Yellow"></button>
+                                        <button class="strategy-color-btn" data-color="#c586c0" style="background-color: #c586c0;" title="Purple"></button>
+                                    </div>
+                                </div>
+                                <div class="strategy-toolbar-section strategy-actions">
+                                    <button class="strategy-tool-btn strategy-clear-btn" id="strategy-clear-btn" title="Clear drawing">
+                                        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 6H5H21M8 6V4C8 3.44772 8.44772 3 9 3H15C15.5523 3 16 3.44772 16 4V6M19 6V20C19 20.5523 18.5523 21 18 21H6C5.44772 21 5 20.5523 5 20V6H19Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                    </button>
+                                    <button class="strategy-tool-btn strategy-download-btn" id="strategy-download-btn" title="Download as PNG">
+                                        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M21 15V19C21 19.5304 20.7893 20.0391 20.4142 20.4142C20.0391 20.7893 19.5304 21 19 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V15M7 10L12 15M12 15L17 10M12 15V3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="strategy-canvas-container">
+                            <canvas id="strategy-field-canvas"></canvas>
+                            <canvas id="strategy-drawing-canvas"></canvas>
+                            <div id="strategy-robots-layer"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="view" id="view-compare" style="display: none;">
+                <div id="compare-container">
+                    <span>Compare</span>
+                </div>
+            </div>
+            <div class="view" id="view-about" style="display: none;">
+                <div id="about-container">
+                    <div class="about-content">
+                        <br>
+                        <h2>Vanguard</h2>
+                        <p id="version-number" style="cursor: pointer; user-select: none;" title="👀">v1.0</p>
+                        <br>
+                        <p class="team-credit">Made with 🤍 by <a href="/app?view=insights&insights=26855" target="_self" class="team-highlight team-26855">26855</a> in collaboration with <a href="/app?view=insights&insights=6547" target="_self" class="team-highlight team-6547">6547</a>.</p>
+                        <p>Built with TypeScript, Flask, and the FIRST and FTCScout APIs.</p>
+                        <p id="easter-egg" style="opacity: 0; transition: opacity 0.8s ease-in, transform 0.8s ease-in; transform: translateY(-10px); margin-top: 20px; font-style: italic; color: #9cdcfe;">shoutout to elliot bc hes the best</p>
+                    </div>
+                </div>
+            </div>
+            <div class="view" id="view-settings" style="display: none;">
+                <div id="settings-container">
+                    <div class="settings-header">
+                        <h1>Settings</h1>
+                    </div>
+
+                    <div class="settings-nav">
+                        <button id="settings-nav-notifications" class="settings-nav-btn settings-nav-active" onclick="switchSettingsSection('notifications')">Notifications</button>
+                        <button id="settings-nav-management" class="settings-nav-btn" onclick="switchSettingsSection('management')">Management</button>
+                    </div>
+
+                    <div id="settings-section-notifications" class="settings-section">
+                        <h2>Notifications</h2>
+                        <div class="settings-card">
+                            <p class="settings-card-description">Notification preferences coming soon.</p>
+                        </div>
+                    </div>
+
+                    <div id="settings-section-management" class="settings-section" style="display: none;">
+                        <h2>Management</h2>
+                        <div class="settings-card">
+                            <p class="settings-card-description">Management options coming soon.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="view" id="view-admin" style="display: none;">
+                <div id="admin-login">
+                    <div class="admin-login-container">
+                        <span>Admin Access</span>
+                        <p class="admin-login-subtitle">Enter your 6-digit authentication code</p>
+                        <form id="admin-login-form">
+                            <div class="form-group">
+                                <label for="admin-otp">One-Time Password</label>
+                                <input type="text" inputmode="numeric" pattern="[0-9]*" id="admin-otp" name="otp" required placeholder="000000" maxlength="6" autocomplete="one-time-code">
+                            </div>
+                             <button type="submit" id="admin-login-button">Authenticate</button>
+                             <div class="login-footer-links">
+                                <a href="#" onclick="showView('schedule'); return false;" class="login-return-button">Return to App</a>
+                             </div>
+                             <p id="admin-login-error"></p>
+                        </form>
+                    </div>
+                </div>
+                <div id="admin-container" style="display: none;">
+                    <div class="admin-header">
+                        <h1>Admin Panel</h1>
+                        <div id="admin-message" class="admin-message" style="display: none;"></div>
+                    </div>
+                    
+                    <div class="admin-nav">
+                        <button id="admin-nav-overview" class="admin-nav-btn admin-nav-active" onclick="switchAdminSection('overview')">Overview</button>
+                        <button id="admin-nav-users" class="admin-nav-btn" onclick="switchAdminSection('users')">User Management</button>
+                        <button id="admin-nav-notes" class="admin-nav-btn" onclick="switchAdminSection('notes')">Notes Management</button>
+                        <button id="admin-nav-notifications" class="admin-nav-btn" onclick="switchAdminSection('notifications')">Notifications</button>
+                        <button id="admin-nav-database" class="admin-nav-btn" onclick="switchAdminSection('database')">Database</button>
+                    </div>
+
+                    <div id="admin-section-overview" class="admin-section">
+                        <h2>Server Statistics</h2>
+                        <div class="admin-stats-grid">
+                            <div class="admin-stat-card">
+                                <div class="admin-stat-label">Total Users</div>
+                                <div class="admin-stat-value" id="stat-total-users">0</div>
+                            </div>
+                            <div class="admin-stat-card">
+                                <div class="admin-stat-label">Total Notes</div>
+                                <div class="admin-stat-value" id="stat-total-notes">0</div>
+                            </div>
+                            <div class="admin-stat-card">
+                                <div class="admin-stat-label">Total Notifications</div>
+                                <div class="admin-stat-value" id="stat-total-notifications">0</div>
+                            </div>
+                            <div class="admin-stat-card">
+                                <div class="admin-stat-label">Database Size</div>
+                                <div class="admin-stat-value" id="stat-database-size">0 MB</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="admin-section-users" class="admin-section" style="display: none;">
+                        <h2>User Management</h2>
+                        
+                        <div class="admin-card">
+                            <h3>Create New User</h3>
+                            <div class="admin-form">
+                                <div class="admin-form-row">
+                                    <div class="form-group">
+                                        <label for="new-user-id">Team ID</label>
+                                        <input type="text" inputmode="numeric" pattern="[0-9]*" id="new-user-id" placeholder="12345">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="new-user-password">Password</label>
+                                        <input type="password" id="new-user-password" placeholder="Enter password">
+                                    </div>
+                                    <button class="admin-btn admin-btn-primary" onclick="createUser()">Create User</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="admin-card">
+                            <h3>Registered Users</h3>
+                            <div class="admin-table-container">
+                                <table class="admin-table" id="admin-users-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Team ID</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="admin-section-notes" class="admin-section" style="display: none;">
+                        <h2>Notes Management</h2>
+                        
+                        <div class="admin-card">
+                            <h3>All Team Notes</h3>
+                            <div id="admin-notes-list" class="admin-notes-list"></div>
+                        </div>
+                    </div>
+
+                    <div id="admin-section-notifications" class="admin-section" style="display: none;">
+                        <h2>Notification Management</h2>
+                        
+                        <div class="admin-card">
+                            <h3>Send Custom Notification</h3>
+                            <div class="admin-form">
+                                <div class="admin-form-row">
+                                    <div class="form-group">
+                                        <label for="notif-team-id">Team ID</label>
+                                        <input type="text" inputmode="numeric" pattern="[0-9]*" id="notif-team-id" placeholder="12345">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="notif-priority">Priority</label>
+                                        <select id="notif-priority">
+                                            <option value="1">Low (1)</option>
+                                            <option value="2">Low-Medium (2)</option>
+                                            <option value="3" selected>Default (3)</option>
+                                            <option value="4">Medium-High (4)</option>
+                                            <option value="5">High (5)</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label for="notif-title">Title</label>
+                                    <input type="text" id="notif-title" placeholder="Notification Title">
+                                </div>
+                                <div class="form-group">
+                                    <label for="notif-message">Message</label>
+                                    <textarea id="notif-message" placeholder="Notification message" rows="3"></textarea>
+                                </div>
+                                <button class="admin-btn admin-btn-primary" onclick="sendNotification()">Send Notification</button>
+                            </div>
+                        </div>
+
+                        <div class="admin-card">
+                            <div class="admin-card-header">
+                                <h3>Notification History (Last 100)</h3>
+                                <button class="admin-btn admin-btn-danger admin-btn-small" onclick="clearNotificationHistory()">Clear History</button>
+                            </div>
+                            <div id="admin-notifications-list" class="admin-notifications-list"></div>
+                        </div>
+                    </div>
+
+                    <div id="admin-section-database" class="admin-section" style="display: none;">
+                        <h2>Database Management</h2>
+                        
+                        <div class="admin-card">
+                            <h3>Database Maintenance</h3>
+                            <p class="admin-card-description">Optimize the database by reclaiming unused space and reorganizing data.</p>
+                            <button class="admin-btn admin-btn-primary" onclick="vacuumDatabase()">Vacuum Database</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="reset-password-modal" class="admin-modal" style="display: none;">
+                    <div class="admin-modal-content">
+                        <h3>Reset Password for User <span id="reset-password-user-id"></span></h3>
+                        <div class="form-group">
+                            <label for="reset-password-input">New Password</label>
+                            <input type="password" id="reset-password-input" placeholder="Enter new password">
+                        </div>
+                        <div class="admin-modal-actions">
+                            <button class="admin-btn admin-btn-secondary" onclick="hideResetPasswordModal()">Cancel</button>
+                            <button class="admin-btn admin-btn-primary" onclick="resetPassword()">Reset Password</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div id="footer">
+            <span id="status-text">Ready</span>
+            <div id="loading-bar-container">
+                <div id="loading-bar"></div>
+            </div>
+        </div>
+        <div id="login" style="display: none;">
+            <div class="login-container">
+                <span>Vanguard</span>
+                <form id="login-form">
+                    <div class="form-group">
+                        <label for="login-id">Team ID</label>
+                        <input type="text" inputmode="numeric" pattern="[0-9]*" id="login-id" name="id" required placeholder="12345">
+                    </div>
+                    <div class="form-group">
+                        <label for="login-password">Password</label>
+                        <input type="password" id="login-password" name="password" required placeholder="••••••••">
+                    </div>
+                    <button type="submit" id="login-button">Login</button>
+                    <p id="login-error"></p>
+                    <a href="https://forms.gle/AgSDjL4PfxtQoCee8" target="_blank" class="login-register-link">Register</a>
+                </form>
+            </div>
+        </div>
+        <script src="/assets/app.js"></script>
+    </body>
+</html>
