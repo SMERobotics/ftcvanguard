@@ -48,7 +48,7 @@ ntfy_topic = "FTC-{}"
 ntfy_teams = [26855, 6547]
 
 [server]
-vanguard_url = "https://ftc.technodot.org"
+vanguard_url = "https://ftcvanguard.org"
 
 [admin]
 admin_teams = [26855, 6547]
