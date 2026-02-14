@@ -13,3 +13,4 @@ vanguard_url = "https://ftc.technodot.org"
 [admin]
 admin_teams = [26855, 6547]
 admin_secret = "67676767676767676767676767676767"
+registration_notification_url = "https://ntfy.sh/..."

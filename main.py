@@ -28,6 +28,7 @@ NTFY_TEAMS = settings["notifications"]["ntfy_teams"]
 VANGUARD_URL = settings["server"]["vanguard_url"]
 ADMIN_TEAMS = settings["admin"]["admin_teams"]
 ADMIN_SECRET = settings["admin"]["admin_secret"]
+REGISTRATION_NOTIF_URL = settings["admin"]["registration_notification_url"]
 SCHEDULE_OFFSET_MINUTES_MIN = -180
 SCHEDULE_OFFSET_MINUTES_MAX = 180
 
@@ -495,6 +496,11 @@ def _api_v1_uaregister():
         db.commit()
         cursor.close()
         db.close()
+        requests.post(REGISTRATION_NOTIF_URL,
+                      data=f"Team {team_number} is registering for Vanguard. Please review.",
+                      headers={
+                          "Title": "Vanguard Registration Alert",
+                      })
         return {"status": "success"}, 201
     except Exception as e:
         print(e)
