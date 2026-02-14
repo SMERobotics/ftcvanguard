@@ -496,11 +496,13 @@ def _api_v1_uaregister():
         db.commit()
         cursor.close()
         db.close()
-        requests.post(REGISTRATION_NOTIF_URL,
-                      data=f"Team {team_number} is registering for Vanguard. Please review.",
-                      headers={
-                          "Title": "Vanguard Registration Alert",
-                      })
+        requests.post(
+            REGISTRATION_NOTIF_URL,
+            data=f"Team {team_number} is registering for Vanguard. Please review.",
+            headers={
+                "Title": "Vanguard Registration Alert",
+            },
+        )
         return {"status": "success"}, 201
     except Exception as e:
         print(e)
