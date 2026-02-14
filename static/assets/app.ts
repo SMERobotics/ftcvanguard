@@ -1548,12 +1548,45 @@ function switchAdminSection(section: string): void {
         loadAdminStats();
     } else if (section === "users") {
         loadAdminUsers();
+        attachUsersSearchListeners();
     } else if (section === "registrations") {
         loadAdminRegistrations();
+        attachRegistrationsListeners();
     } else if (section === "notes") {
         loadAdminNotes();
+        attachNotesSearchListeners();
     } else if (section === "notifications") {
         loadAdminNotifications();
+    }
+}
+
+function attachUsersSearchListeners(): void {
+    const usersSearchInput = document.getElementById("users-search-input") as HTMLInputElement;
+    if (usersSearchInput && !usersSearchInput.dataset.listenerAttached) {
+        usersSearchInput.addEventListener("input", () => {
+            searchUsers();
+        });
+        usersSearchInput.dataset.listenerAttached = "true";
+    }
+}
+
+function attachRegistrationsListeners(): void {
+    const showOldCheckbox = document.getElementById("show-old-registrations") as HTMLInputElement;
+    if (showOldCheckbox && !showOldCheckbox.dataset.listenerAttached) {
+        showOldCheckbox.addEventListener("change", () => {
+            loadAdminRegistrations();
+        });
+        showOldCheckbox.dataset.listenerAttached = "true";
+    }
+}
+
+function attachNotesSearchListeners(): void {
+    const notesSearchInput = document.getElementById("notes-search-input") as HTMLInputElement;
+    if (notesSearchInput && !notesSearchInput.dataset.listenerAttached) {
+        notesSearchInput.addEventListener("input", () => {
+            searchNotes();
+        });
+        notesSearchInput.dataset.listenerAttached = "true";
     }
 }
 
@@ -6267,27 +6300,6 @@ document.addEventListener("DOMContentLoaded", async () => {
                 adminOtpInput?.blur();
                 adminLoginForm?.dispatchEvent(new Event("submit", { cancelable: true }));
             }
-        });
-    }
-
-    const showOldRegsCheckbox = document.getElementById("show-old-registrations") as HTMLInputElement;
-    if (showOldRegsCheckbox) {
-        showOldRegsCheckbox.addEventListener("change", () => {
-            loadAdminRegistrations();
-        });
-    }
-
-    const notesSearchInput = document.getElementById("notes-search-input") as HTMLInputElement;
-    if (notesSearchInput) {
-        notesSearchInput.addEventListener("input", () => {
-            searchNotes();
-        });
-    }
-
-    const usersSearchInput = document.getElementById("users-search-input") as HTMLInputElement;
-    if (usersSearchInput) {
-        usersSearchInput.addEventListener("input", () => {
-            searchUsers();
         });
     }
 
