@@ -227,6 +227,19 @@ wheels = [
 ]
 
 [[package]]
+name = "flask-sitemapper"
+version = "1.8.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "flask" },
+    { name = "jinja2" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/5d/f3/d66e518dc9435d4375e526733b56fdef86853e1d482d05f73dda2d5fea9f/flask_sitemapper-1.8.2.tar.gz", hash = "sha256:9a381ca1e1cd71867c7e7819bacd4bab84bc4fa6074ef9b7ce879fe0d816e942", size = 5982, upload-time = "2025-06-27T16:30:17.314Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/d3/74/a460024e12181db382a832cae9620ed9a85418176a92ff3d39563b4a5274/flask_sitemapper-1.8.2-py3-none-any.whl", hash = "sha256:e93fececd462a2f7abf45fc1a5932d7a30f1c4011e005c42d31b8f74e6230723", size = 7547, upload-time = "2025-06-27T16:30:16.188Z" },
+]
+
+[[package]]
 name = "ftcvanguard"
 version = "1.0.0"
 source = { virtual = "." }
@@ -234,6 +247,7 @@ dependencies = [
     { name = "argon2-cffi" },
     { name = "dotenv" },
     { name = "flask" },
+    { name = "flask-sitemapper" },
     { name = "gunicorn" },
     { name = "pyjwt", extra = ["crypto"] },
     { name = "pyotp" },
@@ -245,6 +259,7 @@ requires-dist = [
     { name = "argon2-cffi", specifier = ">=25.1.0" },
     { name = "dotenv", specifier = ">=0.9.9" },
     { name = "flask", specifier = ">=3.1.2" },
+    { name = "flask-sitemapper", specifier = ">=1.8.2" },
     { name = "gunicorn", specifier = ">=23.0.0" },
     { name = "pyjwt", extras = ["crypto"], specifier = ">=2.10.1" },
     { name = "pyotp", specifier = ">=2.9.0" },

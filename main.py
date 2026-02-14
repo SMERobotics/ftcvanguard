@@ -2,6 +2,7 @@ import argon2
 from argon2 import PasswordHasher
 from datetime import datetime, timedelta
 from flask import Flask, request, send_from_directory, jsonify
+from flask_sitemapper import Sitemapper
 import jwt
 import os
 import pyotp
@@ -290,8 +291,11 @@ def notification_loop():
             print(f"Notification loop error: {e}")
         time.sleep(30)
 
+sitemapper = Sitemapper()
 
 app = Flask(__name__)
+
+sitemapper.init_app(app)
 
 ph = PasswordHasher()
 s = requests.Session()
@@ -431,20 +435,25 @@ if len(NTFY_TEAMS) > 0:
     thread = threading.Thread(target=notification_loop, daemon=True)
     thread.start()
 
-
+@sitemapper.include(lastmod="2026-02-14")
 @app.route("/", methods=["GET"])
 def _root():
     return app.send_static_file("index.html")
 
-
+@sitemapper.include(lastmod="2026-02-14")
 @app.route("/app", methods=["GET"])
 def _app():
     return app.send_static_file("app.html")
 
-
+@sitemapper.include(lastmod="2026-02-14")
 @app.route("/register", methods=["GET"])
 def _register():
     return app.send_static_file("register.html")
+
+@app.route("/sitemap.xml")
+def sitemap():
+    return sitemapper.generate()
+
 
 
 @app.route("/assets/<path:path>", methods=["GET"])
