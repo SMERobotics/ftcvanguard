@@ -129,7 +129,7 @@
 
         .rp-line {
             display: flex;
-            flex-wrap: nowrap;
+            flex-wrap: wrap;
             gap: 6px;
             justify-content: flex-end;
         }
@@ -322,7 +322,7 @@
 
         .grid-3 {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr));
             gap: 24px;
             margin-bottom: 80px;
         }
@@ -464,6 +464,35 @@
             .hero-title {
                 font-size: 32px;
             }
+            .hero-section h2 {
+                font-size: 20px;
+            }
+            .hero-subtitle {
+                font-size: 16px;
+            }
+            .hero-actions {
+                flex-direction: column;
+            }
+            .hero-actions a {
+                text-align: center;
+            }
+            .score-card {
+                max-width: 100%;
+            }
+            .score-card-header {
+                flex-direction: column;
+            }
+            .rp-line {
+                justify-content: flex-start;
+            }
+            .score-card-body {
+                grid-template-columns: 1fr;
+            }
+            .comparison-table {
+                display: block;
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+            }
             .call2action {
                 padding: 24px;
                 flex-direction: column;
@@ -474,10 +503,11 @@
             }
             .call2action-actions .btn-primary,
             .call2action-actions .btn-secondary {
-                flex: 1 1 220px;
+                flex: 1 1 100%;
+                text-align: center;
             }
             .home-nav {
-                display: none; /* Simplify for mobile for now, or add mobile menu back if needed */
+                display: none;
             }
             .home-header {
                 justify-content: center;
