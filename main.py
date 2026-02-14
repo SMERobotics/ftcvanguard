@@ -822,7 +822,7 @@ def _api_v1_schedule_offset_put():
 
     try:
         offset_minutes = int(data.get("offsetMinutes"))
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return {"status": "fuck", "error": "offsetMinutes must be integer"}, 400
 
     saved_offset, updated_at = set_team_schedule_offset(
