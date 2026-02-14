@@ -271,6 +271,7 @@
                     <div class="admin-nav">
                         <button id="admin-nav-overview" class="admin-nav-btn admin-nav-active" onclick="switchAdminSection('overview')">Overview</button>
                         <button id="admin-nav-users" class="admin-nav-btn" onclick="switchAdminSection('users')">User Management</button>
+                        <button id="admin-nav-registrations" class="admin-nav-btn" onclick="switchAdminSection('registrations')">Registrations</button>
                         <button id="admin-nav-notes" class="admin-nav-btn" onclick="switchAdminSection('notes')">Notes Management</button>
                         <button id="admin-nav-notifications" class="admin-nav-btn" onclick="switchAdminSection('notifications')">Notifications</button>
                         <button id="admin-nav-database" class="admin-nav-btn" onclick="switchAdminSection('database')">Database</button>
@@ -319,7 +320,13 @@
                         </div>
 
                         <div class="admin-card">
-                            <h3>Registered Users</h3>
+                            <div class="admin-card-header">
+                                <h3>Registered Users</h3>
+                                <div class="admin-search-container">
+                                    <input type="text" id="users-search-input" class="admin-search-input" placeholder="Search by team ID..." inputmode="numeric">
+                                    <button class="admin-btn admin-btn-secondary admin-btn-small" onclick="clearUsersSearch()">Clear</button>
+                                </div>
+                            </div>
                             <div class="admin-table-container">
                                 <table class="admin-table" id="admin-users-table">
                                     <thead>
@@ -334,11 +341,49 @@
                         </div>
                     </div>
 
+                    <div id="admin-section-registrations" class="admin-section" style="display: none;">
+                        <h2>Registration Requests</h2>
+
+                        <div class="admin-card">
+                            <div class="admin-card-header">
+                                <h3>Pending Requests</h3>
+                                <div class="admin-header-actions">
+                                    <label class="admin-checkbox-container">
+                                        <input type="checkbox" id="show-old-registrations">
+                                        <span class="admin-checkbox-label">Show Old (7+ days)</span>
+                                    </label>
+                                    <button class="admin-btn admin-btn-secondary admin-btn-small" onclick="loadAdminRegistrations()">Refresh</button>
+                                </div>
+                            </div>
+                            <div class="admin-table-container">
+                                <table class="admin-table" id="admin-registrations-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Team</th>
+                                            <th>Email</th>
+                                            <th>Verification</th>
+                                            <th>Submitted</th>
+                                            <th>Status</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
                     <div id="admin-section-notes" class="admin-section" style="display: none;">
                         <h2>Notes Management</h2>
                         
                         <div class="admin-card">
-                            <h3>All Team Notes</h3>
+                            <div class="admin-card-header">
+                                <h3>All Team Notes</h3>
+                                <div class="admin-search-container">
+                                    <input type="text" id="notes-search-input" class="admin-search-input" placeholder="Search by team number..." inputmode="numeric">
+                                    <button class="admin-btn admin-btn-secondary admin-btn-small" onclick="clearNotesSearch()">Clear</button>
+                                </div>
+                            </div>
                             <div id="admin-notes-list" class="admin-notes-list"></div>
                         </div>
                     </div>
@@ -432,7 +477,7 @@
                     </div>
                     <button type="submit" id="login-button">Login</button>
                     <p id="login-error"></p>
-                    <a href="https://forms.gle/AgSDjL4PfxtQoCee8" target="_blank" class="login-register-link">Register</a>
+                    <a href="/register" class="login-register-link">Register</a>
                 </form>
             </div>
         </div>

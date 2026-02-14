@@ -136,6 +136,7 @@ interface AdminStats {
     totalNotes: number;
     totalNotifications: number;
     databaseSize: number;
+    pendingRegistrations?: number;
 }
 
 interface AdminUser {
@@ -158,6 +159,16 @@ interface AdminNotification {
     title: string;
     message: string;
     sentAt: number;
+}
+
+interface AdminRegistration {
+    id: number;
+    teamNumber: number;
+    email: string;
+    imageLink: string;
+    status: string;
+    submittedAt: number;
+    reviewedAt?: number | null;
 }
 
 interface ScheduleOffsetResponse {
@@ -1053,6 +1064,8 @@ async function loadAdminStats(): Promise<void> {
     }
 }
 
+let allUsers: AdminUser[] = [];
+
 async function loadAdminUsers(): Promise<void> {
     try {
         const response = await adminFetch("/api/v1/admin/users");
@@ -1061,26 +1074,75 @@ async function loadAdminUsers(): Promise<void> {
         }
         
         const data = await response.json();
-        const users: AdminUser[] = data.users;
+        allUsers = data.users;
         
-        const tbody = document.querySelector("#admin-users-table tbody")!;
-        tbody.innerHTML = "";
-        
-        for (const user of users) {
-            const row = document.createElement("tr");
-            row.innerHTML = `
-                <td>${user.id}</td>
-                <td>
-                    <button class="admin-action-btn admin-btn-danger" onclick="deleteUser(${user.id})">Delete</button>
-                    <button class="admin-action-btn admin-btn-primary" onclick="showResetPasswordModal(${user.id})">Reset Password</button>
-                </td>
-            `;
-            tbody.appendChild(row);
-        }
+        renderAdminUsers(allUsers);
     } catch (error) {
         console.error("Error loading users:", error);
         showAdminMessage("Failed to load users", "error");
     }
+}
+
+function renderAdminUsers(users: AdminUser[], searchTerm: string = ""): void {
+    const tbody = document.querySelector("#admin-users-table tbody")!;
+    tbody.innerHTML = "";
+    
+    let filteredUsers = users;
+    
+    if (searchTerm) {
+        const term = searchTerm.toLowerCase();
+        filteredUsers = users.filter(user => 
+            user.id.toString().includes(term)
+        );
+    }
+    
+    if (filteredUsers.length === 0) {
+        const message = searchTerm ? "No users found matching your search" : "No users found";
+        tbody.innerHTML = `<tr><td colspan="2" class="admin-empty-state">${message}</td></tr>`;
+        return;
+    }
+    
+    for (const user of filteredUsers) {
+        const row = document.createElement("tr");
+        row.innerHTML = `
+            <td>${user.id}</td>
+            <td>
+                <button class="admin-action-btn admin-btn-danger" onclick="deleteUser(${user.id})">Delete</button>
+                <button class="admin-action-btn admin-btn-primary" onclick="showResetPasswordModal(${user.id})">Reset Password</button>
+            </td>
+        `;
+        tbody.appendChild(row);
+    }
+}
+
+async function searchUsers(): Promise<void> {
+    const searchInput = document.getElementById("users-search-input") as HTMLInputElement;
+    const searchTerm = searchInput.value.trim();
+    
+    if (allUsers.length === 0) {
+        try {
+            const response = await adminFetch("/api/v1/admin/users");
+            if (!response.ok) {
+                throw new Error("Failed to load users");
+            }
+            const data = await response.json();
+            allUsers = data.users;
+        } catch (error) {
+            console.error("Error loading users:", error);
+            showAdminMessage("Failed to load users", "error");
+            return;
+        }
+    }
+    
+    renderAdminUsers(allUsers, searchTerm);
+}
+
+function clearUsersSearch(): void {
+    const searchInput = document.getElementById("users-search-input") as HTMLInputElement;
+    if (searchInput) {
+        searchInput.value = "";
+    }
+    renderAdminUsers(allUsers);
 }
 
 async function createUser(): Promise<void> {
@@ -1193,6 +1255,8 @@ async function resetPassword(): Promise<void> {
     }
 }
 
+let allNotes: AdminNote[] = [];
+
 async function loadAdminNotes(): Promise<void> {
     try {
         const response = await adminFetch("/api/v1/admin/notes");
@@ -1201,58 +1265,103 @@ async function loadAdminNotes(): Promise<void> {
         }
         
         const data = await response.json();
-        const notes: AdminNote[] = data.notes;
+        allNotes = data.notes;
         
-        const container = document.getElementById("admin-notes-list")!;
-        container.innerHTML = "";
-        
-        if (notes.length === 0) {
-            container.innerHTML = `<div class="admin-empty-state">No notes found</div>`;
-            return;
-        }
-        
-        for (const note of notes) {
-            const hasContent = note.autoPerformance || note.teleopPerformance || note.generalNotes;
-            
-            const card = document.createElement("div");
-            card.className = "admin-note-card";
-            card.innerHTML = `
-                <div class="admin-note-header">
-                    <div class="admin-note-meta">
-                        <span class="admin-note-label">Team ${note.teamId} → Team ${note.subjectTeamId}</span>
-                        <span class="admin-note-date">${new Date(note.updatedAt * 1000).toLocaleString()}</span>
-                    </div>
-                    <button class="admin-action-btn admin-btn-danger admin-btn-small" onclick="deleteNote(${note.id})">Delete</button>
-                </div>
-                ${hasContent ? `
-                    <div class="admin-note-content">
-                        ${note.autoPerformance ? `
-                            <div class="admin-note-field">
-                                <strong>Auto Performance:</strong>
-                                <p>${escapeHtml(note.autoPerformance)}</p>
-                            </div>
-                        ` : ""}
-                        ${note.teleopPerformance ? `
-                            <div class="admin-note-field">
-                                <strong>Teleop Performance:</strong>
-                                <p>${escapeHtml(note.teleopPerformance)}</p>
-                            </div>
-                        ` : ""}
-                        ${note.generalNotes ? `
-                            <div class="admin-note-field">
-                                <strong>General Notes:</strong>
-                                <p>${escapeHtml(note.generalNotes)}</p>
-                            </div>
-                        ` : ""}
-                    </div>
-                ` : `<div class="admin-note-empty">No content</div>`}
-            `;
-            container.appendChild(card);
-        }
+        renderAdminNotes(allNotes);
     } catch (error) {
         console.error("Error loading notes:", error);
         showAdminMessage("Failed to load notes", "error");
     }
+}
+
+function renderAdminNotes(notes: AdminNote[], searchTerm: string = ""): void {
+    const container = document.getElementById("admin-notes-list")!;
+    container.innerHTML = "";
+    
+    let filteredNotes = notes;
+    
+    if (searchTerm) {
+        const term = searchTerm.toLowerCase();
+        filteredNotes = notes.filter(note => 
+            note.teamId.toString().includes(term) || 
+            note.subjectTeamId.toString().includes(term)
+        );
+    }
+    
+    if (filteredNotes.length === 0) {
+        const message = searchTerm ? "No notes found matching your search" : "No notes found";
+        container.innerHTML = `<div class="admin-empty-state">${message}</div>`;
+        return;
+    }
+    
+    for (const note of filteredNotes) {
+        const hasContent = note.autoPerformance || note.teleopPerformance || note.generalNotes;
+        
+        const card = document.createElement("div");
+        card.className = "admin-note-card";
+        card.innerHTML = `
+            <div class="admin-note-header">
+                <div class="admin-note-meta">
+                    <span class="admin-note-label">Team ${note.teamId} → Team ${note.subjectTeamId}</span>
+                    <span class="admin-note-date">${new Date(note.updatedAt * 1000).toLocaleString()}</span>
+                </div>
+                <button class="admin-action-btn admin-btn-danger admin-btn-small" onclick="deleteNote(${note.id})">Delete</button>
+            </div>
+            ${hasContent ? `
+                <div class="admin-note-content">
+                    ${note.autoPerformance ? `
+                        <div class="admin-note-field">
+                            <strong>Auto Performance:</strong>
+                            <p>${escapeHtml(note.autoPerformance)}</p>
+                        </div>
+                    ` : ""}
+                    ${note.teleopPerformance ? `
+                        <div class="admin-note-field">
+                            <strong>Teleop Performance:</strong>
+                            <p>${escapeHtml(note.teleopPerformance)}</p>
+                        </div>
+                    ` : ""}
+                    ${note.generalNotes ? `
+                        <div class="admin-note-field">
+                            <strong>General Notes:</strong>
+                            <p>${escapeHtml(note.generalNotes)}</p>
+                        </div>
+                    ` : ""}
+                </div>
+            ` : `<div class="admin-note-empty">No content</div>`}
+        `;
+        container.appendChild(card);
+    }
+}
+
+async function searchNotes(): Promise<void> {
+    const searchInput = document.getElementById("notes-search-input") as HTMLInputElement;
+    const searchTerm = searchInput.value.trim();
+    
+    if (allNotes.length === 0) {
+        try {
+            const response = await adminFetch("/api/v1/admin/notes");
+            if (!response.ok) {
+                throw new Error("Failed to load notes");
+            }
+            const data = await response.json();
+            allNotes = data.notes;
+        } catch (error) {
+            console.error("Error loading notes:", error);
+            showAdminMessage("Failed to load notes", "error");
+            return;
+        }
+    }
+    
+    renderAdminNotes(allNotes, searchTerm);
+}
+
+function clearNotesSearch(): void {
+    const searchInput = document.getElementById("notes-search-input") as HTMLInputElement;
+    if (searchInput) {
+        searchInput.value = "";
+    }
+    renderAdminNotes(allNotes);
 }
 
 function escapeHtml(text: string): string {
@@ -1414,7 +1523,7 @@ async function vacuumDatabase(): Promise<void> {
 }
 
 function switchAdminSection(section: string): void {
-    const sections = ["overview", "users", "notes", "notifications", "database"];
+    const sections = ["overview", "users", "registrations", "notes", "notifications", "database"];
     
     sections.forEach(s => {
         const sectionEl = document.getElementById(`admin-section-${s}`);
@@ -1439,10 +1548,131 @@ function switchAdminSection(section: string): void {
         loadAdminStats();
     } else if (section === "users") {
         loadAdminUsers();
+    } else if (section === "registrations") {
+        loadAdminRegistrations();
     } else if (section === "notes") {
         loadAdminNotes();
     } else if (section === "notifications") {
         loadAdminNotifications();
+    }
+}
+
+function buildAdminStatusBadge(status: string): string {
+    const normalized = (status || "").toLowerCase();
+    const safe = normalized || "pending";
+    return `<span class="admin-status-badge ${safe}">${safe}</span>`;
+}
+
+async function loadAdminRegistrations(): Promise<void> {
+    try {
+        const response = await adminFetch("/api/v1/admin/registrations");
+        if (!response.ok) {
+            throw new Error("Failed to load registrations");
+        }
+
+        const data = await response.json();
+        let registrations: AdminRegistration[] = data.registrations || [];
+
+        const showOldCheckbox = document.getElementById("show-old-registrations") as HTMLInputElement;
+        const showOld = showOldCheckbox ? showOldCheckbox.checked : false;
+
+        const oneWeekAgo = Math.floor(Date.now() / 1000) - (7 * 24 * 60 * 60);
+        
+        if (!showOld) {
+            registrations = registrations.filter(reg => 
+                reg.status === "pending" && (!reg.submittedAt || reg.submittedAt >= oneWeekAgo)
+            );
+        }
+
+        const tbody = document.querySelector("#admin-registrations-table tbody")!;
+        tbody.innerHTML = "";
+
+        if (registrations.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="6" class="admin-empty-state">No registration requests found</td></tr>`;
+            return;
+        }
+
+        registrations.forEach(reg => {
+            const row = document.createElement("tr");
+            const submitted = reg.submittedAt
+                ? new Date(reg.submittedAt * 1000).toLocaleString()
+                : "—";
+            const statusBadge = buildAdminStatusBadge(reg.status);
+            const isPending = reg.status === "pending";
+            const actions = isPending
+                ? `
+                    <button class="admin-action-btn admin-btn-primary" onclick="approveRegistration(${reg.id})">Approve</button>
+                    <button class="admin-action-btn admin-btn-danger" onclick="denyRegistration(${reg.id})">Deny</button>
+                  `
+                : "—";
+
+            row.innerHTML = `
+                <td>${reg.teamNumber}</td>
+                <td>${escapeHtml(reg.email)}</td>
+                <td><a class="admin-link" href="${escapeHtml(reg.imageLink)}" target="_blank">View</a></td>
+                <td>${submitted}</td>
+                <td>${statusBadge}</td>
+                <td>${actions}</td>
+            `;
+            tbody.appendChild(row);
+        });
+    } catch (error) {
+        console.error("Error loading registrations:", error);
+        showAdminMessage("Failed to load registrations", "error");
+    }
+}
+
+async function approveRegistration(registrationId: number): Promise<void> {
+    if (!confirm("Approve this registration and create the user?")) {
+        return;
+    }
+
+    try {
+        const response = await adminFetch(`/api/v1/admin/registrations/${registrationId}/approve`, {
+            method: "POST"
+        });
+
+        if (!response.ok) {
+            const data = await response.json().catch(() => null);
+            throw new Error(data?.error || "Failed to approve registration");
+        }
+
+        const data = await response.json();
+        const password = data.password;
+        const teamNumber = data.teamNumber;
+        showAdminMessage("Registration approved", "success");
+        if (password && teamNumber) {
+            alert(`Team ${teamNumber} temporary password: ${password}`);
+        }
+        loadAdminRegistrations();
+        loadAdminUsers();
+        loadAdminStats();
+    } catch (error: any) {
+        console.error("Error approving registration:", error);
+        showAdminMessage(error.message || "Failed to approve registration", "error");
+    }
+}
+
+async function denyRegistration(registrationId: number): Promise<void> {
+    if (!confirm("Deny this registration request?")) {
+        return;
+    }
+
+    try {
+        const response = await adminFetch(`/api/v1/admin/registrations/${registrationId}/deny`, {
+            method: "POST"
+        });
+
+        if (!response.ok) {
+            const data = await response.json().catch(() => null);
+            throw new Error(data?.error || "Failed to deny registration");
+        }
+
+        showAdminMessage("Registration denied", "success");
+        loadAdminRegistrations();
+    } catch (error: any) {
+        console.error("Error denying registration:", error);
+        showAdminMessage(error.message || "Failed to deny registration", "error");
     }
 }
 
@@ -6040,6 +6270,27 @@ document.addEventListener("DOMContentLoaded", async () => {
         });
     }
 
+    const showOldRegsCheckbox = document.getElementById("show-old-registrations") as HTMLInputElement;
+    if (showOldRegsCheckbox) {
+        showOldRegsCheckbox.addEventListener("change", () => {
+            loadAdminRegistrations();
+        });
+    }
+
+    const notesSearchInput = document.getElementById("notes-search-input") as HTMLInputElement;
+    if (notesSearchInput) {
+        notesSearchInput.addEventListener("input", () => {
+            searchNotes();
+        });
+    }
+
+    const usersSearchInput = document.getElementById("users-search-input") as HTMLInputElement;
+    if (usersSearchInput) {
+        usersSearchInput.addEventListener("input", () => {
+            searchUsers();
+        });
+    }
+
     // Logout initialization
     const logoutBtn = document.getElementById("button-logout");
     if (logoutBtn) {
@@ -6081,6 +6332,13 @@ document.addEventListener("DOMContentLoaded", async () => {
 (window as any).vacuumDatabase = vacuumDatabase;
 (window as any).switchAdminSection = switchAdminSection;
 (window as any).switchSettingsSection = switchSettingsSection;
+(window as any).loadAdminRegistrations = loadAdminRegistrations;
+(window as any).approveRegistration = approveRegistration;
+(window as any).denyRegistration = denyRegistration;
+(window as any).searchNotes = searchNotes;
+(window as any).clearNotesSearch = clearNotesSearch;
+(window as any).searchUsers = searchUsers;
+(window as any).clearUsersSearch = clearUsersSearch;
 
 // nothing
 // ts obfuscator was BUNS

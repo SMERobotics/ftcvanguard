@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#181818">
+    <title>Vanguard - Register</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: "JetBrains Mono", monospace;
+            background-color: #181818;
+            color: #cccccc;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .page {
+            width: 100%;
+            max-width: 1095px;
+            padding: 40px 20px;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-bottom: 40px;
+            border-bottom: 1px solid #333333;
+            margin-bottom: 60px;
+        }
+
+        .logo {
+            font-size: 24px;
+            font-weight: 700;
+            color: #ffffff;
+            text-decoration: none;
+            letter-spacing: -0.5px;
+        }
+
+        .nav a {
+            color: #868686;
+            text-decoration: none;
+            margin-left: 24px;
+            font-size: 14px;
+            transition: color 0.2s;
+        }
+
+        .nav a:hover {
+            color: #ffffff;
+        }
+
+        .content {
+            display: grid;
+            grid-template-columns: 1fr 500px;
+            gap: 60px;
+            align-items: start;
+        }
+
+        .info h1 {
+            font-size: 32px;
+            color: #ffffff;
+            margin: 0 0 16px 0;
+            line-height: 1.2;
+            letter-spacing: -0.8px;
+        }
+
+        .info p {
+            margin: 0 0 16px 0;
+            font-size: 14px;
+            line-height: 1.6;
+            color: #a0a0a0;
+        }
+
+        .info ul {
+            margin: 24px 0;
+            padding: 0;
+            list-style: none;
+        }
+
+        .info li {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 12px;
+            font-size: 13px;
+            color: #cccccc;
+        }
+
+        .info li::before {
+            content: "•";
+            color: #4ec9b0;
+            font-weight: 700;
+            font-size: 18px;
+        }
+
+        .form-card {
+            background-color: #1f1f1f;
+            border: 1px solid #333333;
+            border-radius: 8px;
+            padding: 32px;
+        }
+
+        .form-card h2 {
+            margin: 0 0 8px 0;
+            font-size: 20px;
+            color: #ffffff;
+        }
+
+        .form-card > p {
+            margin: 0 0 24px 0;
+            font-size: 13px;
+            color: #a0a0a0;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            font-size: 13px;
+            color: #cccccc;
+            margin-bottom: 8px;
+        }
+
+        input {
+            width: 100%;
+            background-color: #252526;
+            border: 1px solid #3e3e42;
+            border-radius: 6px;
+            padding: 10px 12px;
+            color: #ffffff;
+            font-family: "JetBrains Mono", monospace;
+            font-size: 13px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        input:focus {
+            border-color: #0078d4;
+        }
+
+        input::placeholder {
+            color: #555555;
+        }
+
+        .hint {
+            margin-top: 6px;
+            font-size: 11px;
+            color: #868686;
+            line-height: 1.4;
+        }
+
+        button[type="submit"] {
+            width: 100%;
+            background-color: #0078d4;
+            color: #ffffff;
+            border: none;
+            border-radius: 6px;
+            padding: 12px;
+            font-family: "JetBrains Mono", monospace;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            margin-top: 8px;
+        }
+
+        button[type="submit"]:hover {
+            background-color: #0063b1;
+        }
+
+        button[type="submit"]:disabled {
+            background-color: #3e3e42;
+            cursor: not-allowed;
+        }
+
+        .message {
+            margin-bottom: 20px;
+            padding: 12px;
+            border-radius: 6px;
+            font-size: 13px;
+            display: none;
+        }
+
+        .message.success {
+            background-color: rgba(78, 201, 176, 0.15);
+            border: 1px solid #4ec9b0;
+            color: #b4f0df;
+        }
+
+        .message.error {
+            background-color: rgba(255, 107, 107, 0.1);
+            border: 1px solid rgba(255, 107, 107, 0.6);
+            color: #ffb3b3;
+        }
+
+        .alt-link {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 13px;
+            color: #868686;
+        }
+
+        .alt-link a {
+            color: #ffffff;
+            text-decoration: none;
+        }
+
+        .alt-link a:hover {
+            text-decoration: underline;
+        }
+
+        @media (max-width: 1000px) {
+            .content {
+                grid-template-columns: 1fr;
+                gap: 40px;
+            }
+
+            .form-card {
+                max-width: 500px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .header {
+                justify-content: center;
+            }
+
+            .nav {
+                display: none;
+            }
+
+            .info h1 {
+                font-size: 24px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="page">
+        <header class="header">
+            <a href="/" class="logo">Vanguard</a>
+            <nav class="nav">
+                <a href="/">Home</a>
+                <a href="/app">Login</a>
+            </nav>
+        </header>
+
+        <div class="content">
+            <div class="info">
+                <h1>Register Your Team</h1>
+                <p>
+                    Vanguard accounts are manually approved to verify each team is who they say they are.
+                    Once approved, you will receive a temporary password via email.
+                </p>
+                <p>
+                    Please include a clear image of your robot with team number signs visible and a piece of paper that says "Vanguard".
+                </p>
+                <ul>
+                    <li>Approval usually happens quickly during the day (Chicago time)</li>
+                    <li>It will make you reset your temporary password after first login</li>
+                    <li>Use an image host like Imgur or Google Drive with public access</li>
+                </ul>
+                <p style="margin-top: 32px; font-size: 13px;">
+                    Need help? <a href="mailto:support@ftcvanguard.org" style="color: #0078d4; text-decoration: none;">support@ftcvanguard.org</a>
+                </p>
+            </div>
+
+            <div class="form-card">
+                <h2>Submit Registration</h2>
+                <p>All fields are required. We will only use your email to send login details.</p>
+                
+                <div id="message" class="message"></div>
+
+                <form id="register-form">
+                    <div class="form-group">
+                        <label for="teamnumber">Team Number</label>
+                        <input type="number" id="teamnumber" name="teamnumber" required placeholder="e.g. 26855" inputmode="numeric">
+                    </div>
+                    <div class="form-group">
+                        <label for="email">Team Email</label>
+                        <input type="email" id="email" name="email" required placeholder="team@example.com" autocomplete="email">
+                    </div>
+                    <div class="form-group">
+                        <label for="imagelink">Verification Image Link</label>
+                        <input type="url" id="imagelink" name="imagelink" required placeholder="https://imgur.com/...">
+                        <div class="hint">Show your robot, team number signage, and a paper that says "Vanguard".</div>
+                    </div>
+                    <button type="submit" id="submit-btn">Submit Request</button>
+                </form>
+
+                <div class="alt-link">Already approved? <a href="/app">Log in to Vanguard</a></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById("register-form").addEventListener("submit", async (e) => {
+            e.preventDefault();
+
+            const submitBtn = document.getElementById("submit-btn");
+            const messageEl = document.getElementById("message");
+            
+            submitBtn.disabled = true;
+            submitBtn.textContent = "Submitting...";
+            messageEl.style.display = "none";
+
+            const formData = new FormData(e.target);
+            
+            try {
+                const response = await fetch("/api/v1/uaregister", {
+                    method: "POST",
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    messageEl.className = "message success";
+                    messageEl.textContent = "Registration submitted successfully! You will receive an email once approved.";
+                    messageEl.style.display = "block";
+                    e.target.reset();
+                } else {
+                    messageEl.className = "message error";
+                    messageEl.textContent = data.error || "Registration failed. Please try again.";
+                    messageEl.style.display = "block";
+                }
+            } catch (error) {
+                messageEl.className = "message error";
+                messageEl.textContent = "Network error. Please check your connection and try again.";
+                messageEl.style.display = "block";
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = "Submit Request";
+            }
+        });
+    </script>
+</body>
+</html>

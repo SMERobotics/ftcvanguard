@@ -1,12 +1,13 @@
 import argon2
 from argon2 import PasswordHasher
 from datetime import datetime, timedelta
-from flask import Flask, request, send_from_directory
+from flask import Flask, request, send_from_directory, jsonify
 import jwt
 import os
 import pyotp
 import requests
 import sqlite3
+import secrets
 import threading
 import time
 import tomllib
@@ -35,7 +36,9 @@ get_totp = lambda: pyotp.TOTP(ADMIN_SECRET)
 
 
 def clamp_schedule_offset(offset_minutes: int) -> int:
-    return max(SCHEDULE_OFFSET_MINUTES_MIN, min(SCHEDULE_OFFSET_MINUTES_MAX, offset_minutes))
+    return max(
+        SCHEDULE_OFFSET_MINUTES_MIN, min(SCHEDULE_OFFSET_MINUTES_MAX, offset_minutes)
+    )
 
 
 def normalize_event_code(event_code: str | None) -> str:
@@ -81,7 +84,9 @@ def get_team_schedule_offset(team_id: int, event_code: str) -> tuple[int, int]:
     return safe_offset, updated_at
 
 
-def set_team_schedule_offset(team_id: int, event_code: str, offset_minutes: int) -> tuple[int, int]:
+def set_team_schedule_offset(
+    team_id: int, event_code: str, offset_minutes: int
+) -> tuple[int, int]:
     normalized_event_code = normalize_event_code(event_code)
     if not normalized_event_code:
         return 0, int(datetime.now().timestamp())
@@ -305,6 +310,18 @@ cursor.execute(
     "CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, password TEXT)"
 )
 
+cursor.execute(
+    """CREATE TABLE IF NOT EXISTS registrations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        team_number INTEGER NOT NULL,
+        email TEXT NOT NULL,
+        image_link TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'pending',
+        submitted_at INTEGER NOT NULL,
+        reviewed_at INTEGER
+    )"""
+)
+
 cursor.execute("""CREATE TABLE IF NOT EXISTS notes (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     team_id INTEGER NOT NULL,
@@ -375,9 +392,7 @@ else:
 
     if "event_code" not in team_schedule_column_names or not has_event_scoped_pk:
         print("Migrating schedule_offsets table to event-scoped offsets")
-        cursor.execute(
-            "ALTER TABLE schedule_offsets RENAME TO schedule_offsets_legacy"
-        )
+        cursor.execute("ALTER TABLE schedule_offsets RENAME TO schedule_offsets_legacy")
         cursor.execute("""CREATE TABLE schedule_offsets (
             team_id INTEGER NOT NULL,
             event_code TEXT NOT NULL,
@@ -415,18 +430,75 @@ if len(NTFY_TEAMS) > 0:
     thread = threading.Thread(target=notification_loop, daemon=True)
     thread.start()
 
-@app.route('/', methods=["GET"])
+
+@app.route("/", methods=["GET"])
 def _root():
     return app.send_static_file("index.html")
+
 
 @app.route("/app", methods=["GET"])
 def _app():
     return app.send_static_file("app.html")
 
 
+@app.route("/register", methods=["GET"])
+def _register():
+    return app.send_static_file("register.html")
+
+
 @app.route("/assets/<path:path>", methods=["GET"])
 def _assets(path):
     return send_from_directory("static/assets", path)
+
+
+@app.route("/api/v1/uaregister", methods=["POST"])
+def _api_v1_uaregister():
+    data = request.form if request.form else request.json or {}
+    team_number = data.get("teamnumber") or data.get("teamNumber")
+    email = data.get("email")
+    image_link = data.get("imagelink") or data.get("imageLink")
+
+    if not team_number or not email or not image_link:
+        return {"status": "fuck", "error": "missing required fields"}, 400
+
+    try:
+        team_number = int(team_number)
+    except ValueError:
+        return {"status": "fuck", "error": "team number must be int"}, 400
+
+    submitted_at = int(datetime.now().timestamp())
+
+    try:
+        db = get_db()
+        cursor = db.cursor()
+
+        cursor.execute("SELECT id FROM users WHERE id = ?", (team_number,))
+        if cursor.fetchone() is not None:
+            cursor.close()
+            db.close()
+            return {"status": "fuck", "error": "team already registered"}, 409
+
+        cursor.execute(
+            "SELECT id FROM registrations WHERE team_number = ? AND status = 'pending'",
+            (team_number,),
+        )
+        if cursor.fetchone() is not None:
+            cursor.close()
+            db.close()
+            return {"status": "fuck", "error": "registration pending"}, 409
+
+        cursor.execute(
+            """INSERT INTO registrations (team_number, email, image_link, status, submitted_at)
+               VALUES (?, ?, ?, 'pending', ?)""",
+            (team_number, email.strip(), image_link.strip(), submitted_at),
+        )
+        db.commit()
+        cursor.close()
+        db.close()
+        return {"status": "success"}, 201
+    except Exception as e:
+        print(e)
+        return {"status": "fuck", "error": "idk"}, 500
 
 
 @app.route("/api/v1/register", methods=["POST"])
@@ -695,10 +767,12 @@ def _api_v1_schedule_offset_put():
 
     try:
         offset_minutes = int(data.get("offsetMinutes"))
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return {"status": "fuck", "error": "offsetMinutes must be integer"}, 400
 
-    saved_offset, updated_at = set_team_schedule_offset(team_id, event_code, offset_minutes)
+    saved_offset, updated_at = set_team_schedule_offset(
+        team_id, event_code, offset_minutes
+    )
     return {
         "status": "success",
         "eventCode": event_code,
@@ -1253,6 +1327,9 @@ def _api_v1_admin_stats():
         cursor.execute("SELECT COUNT(*) FROM notifications")
         total_notifications = cursor.fetchone()[0]
 
+        cursor.execute("SELECT COUNT(*) FROM registrations WHERE status = 'pending'")
+        pending_registrations = cursor.fetchone()[0]
+
         cursor.execute(
             "SELECT page_count * page_size FROM pragma_page_count(), pragma_page_size()"
         )
@@ -1268,6 +1345,7 @@ def _api_v1_admin_stats():
                 "totalNotes": total_notes,
                 "totalNotifications": total_notifications,
                 "databaseSize": db_size,
+                "pendingRegistrations": pending_registrations,
             },
         }, 200
     except Exception as e:
@@ -1541,6 +1619,169 @@ def _api_v1_admin_notifications():
         ]
 
         return {"status": "success", "notifications": notifications}, 200
+    except Exception as e:
+        print(e)
+        return {"status": "fuck", "error": "idk"}, 500
+
+
+@app.route("/api/v1/admin/registrations", methods=["GET"])
+def _api_v1_admin_registrations():
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return {"status": "fuck", "error": "no auth"}, 401
+
+    token = auth_header.split(" ")[1]
+    try:
+        payload = jwt.decode(token, RSA_PUBLIC_KEY, algorithms=["RS256"])
+        if "admin" not in payload.get("scope", []):
+            return {"status": "fuck", "error": "unauthorized"}, 403
+    except jwt.ExpiredSignatureError:
+        return {"status": "fuck", "error": "token expired"}, 401
+    except jwt.InvalidTokenError:
+        return {"status": "fuck", "error": "invalid token"}, 401
+
+    try:
+        db = get_db()
+        cursor = db.cursor()
+        cursor.execute(
+            """SELECT id, team_number, email, image_link, status, submitted_at, reviewed_at
+               FROM registrations
+               ORDER BY submitted_at DESC"""
+        )
+        rows = cursor.fetchall()
+        cursor.close()
+        db.close()
+
+        registrations = [
+            {
+                "id": row[0],
+                "teamNumber": row[1],
+                "email": row[2],
+                "imageLink": row[3],
+                "status": row[4],
+                "submittedAt": row[5],
+                "reviewedAt": row[6],
+            }
+            for row in rows
+        ]
+
+        return {"status": "success", "registrations": registrations}, 200
+    except Exception as e:
+        print(e)
+        return {"status": "fuck", "error": "idk"}, 500
+
+
+@app.route(
+    "/api/v1/admin/registrations/<int:registration_id>/approve", methods=["POST"]
+)
+def _api_v1_admin_approve_registration(registration_id):
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return {"status": "fuck", "error": "no auth"}, 401
+
+    token = auth_header.split(" ")[1]
+    try:
+        payload = jwt.decode(token, RSA_PUBLIC_KEY, algorithms=["RS256"])
+        if "admin" not in payload.get("scope", []):
+            return {"status": "fuck", "error": "unauthorized"}, 403
+    except jwt.ExpiredSignatureError:
+        return {"status": "fuck", "error": "token expired"}, 401
+    except jwt.InvalidTokenError:
+        return {"status": "fuck", "error": "invalid token"}, 401
+
+    reviewed_at = int(datetime.now().timestamp())
+
+    try:
+        db = get_db()
+        cursor = db.cursor()
+        cursor.execute(
+            """SELECT team_number, status FROM registrations WHERE id = ?""",
+            (registration_id,),
+        )
+        row = cursor.fetchone()
+        if row is None:
+            cursor.close()
+            db.close()
+            return {"status": "fuck", "error": "registration not found"}, 404
+
+        team_number = int(row[0])
+        status = row[1]
+        if status != "pending":
+            cursor.close()
+            db.close()
+            return {"status": "fuck", "error": "already reviewed"}, 409
+
+        cursor.execute("SELECT id FROM users WHERE id = ?", (team_number,))
+        if cursor.fetchone() is not None:
+            cursor.close()
+            db.close()
+            return {"status": "fuck", "error": "team already registered"}, 409
+
+        password = secrets.token_urlsafe(9)
+        hash = ph.hash(password)
+
+        cursor.execute(
+            "INSERT INTO users (id, password) VALUES (?, ?)", (team_number, hash)
+        )
+        cursor.execute(
+            """UPDATE registrations SET status = 'approved', reviewed_at = ? WHERE id = ?""",
+            (reviewed_at, registration_id),
+        )
+        db.commit()
+        cursor.close()
+        db.close()
+        return {
+            "status": "success",
+            "teamNumber": team_number,
+            "password": password,
+        }, 200
+    except Exception as e:
+        print(e)
+        return {"status": "fuck", "error": "idk"}, 500
+
+
+@app.route("/api/v1/admin/registrations/<int:registration_id>/deny", methods=["POST"])
+def _api_v1_admin_deny_registration(registration_id):
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return {"status": "fuck", "error": "no auth"}, 401
+
+    token = auth_header.split(" ")[1]
+    try:
+        payload = jwt.decode(token, RSA_PUBLIC_KEY, algorithms=["RS256"])
+        if "admin" not in payload.get("scope", []):
+            return {"status": "fuck", "error": "unauthorized"}, 403
+    except jwt.ExpiredSignatureError:
+        return {"status": "fuck", "error": "token expired"}, 401
+    except jwt.InvalidTokenError:
+        return {"status": "fuck", "error": "invalid token"}, 401
+
+    reviewed_at = int(datetime.now().timestamp())
+
+    try:
+        db = get_db()
+        cursor = db.cursor()
+        cursor.execute(
+            "SELECT status FROM registrations WHERE id = ?", (registration_id,)
+        )
+        row = cursor.fetchone()
+        if row is None:
+            cursor.close()
+            db.close()
+            return {"status": "fuck", "error": "registration not found"}, 404
+        if row[0] != "pending":
+            cursor.close()
+            db.close()
+            return {"status": "fuck", "error": "already reviewed"}, 409
+
+        cursor.execute(
+            """UPDATE registrations SET status = 'denied', reviewed_at = ? WHERE id = ?""",
+            (reviewed_at, registration_id),
+        )
+        db.commit()
+        cursor.close()
+        db.close()
+        return {"status": "success"}, 200
     except Exception as e:
         print(e)
         return {"status": "fuck", "error": "idk"}, 500
