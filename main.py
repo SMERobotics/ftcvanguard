@@ -291,6 +291,7 @@ def notification_loop():
             print(f"Notification loop error: {e}")
         time.sleep(30)
 
+
 sitemapper = Sitemapper()
 
 app = Flask(__name__)
@@ -352,7 +353,7 @@ cursor.execute("""CREATE TABLE IF NOT EXISTS strategy (
     match_number INTEGER NOT NULL,
     match_description TEXT NOT NULL,
     phase TEXT NOT NULL,
-    drawing_data TEXT,
+    strokes TEXT,
     robots_data TEXT,
     updated_at INTEGER NOT NULL,
     UNIQUE(team_id, event_code, match_description, phase)
@@ -363,10 +364,44 @@ columns = [col[1] for col in cursor.fetchall()]
 if "match_description" not in columns:
     print("Migrating strategy table: adding match_description column")
     cursor.execute("ALTER TABLE strategy ADD COLUMN match_description TEXT DEFAULT ''")
-    # For existing rows, set match_description to "Match {match_number}" as fallback
     cursor.execute(
         "UPDATE strategy SET match_description = 'Match ' || match_number WHERE match_description = ''"
     )
+    db.commit()
+
+# Migration: fix UNIQUE constraint to include match_description
+cursor.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='strategy'")
+strategy_sql = cursor.fetchone()
+if (
+    strategy_sql
+    and "UNIQUE(team_id, event_code, match_description, phase)" not in strategy_sql[0]
+):
+    print("Migrating strategy table: fixing UNIQUE constraint")
+    cursor.execute("ALTER TABLE strategy RENAME TO strategy_old")
+    cursor.execute("""CREATE TABLE strategy (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        team_id INTEGER NOT NULL,
+        event_code TEXT NOT NULL,
+        match_number INTEGER NOT NULL,
+        match_description TEXT NOT NULL,
+        phase TEXT NOT NULL,
+        drawing_data TEXT,
+        robots_data TEXT,
+        updated_at INTEGER NOT NULL,
+        UNIQUE(team_id, event_code, match_description, phase)
+    )""")
+    cursor.execute("""INSERT INTO strategy (id, team_id, event_code, match_number, match_description, phase, drawing_data, robots_data, updated_at)
+        SELECT id, team_id, event_code, match_number, COALESCE(match_description, 'Match ' || match_number), phase, drawing_data, robots_data, updated_at
+        FROM strategy_old""")
+    cursor.execute("DROP TABLE strategy_old")
+    db.commit()
+
+# Migration: add strokes column if it doesn't exist
+cursor.execute("PRAGMA table_info(strategy)")
+strategy_columns = [col[1] for col in cursor.fetchall()]
+if "strokes" not in strategy_columns:
+    print("Migrating strategy table: adding strokes column")
+    cursor.execute("ALTER TABLE strategy ADD COLUMN strokes TEXT")
     db.commit()
 
 # Migration: convert schedule_offsets to event-scoped keys
@@ -435,25 +470,28 @@ if len(NTFY_TEAMS) > 0:
     thread = threading.Thread(target=notification_loop, daemon=True)
     thread.start()
 
+
 @sitemapper.include(lastmod="2026-02-14")
 @app.route("/", methods=["GET"])
 def _root():
     return app.send_static_file("index.html")
+
 
 @sitemapper.include(lastmod="2026-02-14")
 @app.route("/app", methods=["GET"])
 def _app():
     return app.send_static_file("app.html")
 
+
 @sitemapper.include(lastmod="2026-02-14")
 @app.route("/register", methods=["GET"])
 def _register():
     return app.send_static_file("register.html")
 
+
 @app.route("/sitemap.xml")
 def sitemap():
     return sitemapper.generate()
-
 
 
 @app.route("/assets/<path:path>", methods=["GET"])
@@ -784,7 +822,7 @@ def _api_v1_schedule_offset_put():
 
     try:
         offset_minutes = int(data.get("offsetMinutes"))
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return {"status": "fuck", "error": "offsetMinutes must be integer"}, 400
 
     saved_offset, updated_at = set_team_schedule_offset(
@@ -1151,7 +1189,7 @@ def _api_v1_strategy_get():
         db = get_db()
         cursor = db.cursor()
         cursor.execute(
-            """SELECT drawing_data, robots_data, updated_at
+            """SELECT strokes, robots_data, updated_at
                FROM strategy WHERE team_id = ? AND event_code = ? AND match_description = ? AND phase = ?""",
             (team_id, event_code, match_description, phase),
         )
@@ -1163,7 +1201,7 @@ def _api_v1_strategy_get():
             return {
                 "status": "success",
                 "strategy": {
-                    "drawingData": None,
+                    "strokes": None,
                     "robotsData": None,
                     "updatedAt": None,
                 },
@@ -1172,7 +1210,7 @@ def _api_v1_strategy_get():
         return {
             "status": "success",
             "strategy": {
-                "drawingData": row[0],
+                "strokes": row[0],
                 "robotsData": row[1],
                 "updatedAt": row[2],
             },
@@ -1206,7 +1244,7 @@ def _api_v1_strategy_post():
         match_number = int(data.get("matchNumber"))
         match_description = data.get("matchDescription")
         phase = data.get("phase")
-        drawing_data = data.get("drawingData")
+        strokes = data.get("strokes")
         robots_data = data.get("robotsData")
     except (ValueError, TypeError) as e:
         print(f"Invalid strategy data: {e}")
@@ -1218,26 +1256,30 @@ def _api_v1_strategy_post():
     if phase not in ("auto", "teleop", "endgame"):
         return {"status": "fuck", "error": "invalid phase"}, 400
 
+    import json
+
+    strokes_str = json.dumps(strokes) if strokes else None
+
     try:
         db = get_db()
         cursor = db.cursor()
         updated_at = int(datetime.now().timestamp())
 
         cursor.execute(
-            """INSERT INTO strategy (team_id, event_code, match_number, match_description, phase, drawing_data, robots_data, updated_at)
+            """INSERT INTO strategy (team_id, event_code, match_number, match_description, phase, strokes, robots_data, updated_at)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                ON CONFLICT(team_id, event_code, match_description, phase)
-               DO UPDATE SET drawing_data=?, robots_data=?, updated_at=?""",
+               DO UPDATE SET strokes=?, robots_data=?, updated_at=?""",
             (
                 team_id,
                 event_code,
                 match_number,
                 match_description,
                 phase,
-                drawing_data,
+                strokes_str,
                 robots_data,
                 updated_at,
-                drawing_data,
+                strokes_str,
                 robots_data,
                 updated_at,
             ),

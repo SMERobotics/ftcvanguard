@@ -4960,9 +4960,7 @@ function generateLineChart(
 // Configurable defaults - tweak these to adjust field layout
 const STRATEGY_CONFIG = {
     // Robot appearance
-    robotSizeMin: 100,
-    robotSizeMax: 120,
-    robotSizeFactor: 0.1,       // fraction of field width
+    robotSizeFactor: 0.1,        // fraction of field width
     robotBorderRadius: 4,        // px
     robotFontSizeFactor: 0.28,   // fraction of robot size
     robotMinFontSize: 10,        // px
@@ -4999,8 +4997,20 @@ interface StrategyRobotState {
     rotation: number;
 }
 
+interface StrategyStrokePoint {
+    x: number;  // 0-1 relative to field bounds
+    y: number;  // 0-1 relative to field bounds
+}
+
+interface StrategyStroke {
+    points: StrategyStrokePoint[];
+    color: string;
+    isEraser: boolean;
+    lineWidthFactor: number;  // fraction of field width
+}
+
 interface StrategyPhaseData {
-    drawingData: string | null;
+    strokes: StrategyStroke[];
     robotsData: string | null;
 }
 
@@ -5017,6 +5027,8 @@ let strategyFieldImage: HTMLImageElement | null = null;
 let strategyRobotStates: Map<string, StrategyRobotState> = new Map();
 let strategyPhaseCache: Map<string, StrategyPhaseData> = new Map();
 let strategyEraserCursorEl: HTMLElement | null = null;
+let strategyCurrentStroke: StrategyStroke | null = null;
+let strategyStrokes: StrategyStroke[] = [];
 
 function getStrategyPhaseKey(match: Match, phase: StrategyPhase): string {
     return `${currentEventCode}_${match.description}_${phase}`;
@@ -5105,6 +5117,12 @@ function resizeStrategyCanvases() {
     drawingCanvas.height = h;
 
     renderFieldBackground();
+    
+    // Re-render strokes and recreate robots with new sizes
+    if (strategyCurrentMatch) {
+        renderStrategyStrokes();
+        createStrategyRobots(strategyCurrentMatch);
+    }
 }
 
 function renderFieldBackground() {
@@ -5166,7 +5184,7 @@ function createStrategyRobots(match: Match) {
 
     const bounds = getFieldBounds();
     const cfg = STRATEGY_CONFIG;
-    const robotSize = Math.max(cfg.robotSizeMin, Math.min(cfg.robotSizeMax, bounds.w * cfg.robotSizeFactor));
+    const robotSize = bounds.w * cfg.robotSizeFactor;
 
     const posKeys: { teams: Team[]; posKey: "blue1" | "blue2" | "red1" | "red2"; color: string }[] = [
         { teams: blueTeams, posKey: "blue1", color: cfg.blueColor },
@@ -5218,17 +5236,27 @@ function createStrategyRobots(match: Match) {
         const arrow = document.createElement("div");
         arrow.className = "strategy-robot-arrow";
         arrow.style.borderBottomColor = pos.color;
+        const arrowSize = Math.max(4, robotSize * 0.05);
+        arrow.style.borderLeft = `${arrowSize}px solid transparent`;
+        arrow.style.borderRight = `${arrowSize}px solid transparent`;
+        arrow.style.borderBottom = `${arrowSize * 1.2}px solid`;
 
         // Team number label
         const label = document.createElement("span");
         label.style.color = pos.color;
+        label.style.fontSize = `${Math.max(cfg.robotMinFontSize, robotSize * cfg.robotFontSizeFactor)}px`;
         label.textContent = pos.team.teamNumber.toString();
 
         // Rotate button
         const rotateBtn = document.createElement("button");
         rotateBtn.className = "strategy-robot-rotate-btn";
         rotateBtn.title = "Drag to rotate";
-        rotateBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none"><path d="M1 4v6h6M23 20v-6h-6" stroke="${pos.color}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M20.49 9A9 9 0 005.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 013.51 15" stroke="${pos.color}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+        const btnSize = Math.max(16, robotSize * 0.18);
+        rotateBtn.style.width = `${btnSize}px`;
+        rotateBtn.style.height = `${btnSize}px`;
+        rotateBtn.style.bottom = `${-btnSize - 4}px`;
+        const iconSize = Math.max(10, btnSize * 0.6);
+        rotateBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" style="width: ${iconSize}px; height: ${iconSize}px;"><path d="M1 4v6h6M23 20v-6h-6" stroke="${pos.color}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M20.49 9A9 9 0 005.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 013.51 15" stroke="${pos.color}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 
         el.appendChild(arrow);
         el.appendChild(label);
@@ -5443,10 +5471,6 @@ function initStrategyDrawing() {
     const ctx = drawingCanvas.getContext("2d");
     if (!ctx) return;
 
-    let lastX = 0;
-    let lastY = 0;
-
-    // Eraser circle cursor
     ensureEraserCursor();
 
     const getPos = (e: MouseEvent | Touch): { x: number; y: number } => {
@@ -5457,39 +5481,66 @@ function initStrategyDrawing() {
         };
     };
 
+    const toFraction = (x: number, y: number): StrategyStrokePoint => {
+        const bounds = getFieldBounds();
+        return {
+            x: (x - bounds.x) / bounds.w,
+            y: (y - bounds.y) / bounds.h
+        };
+    };
+
     const startDraw = (x: number, y: number) => {
         strategyIsDrawing = true;
-        lastX = x;
-        lastY = y;
+        const bounds = getFieldBounds();
+        const lineWidthFactor = strategyTool === "eraser" 
+            ? (STRATEGY_CONFIG.eraserRadius * 2) / bounds.w 
+            : STRATEGY_CONFIG.drawLineWidth / bounds.w;
+        
+        strategyCurrentStroke = {
+            points: [toFraction(x, y)],
+            color: strategyDrawingColor,
+            isEraser: strategyTool === "eraser",
+            lineWidthFactor: lineWidthFactor
+        };
     };
 
     const draw = (x: number, y: number) => {
-        if (!strategyIsDrawing) return;
+        if (!strategyIsDrawing || !strategyCurrentStroke) return;
 
-        ctx.beginPath();
-        ctx.moveTo(lastX, lastY);
-        ctx.lineTo(x, y);
+        const point = toFraction(x, y);
+        strategyCurrentStroke.points.push(point);
 
-        if (strategyTool === "eraser") {
-            ctx.globalCompositeOperation = "destination-out";
-            ctx.strokeStyle = "rgba(0,0,0,1)";
-            ctx.lineWidth = STRATEGY_CONFIG.eraserRadius * 2;
-        } else {
-            ctx.globalCompositeOperation = "source-over";
-            ctx.strokeStyle = strategyDrawingColor;
-            ctx.lineWidth = STRATEGY_CONFIG.drawLineWidth;
+        // Draw just the new segment for immediate feedback
+        const bounds = getFieldBounds();
+        const points = strategyCurrentStroke.points;
+        if (points.length >= 2) {
+            const prev = points[points.length - 2];
+            const curr = points[points.length - 1];
+            
+            ctx.beginPath();
+            ctx.moveTo(bounds.x + prev.x * bounds.w, bounds.y + prev.y * bounds.h);
+            ctx.lineTo(bounds.x + curr.x * bounds.w, bounds.y + curr.y * bounds.h);
+
+            if (strategyCurrentStroke.isEraser) {
+                ctx.globalCompositeOperation = "destination-out";
+                ctx.strokeStyle = "rgba(0,0,0,1)";
+            } else {
+                ctx.globalCompositeOperation = "source-over";
+                ctx.strokeStyle = strategyCurrentStroke.color;
+            }
+            ctx.lineWidth = strategyCurrentStroke.lineWidthFactor * bounds.w;
+            ctx.lineCap = "round";
+            ctx.lineJoin = "round";
+            ctx.stroke();
         }
-
-        ctx.lineCap = "round";
-        ctx.lineJoin = "round";
-        ctx.stroke();
-
-        lastX = x;
-        lastY = y;
     };
 
     const endDraw = () => {
-        if (strategyIsDrawing) {
+        if (strategyIsDrawing && strategyCurrentStroke) {
+            if (strategyCurrentStroke.points.length > 0) {
+                strategyStrokes.push(strategyCurrentStroke);
+            }
+            strategyCurrentStroke = null;
             strategyIsDrawing = false;
             cacheCurrentPhaseDrawing();
             scheduleStrategySave();
@@ -5545,6 +5596,44 @@ function initStrategyDrawing() {
     });
 }
 
+function renderStrategyStrokes() {
+    const drawingCanvas = document.getElementById("strategy-drawing-canvas") as HTMLCanvasElement;
+    if (!drawingCanvas) return;
+
+    const ctx = drawingCanvas.getContext("2d");
+    if (!ctx) return;
+
+    ctx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
+    const bounds = getFieldBounds();
+
+    for (const stroke of strategyStrokes) {
+        if (stroke.points.length < 2) continue;
+
+        ctx.beginPath();
+        const first = stroke.points[0];
+        ctx.moveTo(bounds.x + first.x * bounds.w, bounds.y + first.y * bounds.h);
+
+        for (let i = 1; i < stroke.points.length; i++) {
+            const pt = stroke.points[i];
+            ctx.lineTo(bounds.x + pt.x * bounds.w, bounds.y + pt.y * bounds.h);
+        }
+
+        if (stroke.isEraser) {
+            ctx.globalCompositeOperation = "destination-out";
+            ctx.strokeStyle = "rgba(0,0,0,1)";
+        } else {
+            ctx.globalCompositeOperation = "source-over";
+            ctx.strokeStyle = stroke.color;
+        }
+        ctx.lineWidth = stroke.lineWidthFactor * bounds.w;
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+        ctx.stroke();
+    }
+    
+    ctx.globalCompositeOperation = "source-over";
+}
+
 function ensureEraserCursor() {
     if (strategyEraserCursorEl) return;
     const el = document.createElement("div");
@@ -5581,37 +5670,22 @@ function updateEraserCursor(clientX: number, clientY: number) {
 
 function cacheCurrentPhaseDrawing() {
     if (!strategyCurrentMatch) return;
-    const drawingCanvas = document.getElementById("strategy-drawing-canvas") as HTMLCanvasElement;
-    if (!drawingCanvas) return;
 
     const key = getStrategyPhaseKey(strategyCurrentMatch, strategyCurrentPhase);
     strategyPhaseCache.set(key, {
-        drawingData: drawingCanvas.toDataURL(),
+        strokes: [...strategyStrokes],
         robotsData: collectRobotsData()
     });
 }
 
 function restorePhaseDrawing() {
     if (!strategyCurrentMatch) return;
-    const drawingCanvas = document.getElementById("strategy-drawing-canvas") as HTMLCanvasElement;
-    if (!drawingCanvas) return;
-
-    const ctx = drawingCanvas.getContext("2d");
-    if (!ctx) return;
 
     const key = getStrategyPhaseKey(strategyCurrentMatch, strategyCurrentPhase);
     const cached = strategyPhaseCache.get(key);
 
-    ctx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
-
-    if (cached?.drawingData) {
-        const img = new Image();
-        img.onload = () => {
-            ctx.drawImage(img, 0, 0);
-        };
-        img.src = cached.drawingData;
-    }
-
+    strategyStrokes = cached?.strokes ? [...cached.strokes] : [];
+    renderStrategyStrokes();
     createStrategyRobots(strategyCurrentMatch);
 }
 
@@ -5631,9 +5705,18 @@ async function loadStrategyFromBackend(match: Match, phase: StrategyPhase) {
 
         const key = getStrategyPhaseKey(match, phase);
 
-        if (strategy.drawingData || strategy.robotsData) {
+        let strokes: StrategyStroke[] = [];
+        if (strategy.strokes) {
+            try {
+                strokes = typeof strategy.strokes === "string" ? JSON.parse(strategy.strokes) : strategy.strokes;
+            } catch {
+                strokes = [];
+            }
+        }
+
+        if (strokes.length > 0 || strategy.robotsData) {
             strategyPhaseCache.set(key, {
-                drawingData: strategy.drawingData,
+                strokes: strokes,
                 robotsData: strategy.robotsData
             });
             restoreRobotsFromData(strategy.robotsData, match, phase);
@@ -5648,10 +5731,6 @@ function saveStrategyToBackend() {
     const token = localStorage.getItem("token");
     if (!token) return;
 
-    const drawingCanvas = document.getElementById("strategy-drawing-canvas") as HTMLCanvasElement;
-    if (!drawingCanvas) return;
-
-    const drawingData = drawingCanvas.toDataURL();
     const robotsData = collectRobotsData();
 
     authFetch("/api/v1/strategy", {
@@ -5665,7 +5744,7 @@ function saveStrategyToBackend() {
             matchNumber: strategyCurrentMatch.matchNumber,
             matchDescription: strategyCurrentMatch.description,
             phase: strategyCurrentPhase,
-            drawingData: drawingData,
+            strokes: strategyStrokes,
             robotsData: robotsData
         })
     }).catch(e => console.error("Failed to save strategy:", e));
@@ -5779,6 +5858,8 @@ function clearStrategyDrawing() {
     const ctx = drawingCanvas.getContext("2d");
     if (!ctx) return;
 
+    // Clear strokes array and canvas
+    strategyStrokes = [];
     ctx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
 
     // Reset robot positions for this phase
