@@ -34,6 +34,33 @@ body {
     -moz-user-select: none;
     -ms-user-select: none;
     overflow: hidden;
+    --native-viewport-offset-top: 0px;
+    --native-viewport-offset-bottom: 0px;
+    --native-safe-area-top: 0px;
+    --native-safe-area-right: 0px;
+    --native-safe-area-bottom: 0px;
+    --native-safe-area-left: 0px;
+}
+
+body.native-mobile {
+    --native-safe-area-top: max(env(safe-area-inset-top, 0px), var(--native-viewport-offset-top));
+    --native-safe-area-right: env(safe-area-inset-right, 0px);
+    --native-safe-area-bottom: max(env(safe-area-inset-bottom, 0px), var(--native-viewport-offset-bottom));
+    --native-safe-area-left: env(safe-area-inset-left, 0px);
+}
+
+body.native-mobile #header {
+    padding-top: var(--native-safe-area-top);
+    padding-left: var(--native-safe-area-left);
+    padding-right: var(--native-safe-area-right);
+}
+
+body.native-mobile #main {
+    padding-bottom: var(--native-safe-area-bottom);
+}
+
+body.native-mobile #sidebar-nav {
+    padding-bottom: var(--native-safe-area-bottom);
 }
 
 #header {
@@ -2415,10 +2442,19 @@ textarea:focus-visible {
             "main"
             "footer";
     }
+
+    body.native-mobile {
+        grid-template-rows: calc(48px + var(--native-safe-area-top)) 1fr 0;
+    }
     
     #header {
         padding: 0;
         justify-content: flex-start;
+    }
+
+    body.native-mobile #header {
+        min-height: calc(48px + var(--native-safe-area-top));
+        align-items: flex-end;
     }
     
     .header-content {
@@ -2428,6 +2464,12 @@ textarea:focus-visible {
         gap: 8px;
         padding: 0 4px 0 4px;
         padding-right: 10px;
+    }
+
+    body.native-mobile .header-content {
+        min-height: 48px;
+        padding-left: max(4px, var(--native-safe-area-left));
+        padding-right: max(10px, var(--native-safe-area-right));
     }
     
     .mobile-menu-btn {
@@ -2487,6 +2529,12 @@ textarea:focus-visible {
         transform: translateX(-100%);
         transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
         padding-top: 0;
+    }
+
+    body.native-mobile #sidebar-nav {
+        padding-top: var(--native-safe-area-top);
+        padding-left: var(--native-safe-area-left);
+        padding-bottom: var(--native-safe-area-bottom);
     }
     
     #sidebar.open #sidebar-nav {

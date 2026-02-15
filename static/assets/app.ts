@@ -1,5 +1,54 @@
-const IS_NATIVE = typeof (window as any).Capacitor !== 'undefined' && (window as any).Capacitor.platform !== 'web';
+const CAPACITOR_REF = (window as any).Capacitor;
+const CAPACITOR_PLATFORM = typeof CAPACITOR_REF?.getPlatform === "function"
+    ? CAPACITOR_REF.getPlatform()
+    : CAPACITOR_REF?.platform;
+const IS_NATIVE = typeof CAPACITOR_PLATFORM === "string" && CAPACITOR_PLATFORM !== "web";
+const IS_NATIVE_MOBILE = CAPACITOR_PLATFORM === "ios" || CAPACITOR_PLATFORM === "android";
 const BASE_URL = IS_NATIVE ? "https://ftcvanguard.org" : "";
+
+let nativeViewportListenersAttached: boolean = false;
+
+function updateNativeViewportInsets() {
+    if (!IS_NATIVE_MOBILE) return;
+    const body = document.body;
+    if (!body) return;
+
+    const viewport = window.visualViewport;
+    if (!viewport) {
+        body.style.setProperty("--native-viewport-offset-top", "0px");
+        body.style.setProperty("--native-viewport-offset-bottom", "0px");
+        return;
+    }
+
+    const topInset = Math.min(90, Math.max(0, Math.round(viewport.offsetTop)));
+    const viewportHeight = Math.round(viewport.height);
+    const windowHeight = Math.round(window.innerHeight);
+    const rawBottomInset = Math.max(0, windowHeight - viewportHeight - topInset);
+    const bottomInset = rawBottomInset > 120 ? 0 : rawBottomInset;
+
+    body.style.setProperty("--native-viewport-offset-top", `${topInset}px`);
+    body.style.setProperty("--native-viewport-offset-bottom", `${bottomInset}px`);
+}
+
+function setupNativeMobileSafeAreaHandling() {
+    if (!IS_NATIVE_MOBILE) return;
+    const body = document.body;
+    if (!body) return;
+
+    body.classList.add("native-mobile");
+    body.dataset.nativePlatform = CAPACITOR_PLATFORM;
+    updateNativeViewportInsets();
+
+    if (nativeViewportListenersAttached) return;
+    nativeViewportListenersAttached = true;
+
+    window.addEventListener("resize", updateNativeViewportInsets);
+    window.addEventListener("orientationchange", updateNativeViewportInsets);
+    window.visualViewport?.addEventListener("resize", updateNativeViewportInsets);
+    window.visualViewport?.addEventListener("scroll", updateNativeViewportInsets);
+}
+
+setupNativeMobileSafeAreaHandling();
 
 interface Tab {
     buttonId: string;
