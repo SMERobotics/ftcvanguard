@@ -1,7 +1,5 @@
-/*
-not functional but nice things to do:
-- [ ] integrate bearer auth directly into authFetch()
-*/
+const IS_NATIVE = typeof (window as any).Capacitor !== 'undefined' && (window as any).Capacitor.platform !== 'web';
+const BASE_URL = IS_NATIVE ? "https://ftcvanguard.org" : "";
 
 interface Tab {
     buttonId: string;
@@ -316,7 +314,8 @@ async function assertAuthorized(response: Response): Promise<Response> {
 }
 
 async function authFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
-    const res = await fetch(input, init);
+    const url = typeof input === "string" ? `${BASE_URL}${input}` : input;
+    const res = await fetch(url, init);
     return assertAuthorized(res);
 }
 
@@ -1108,7 +1107,7 @@ async function handlePasswordChange(event: Event): Promise<void> {
     const token = localStorage.getItem("token");
 
     try {
-        const response = await fetch("/api/v1/password_reset", {
+        const response = await fetch(`${BASE_URL}/api/v1/password_reset`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
@@ -1177,7 +1176,7 @@ async function adminFetch(endpoint: string, options: RequestInit = {}): Promise<
         headers.set("Authorization", `Bearer ${token}`);
     }
     
-    return fetch(endpoint, {
+    return fetch(`${BASE_URL}${endpoint}`, {
         ...options,
         headers
     });
@@ -3417,7 +3416,7 @@ async function handleLogin(event: Event) {
     errorElement.textContent = "";
 
     try {
-        const response = await fetch("/api/v1/login", {
+        const response = await fetch(`${BASE_URL}/api/v1/login`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json"

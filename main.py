@@ -2,6 +2,7 @@ import argon2
 from argon2 import PasswordHasher
 from datetime import datetime, timedelta
 from flask import Flask, request, send_from_directory, jsonify
+from flask_cors import CORS
 from flask_sitemapper import Sitemapper
 import jwt
 import os
@@ -295,7 +296,7 @@ def notification_loop():
 sitemapper = Sitemapper()
 
 app = Flask(__name__)
-
+CORS(app, origins=["https://ftcvanguard.org", "http://localhost", "capacitor://localhost"])
 sitemapper.init_app(app)
 
 ph = PasswordHasher()

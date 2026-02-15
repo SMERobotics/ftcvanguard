@@ -1,8 +1,6 @@
 "use strict";
-/*
-not functional but nice things to do:
-- [ ] integrate bearer auth directly into authFetch()
-*/
+const IS_NATIVE = typeof window.Capacitor !== 'undefined' && window.Capacitor.platform !== 'web';
+const BASE_URL = IS_NATIVE ? "https://ftcvanguard.org" : "";
 const tabs = [
     { buttonId: "button-schedule", viewId: "view-schedule" },
     { buttonId: "button-rankings", viewId: "view-rankings" },
@@ -123,7 +121,8 @@ async function assertAuthorized(response) {
     return response;
 }
 async function authFetch(input, init) {
-    const res = await fetch(input, init);
+    const url = typeof input === "string" ? `${BASE_URL}${input}` : input;
+    const res = await fetch(url, init);
     return assertAuthorized(res);
 }
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
@@ -860,7 +859,7 @@ async function handlePasswordChange(event) {
     submitBtn.textContent = "Updating...";
     const token = localStorage.getItem("token");
     try {
-        const response = await fetch("/api/v1/password_reset", {
+        const response = await fetch(`${BASE_URL}/api/v1/password_reset`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
@@ -921,7 +920,7 @@ async function adminFetch(endpoint, options = {}) {
     if (token) {
         headers.set("Authorization", `Bearer ${token}`);
     }
-    return fetch(endpoint, {
+    return fetch(`${BASE_URL}${endpoint}`, {
         ...options,
         headers
     });
@@ -2891,7 +2890,7 @@ async function handleLogin(event) {
     errorElement.style.display = "none";
     errorElement.textContent = "";
     try {
-        const response = await fetch("/api/v1/login", {
+        const response = await fetch(`${BASE_URL}/api/v1/login`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json"
