@@ -36,6 +36,7 @@ let currentOPRData = new Map();
 let isAdminAuthenticated = false;
 let currentUserScopes = [];
 let currentSettingsSection = "notifications";
+let PasswordChangeLastFocusedEl = null;
 let adminToken = null;
 let currentAdminSection = "overview";
 let scheduleOffsetMinutes = 0;
@@ -771,7 +772,7 @@ function hideLoading() {
     }
 }
 function switchSettingsSection(section) {
-    const sections = ["notifications", "management"];
+    const sections = ["notifications", "security", "management"];
     sections.forEach(s => {
         const sectionEl = document.getElementById(`settings-section-${s}`);
         const navBtn = document.getElementById(`settings-nav-${s}`);
@@ -789,6 +790,131 @@ function switchSettingsSection(section) {
     });
     currentSettingsSection = section;
 }
+function showPasswordChangeModal() {
+    const modal = document.getElementById("password-reset-modal");
+    if (modal) {
+        PasswordChangeLastFocusedEl = document.activeElement;
+        modal.style.display = "flex";
+        modal.setAttribute("aria-hidden", "false");
+        document.body.style.overflow = "hidden";
+        setTimeout(() => {
+            const input = document.getElementById("current-password");
+            if (input)
+                input.focus();
+        }, 60);
+    }
+}
+function closePasswordChangeModal() {
+    const modal = document.getElementById("password-reset-modal");
+    if (modal) {
+        modal.style.display = "none";
+        modal.setAttribute("aria-hidden", "true");
+        document.body.style.overflow = "";
+        const currentPasswordInput = document.getElementById("current-password");
+        const newPasswordInput = document.getElementById("new-password");
+        const confirmPasswordInput = document.getElementById("confirm-password");
+        const errorEl = document.getElementById("password-reset-error");
+        const successEl = document.getElementById("password-reset-success");
+        if (currentPasswordInput)
+            currentPasswordInput.value = "";
+        if (newPasswordInput)
+            newPasswordInput.value = "";
+        if (confirmPasswordInput)
+            confirmPasswordInput.value = "";
+        if (errorEl)
+            errorEl.style.display = "none";
+        if (successEl)
+            successEl.style.display = "none";
+        if (PasswordChangeLastFocusedEl) {
+            PasswordChangeLastFocusedEl.focus();
+            PasswordChangeLastFocusedEl = null;
+        }
+    }
+}
+async function handlePasswordChange(event) {
+    event.preventDefault();
+    const currentPasswordInput = document.getElementById("current-password");
+    const newPasswordInput = document.getElementById("new-password");
+    const confirmPasswordInput = document.getElementById("confirm-password");
+    const errorEl = document.getElementById("password-reset-error");
+    const successEl = document.getElementById("password-reset-success");
+    const submitBtn = document.getElementById("password-reset-submit-btn");
+    if (!currentPasswordInput || !newPasswordInput || !confirmPasswordInput || !errorEl || !successEl || !submitBtn)
+        return;
+    errorEl.style.display = "none";
+    successEl.style.display = "none";
+    const currentPassword = currentPasswordInput.value;
+    const newPassword = newPasswordInput.value;
+    const confirmPassword = confirmPasswordInput.value;
+    if (newPassword !== confirmPassword) {
+        errorEl.textContent = "New passwords do not match";
+        errorEl.style.display = "block";
+        return;
+    }
+    if (newPassword.length < 6) {
+        errorEl.textContent = "New password must be at least 6 characters";
+        errorEl.style.display = "block";
+        return;
+    }
+    submitBtn.disabled = true;
+    submitBtn.textContent = "Updating...";
+    const token = localStorage.getItem("token");
+    try {
+        const response = await fetch("/api/v1/password_reset", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${token}`,
+            },
+            body: JSON.stringify({ currentPassword, newPassword }),
+        });
+        const data = await response.json();
+        if (response.ok) {
+            successEl.textContent = "Password changed successfully";
+            successEl.style.display = "block";
+            currentPasswordInput.value = "";
+            newPasswordInput.value = "";
+            confirmPasswordInput.value = "";
+            // Close modal after success
+            setTimeout(() => {
+                closePasswordChangeModal();
+                submitBtn.disabled = false;
+                submitBtn.textContent = "Confirm";
+            }, 1500);
+        }
+        else {
+            errorEl.textContent = data.error || "Failed to change password";
+            errorEl.style.display = "block";
+            submitBtn.disabled = false;
+            submitBtn.textContent = "Confirm";
+        }
+    }
+    catch (error) {
+        console.error("Password reset error:", error);
+        errorEl.textContent = "An error occurred. Please try again.";
+        errorEl.style.display = "block";
+        submitBtn.disabled = false;
+        submitBtn.textContent = "Confirm";
+    }
+}
+document.addEventListener("mousedown", (event) => {
+    const modal = document.getElementById("password-reset-modal");
+    if (!modal || modal.style.display !== "flex") {
+        return;
+    }
+    if (event.target === modal) {
+        closePasswordChangeModal();
+    }
+});
+document.addEventListener("keydown", (event) => {
+    const modal = document.getElementById("password-reset-modal");
+    if (!modal || modal.style.display !== "flex") {
+        return;
+    }
+    if (event.key === "Escape") {
+        closePasswordChangeModal();
+    }
+});
 async function adminFetch(endpoint, options = {}) {
     const token = adminToken || localStorage.getItem("token");
     const headers = new Headers(options.headers || {});
@@ -5547,6 +5673,9 @@ window.clearNotificationHistory = clearNotificationHistory;
 window.vacuumDatabase = vacuumDatabase;
 window.switchAdminSection = switchAdminSection;
 window.switchSettingsSection = switchSettingsSection;
+window.showPasswordChangeModal = showPasswordChangeModal;
+window.closePasswordChangeModal = closePasswordChangeModal;
+window.handlePasswordChange = handlePasswordChange;
 window.loadAdminRegistrations = loadAdminRegistrations;
 window.approveRegistration = approveRegistration;
 window.denyRegistration = denyRegistration;

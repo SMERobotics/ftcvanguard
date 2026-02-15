@@ -226,6 +226,7 @@ let currentOPRData: Map<number, number | null> = new Map();
 let isAdminAuthenticated: boolean = false;
 let currentUserScopes: string[] = [];
 let currentSettingsSection: string = "notifications";
+let PasswordChangeLastFocusedEl: HTMLElement | null = null;
 let adminToken: string | null = null;
 let currentAdminSection: string = "overview";
 let scheduleOffsetMinutes: number = 0;
@@ -1008,7 +1009,7 @@ function hideLoading() {
 }
 
 function switchSettingsSection(section: string): void {
-    const sections = ["notifications", "management"];
+    const sections = ["notifications", "security", "management"];
 
     sections.forEach(s => {
         const sectionEl = document.getElementById(`settings-section-${s}`);
@@ -1029,6 +1030,144 @@ function switchSettingsSection(section: string): void {
 
     currentSettingsSection = section;
 }
+
+function showPasswordChangeModal(): void {
+    const modal = document.getElementById("password-reset-modal") as HTMLElement | null;
+    if (modal) {
+        PasswordChangeLastFocusedEl = document.activeElement as HTMLElement;
+        modal.style.display = "flex";
+        modal.setAttribute("aria-hidden", "false");
+        document.body.style.overflow = "hidden";
+        setTimeout(() => {
+            const input = document.getElementById("current-password") as HTMLInputElement | null;
+            if (input) input.focus();
+        }, 60);
+    }
+}
+
+function closePasswordChangeModal(): void {
+    const modal = document.getElementById("password-reset-modal") as HTMLElement | null;
+    if (modal) {
+        modal.style.display = "none";
+        modal.setAttribute("aria-hidden", "true");
+        document.body.style.overflow = "";
+
+        const currentPasswordInput = document.getElementById("current-password") as HTMLInputElement;
+        const newPasswordInput = document.getElementById("new-password") as HTMLInputElement;
+        const confirmPasswordInput = document.getElementById("confirm-password") as HTMLInputElement;
+        const errorEl = document.getElementById("password-reset-error");
+        const successEl = document.getElementById("password-reset-success");
+
+        if (currentPasswordInput) currentPasswordInput.value = "";
+        if (newPasswordInput) newPasswordInput.value = "";
+        if (confirmPasswordInput) confirmPasswordInput.value = "";
+        if (errorEl) errorEl.style.display = "none";
+        if (successEl) successEl.style.display = "none";
+
+        if (PasswordChangeLastFocusedEl) {
+            PasswordChangeLastFocusedEl.focus();
+            PasswordChangeLastFocusedEl = null;
+        }
+    }
+}
+
+async function handlePasswordChange(event: Event): Promise<void> {
+    event.preventDefault();
+
+    const currentPasswordInput = document.getElementById("current-password") as HTMLInputElement;
+    const newPasswordInput = document.getElementById("new-password") as HTMLInputElement;
+    const confirmPasswordInput = document.getElementById("confirm-password") as HTMLInputElement;
+    const errorEl = document.getElementById("password-reset-error");
+    const successEl = document.getElementById("password-reset-success");
+    const submitBtn = document.getElementById("password-reset-submit-btn") as HTMLButtonElement;
+
+    if (!currentPasswordInput || !newPasswordInput || !confirmPasswordInput || !errorEl || !successEl || !submitBtn) return;
+
+    errorEl.style.display = "none";
+    successEl.style.display = "none";
+
+    const currentPassword = currentPasswordInput.value;
+    const newPassword = newPasswordInput.value;
+    const confirmPassword = confirmPasswordInput.value;
+
+    if (newPassword !== confirmPassword) {
+        errorEl.textContent = "New passwords do not match";
+        errorEl.style.display = "block";
+        return;
+    }
+
+    if (newPassword.length < 6) {
+        errorEl.textContent = "New password must be at least 6 characters";
+        errorEl.style.display = "block";
+        return;
+    }
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = "Updating...";
+
+    const token = localStorage.getItem("token");
+
+    try {
+        const response = await fetch("/api/v1/password_reset", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${token}`,
+            },
+            body: JSON.stringify({ currentPassword, newPassword }),
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            successEl.textContent = "Password changed successfully";
+            successEl.style.display = "block";
+            currentPasswordInput.value = "";
+            newPasswordInput.value = "";
+            confirmPasswordInput.value = "";
+            
+            // Close modal after success
+            setTimeout(() => {
+                closePasswordChangeModal();
+                submitBtn.disabled = false;
+                submitBtn.textContent = "Confirm";
+            }, 1500);
+        } else {
+            errorEl.textContent = data.error || "Failed to change password";
+            errorEl.style.display = "block";
+            submitBtn.disabled = false;
+            submitBtn.textContent = "Confirm";
+        }
+    } catch (error) {
+        console.error("Password reset error:", error);
+        errorEl.textContent = "An error occurred. Please try again.";
+        errorEl.style.display = "block";
+        submitBtn.disabled = false;
+        submitBtn.textContent = "Confirm";
+    }
+}
+
+document.addEventListener("mousedown", (event: MouseEvent) => {
+    const modal = document.getElementById("password-reset-modal") as HTMLElement | null;
+    if (!modal || modal.style.display !== "flex") {
+        return;
+    }
+
+    if (event.target === modal) {
+        closePasswordChangeModal();
+    }
+});
+
+document.addEventListener("keydown", (event: KeyboardEvent) => {
+    const modal = document.getElementById("password-reset-modal") as HTMLElement | null;
+    if (!modal || modal.style.display !== "flex") {
+        return;
+    }
+
+    if (event.key === "Escape") {
+        closePasswordChangeModal();
+    }
+});
 
 async function adminFetch(endpoint: string, options: RequestInit = {}): Promise<Response> {
     const token = adminToken || localStorage.getItem("token");
@@ -6425,6 +6564,9 @@ document.addEventListener("DOMContentLoaded", async () => {
 (window as any).vacuumDatabase = vacuumDatabase;
 (window as any).switchAdminSection = switchAdminSection;
 (window as any).switchSettingsSection = switchSettingsSection;
+(window as any).showPasswordChangeModal = showPasswordChangeModal;
+(window as any).closePasswordChangeModal = closePasswordChangeModal;
+(window as any).handlePasswordChange = handlePasswordChange;
 (window as any).loadAdminRegistrations = loadAdminRegistrations;
 (window as any).approveRegistration = approveRegistration;
 (window as any).denyRegistration = denyRegistration;

@@ -1362,6 +1362,7 @@ body {
 
 .view {
     animation: fadeInUp 0.3s ease-out;
+    height: 100%;
 }
 
 .view.fade-out {
@@ -5222,11 +5223,218 @@ body.home-page {
     margin: 0 0 16px 0;
 }
 
+.settings-action-button {
+    background-color: #0078d4;
+    color: #ffffff;
+    border: none;
+    border-radius: 6px;
+    padding: 12px 20px;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.settings-action-button:hover {
+    background-color: #0063b1;
+}
+
+/* Password Reset Modal */
+.password-modal-overlay {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    background-color: rgba(0, 0, 0, 0.62);
+    backdrop-filter: blur(4px);
+    padding: 16px;
+}
+
+.password-modal-container {
+    width: 100%;
+    max-width: 420px;
+    background-color: #1f1f1f;
+    border: 1px solid #333333;
+    border-radius: 8px;
+    box-shadow: 0 14px 42px rgba(0, 0, 0, 0.55);
+    padding: 24px;
+    position: relative;
+    animation: slideUp 180ms ease-out;
+}
+
+.password-modal-close {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    width: 28px;
+    height: 28px;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    background: transparent;
+    color: #8f8f8f;
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.password-modal-close:hover {
+    background-color: #2f2f31;
+    color: #cccccc;
+}
+
+.password-modal-close:focus-visible,
+.password-modal-cancel-btn:focus-visible,
+.password-modal-confirm-btn:focus-visible,
+.password-modal-form-group input:focus-visible {
+    outline: 2px solid #0078d4;
+    outline-offset: 1px;
+}
+
+.password-modal-title {
+    margin: 0;
+    color: #ffffff;
+    font-size: 20px;
+    font-weight: 600;
+    letter-spacing: -0.5px;
+}
+
+.password-modal-description {
+    margin: 14px 0 18px 0;
+    color: #a0a0a0;
+    font-size: 13px;
+    line-height: 1.45;
+}
+
+#password-reset-form {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.password-modal-form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.password-modal-form-group label {
+    color: #cccccc;
+    font-size: 13px;
+    font-weight: 500;
+}
+
+.password-modal-form-group input {
+    background-color: #252526;
+    border: 1px solid #3e3e42;
+    border-radius: 6px;
+    padding: 12px;
+    color: #ffffff;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 14px;
+    outline: none;
+    transition: all 0.2s ease;
+    appearance: none;
+}
+
+.password-modal-form-group input:focus {
+    border-color: #0078d4;
+    background-color: #2d2d30;
+    box-shadow: 0 0 0 2px rgba(0, 120, 212, 0.2);
+}
+
+.password-modal-form-group input::placeholder {
+    color: #6f6f6f;
+}
+
+.password-modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 2px;
+}
+
+.password-modal-cancel-btn,
+.password-modal-confirm-btn {
+    min-width: 96px;
+    border-radius: 6px;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 14px;
+    font-weight: 600;
+    padding: 10px 14px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.password-modal-cancel-btn {
+    border: 1px solid #3e3e42;
+    background-color: #252526;
+    color: #cccccc;
+}
+
+.password-modal-cancel-btn:hover {
+    background-color: #2d2d30;
+}
+
+.password-modal-confirm-btn {
+    border: none;
+    background-color: #0078d4;
+    color: #ffffff;
+}
+
+.password-modal-confirm-btn:hover {
+    background-color: #0063b1;
+}
+
+.password-modal-confirm-btn:disabled {
+    background-color: #3e3e42;
+    color: #8a8a8a;
+    cursor: not-allowed;
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px) scale(0.96);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.settings-form-error {
+    color: #f48771;
+    font-size: 13px;
+    margin-top: 12px;
+    text-align: center;
+    background-color: rgba(244, 135, 113, 0.1);
+    padding: 8px;
+    border-radius: 4px;
+}
+
+.settings-form-success {
+    color: #73c991;
+    font-size: 13px;
+    margin-top: 12px;
+    text-align: center;
+    background-color: rgba(115, 201, 145, 0.1);
+    padding: 8px;
+    border-radius: 4px;
+}
+
 @media (max-width: 768px) {
     #settings-container {
         padding: 16px;
     }
 
+    .password-modal-container {
+        max-width: 90%;
+        padding: 24px;
+    }
+    
     .settings-header h1 {
         font-size: 24px;
     }

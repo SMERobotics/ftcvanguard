@@ -648,6 +648,58 @@ def _api_v1_login():
         return {"status": "fuck", "error": "idk"}, 500
 
 
+@app.route("/api/v1/password_reset", methods=["POST"])
+def _api_v1_password_reset():
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return {"status": "fuck", "error": "no auth"}, 401
+
+    token = auth_header.split(" ")[1]
+    try:
+        payload = jwt.decode(token, RSA_PUBLIC_KEY, algorithms=["RS256"])
+        team_id = payload.get("id")
+    except jwt.ExpiredSignatureError:
+        return {"status": "fuck", "error": "token expired"}, 401
+    except jwt.InvalidTokenError:
+        return {"status": "fuck", "error": "invalid token"}, 401
+
+    data = request.json
+    current_password = data.get("currentPassword")
+    new_password = data.get("newPassword")
+
+    if not current_password or not new_password:
+        return {"status": "fuck", "error": "missing fields"}, 400
+
+    if len(new_password) < 6:
+        return {"status": "fuck", "error": "password too short"}, 400
+
+    try:
+        db = get_db()
+        cursor = db.cursor()
+        cursor.execute("SELECT password FROM users WHERE id = ?", (team_id,))
+        row = cursor.fetchone()
+
+        if row is None:
+            cursor.close()
+            db.close()
+            return {"status": "fuck", "error": "user not found"}, 404
+
+        stored_hash = row[0]
+        ph.verify(stored_hash, current_password)
+
+        new_hash = ph.hash(new_password)
+        cursor.execute("UPDATE users SET password = ? WHERE id = ?", (new_hash, team_id))
+        db.commit()
+        cursor.close()
+        db.close()
+        return {"status": "success!"}, 200
+    except argon2.exceptions.VerifyMismatchError:
+        return {"status": "fuck", "error": "incorrect password"}, 401
+    except Exception as e:
+        print(e)
+        return {"status": "fuck", "error": "idk"}, 500
+
+
 @app.route("/api/v1/verify", methods=["GET"])
 def _api_v1_verify():
     auth_header = request.headers.get("Authorization")
