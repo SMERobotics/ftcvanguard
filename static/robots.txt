@@ -1,5 +1,5 @@
 # Robots.txt for Vanguard - FTC Scouting Platform
-# https://vanguard.trade/
+# https://ftcvanguard.org/
 
 User-agent: *
 Allow: /
@@ -13,7 +13,7 @@ Disallow: /api/
 Disallow: /admin/
 
 # Sitemap location
-Sitemap: https://vanguard.trade/sitemap.xml
+Sitemap: https://ftcvanguard.org/sitemap.xml
 
 # Crawl-delay for respectful crawling
 Crawl-delay: 1
