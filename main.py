@@ -296,7 +296,7 @@ def notification_loop():
 sitemapper = Sitemapper()
 
 app = Flask(__name__)
-CORS(app, origins=["https://ftcvanguard.org", "http://localhost", "capacitor://localhost"])
+CORS(app, origins=["https://ftcvanguard.org", "http://localhost", "https://localhost", "capacitor://localhost"])
 sitemapper.init_app(app)
 
 ph = PasswordHasher()
