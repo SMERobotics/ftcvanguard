@@ -1,0 +1,44 @@
+# Robots.txt for Vanguard - FTC Scouting Platform
+# https://vanguard.trade/
+
+User-agent: *
+Allow: /
+Allow: /app
+Allow: /register
+
+# Disallow API endpoints
+Disallow: /api/
+
+# Disallow admin areas
+Disallow: /admin/
+
+# Sitemap location
+Sitemap: https://vanguard.trade/sitemap.xml
+
+# Crawl-delay for respectful crawling
+Crawl-delay: 1
+
+# Specific bot directives
+User-agent: Googlebot
+Allow: /
+Crawl-delay: 0
+
+User-agent: Bingbot
+Allow: /
+Crawl-delay: 1
+
+User-agent: Slurp
+Allow: /
+Crawl-delay: 2
+
+User-agent: DuckDuckBot
+Allow: /
+Crawl-delay: 1
+
+User-agent: Baiduspider
+Allow: /
+Crawl-delay: 2
+
+User-agent: YandexBot
+Allow: /
+Crawl-delay: 2
