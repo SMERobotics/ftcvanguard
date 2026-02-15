@@ -3546,6 +3546,17 @@ textarea:focus-visible {
     font-size: 12px;
     margin-right: 8px;
     min-width: 70px;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    color: #ffffff;
+    cursor: pointer;
+    font-family: "JetBrains Mono", monospace;
+    font-weight: 600;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
 }
 
 .admin-action-btn:last-child {
