@@ -2,3 +2,6 @@ ctfd/
 .git/
 __pycache__/
 .env
+ios/
+android/
+dist/
