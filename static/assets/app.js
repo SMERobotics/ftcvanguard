@@ -1,8 +1,55 @@
 "use strict";
-/*
-not functional but nice things to do:
-- [ ] integrate bearer auth directly into authFetch()
-*/
+const CAPACITOR_REF = window.Capacitor;
+const CAPACITOR_PLATFORM = typeof CAPACITOR_REF?.getPlatform === "function"
+    ? CAPACITOR_REF.getPlatform()
+    : CAPACITOR_REF?.platform;
+const CAPACITOR_CUSTOM_PLATFORM = window.CapacitorCustomPlatform;
+const APP_PROTOCOL = window.location.protocol;
+const IS_NATIVE = typeof CAPACITOR_PLATFORM === "string" && CAPACITOR_PLATFORM !== "web";
+const IS_NATIVE_MOBILE = CAPACITOR_PLATFORM === "ios" || CAPACITOR_PLATFORM === "android";
+const IS_ELECTRON_PLATFORM = CAPACITOR_CUSTOM_PLATFORM?.name === "electron" || APP_PROTOCOL === "capacitor-electron:";
+const IS_CAPACITOR_SCHEME = APP_PROTOCOL === "capacitor:";
+const IS_CAPACITOR = IS_NATIVE || IS_ELECTRON_PLATFORM || IS_CAPACITOR_SCHEME;
+const BASE_URL = IS_CAPACITOR ? "https://ftcvanguard.org" : "";
+let nativeViewportListenersAttached = false;
+function updateNativeViewportInsets() {
+    if (!IS_NATIVE_MOBILE)
+        return;
+    const body = document.body;
+    if (!body)
+        return;
+    const viewport = window.visualViewport;
+    if (!viewport) {
+        body.style.setProperty("--native-viewport-offset-top", "0px");
+        body.style.setProperty("--native-viewport-offset-bottom", "0px");
+        return;
+    }
+    const topInset = Math.min(90, Math.max(0, Math.round(viewport.offsetTop)));
+    const viewportHeight = Math.round(viewport.height);
+    const windowHeight = Math.round(window.innerHeight);
+    const rawBottomInset = Math.max(0, windowHeight - viewportHeight - topInset);
+    const bottomInset = rawBottomInset > 120 ? 0 : rawBottomInset;
+    body.style.setProperty("--native-viewport-offset-top", `${topInset}px`);
+    body.style.setProperty("--native-viewport-offset-bottom", `${bottomInset}px`);
+}
+function setupNativeMobileSafeAreaHandling() {
+    if (!IS_NATIVE_MOBILE)
+        return;
+    const body = document.body;
+    if (!body)
+        return;
+    body.classList.add("native-mobile");
+    body.dataset.nativePlatform = CAPACITOR_PLATFORM;
+    updateNativeViewportInsets();
+    if (nativeViewportListenersAttached)
+        return;
+    nativeViewportListenersAttached = true;
+    window.addEventListener("resize", updateNativeViewportInsets);
+    window.addEventListener("orientationchange", updateNativeViewportInsets);
+    window.visualViewport?.addEventListener("resize", updateNativeViewportInsets);
+    window.visualViewport?.addEventListener("scroll", updateNativeViewportInsets);
+}
+setupNativeMobileSafeAreaHandling();
 const tabs = [
     { buttonId: "button-schedule", viewId: "view-schedule" },
     { buttonId: "button-rankings", viewId: "view-rankings" },
@@ -36,6 +83,7 @@ let currentOPRData = new Map();
 let isAdminAuthenticated = false;
 let currentUserScopes = [];
 let currentSettingsSection = "notifications";
+let PasswordChangeLastFocusedEl = null;
 let adminToken = null;
 let currentAdminSection = "overview";
 let scheduleOffsetMinutes = 0;
@@ -121,8 +169,18 @@ async function assertAuthorized(response) {
     }
     return response;
 }
+function buildApiUrl(path) {
+    if (!BASE_URL) {
+        return path;
+    }
+    if (path.startsWith("http://") || path.startsWith("https://") || path.startsWith("//")) {
+        return path;
+    }
+    return path.startsWith("/") ? `${BASE_URL}${path}` : `${BASE_URL}/${path}`;
+}
 async function authFetch(input, init) {
-    const res = await fetch(input, init);
+    const url = typeof input === "string" ? buildApiUrl(input) : input;
+    const res = await fetch(url, init);
     return assertAuthorized(res);
 }
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
@@ -771,7 +829,7 @@ function hideLoading() {
     }
 }
 function switchSettingsSection(section) {
-    const sections = ["notifications", "management"];
+    const sections = ["notifications", "security", "management"];
     sections.forEach(s => {
         const sectionEl = document.getElementById(`settings-section-${s}`);
         const navBtn = document.getElementById(`settings-nav-${s}`);
@@ -789,13 +847,138 @@ function switchSettingsSection(section) {
     });
     currentSettingsSection = section;
 }
+function showPasswordChangeModal() {
+    const modal = document.getElementById("password-reset-modal");
+    if (modal) {
+        PasswordChangeLastFocusedEl = document.activeElement;
+        modal.style.display = "flex";
+        modal.setAttribute("aria-hidden", "false");
+        document.body.style.overflow = "hidden";
+        setTimeout(() => {
+            const input = document.getElementById("current-password");
+            if (input)
+                input.focus();
+        }, 60);
+    }
+}
+function closePasswordChangeModal() {
+    const modal = document.getElementById("password-reset-modal");
+    if (modal) {
+        modal.style.display = "none";
+        modal.setAttribute("aria-hidden", "true");
+        document.body.style.overflow = "";
+        const currentPasswordInput = document.getElementById("current-password");
+        const newPasswordInput = document.getElementById("new-password");
+        const confirmPasswordInput = document.getElementById("confirm-password");
+        const errorEl = document.getElementById("password-reset-error");
+        const successEl = document.getElementById("password-reset-success");
+        if (currentPasswordInput)
+            currentPasswordInput.value = "";
+        if (newPasswordInput)
+            newPasswordInput.value = "";
+        if (confirmPasswordInput)
+            confirmPasswordInput.value = "";
+        if (errorEl)
+            errorEl.style.display = "none";
+        if (successEl)
+            successEl.style.display = "none";
+        if (PasswordChangeLastFocusedEl) {
+            PasswordChangeLastFocusedEl.focus();
+            PasswordChangeLastFocusedEl = null;
+        }
+    }
+}
+async function handlePasswordChange(event) {
+    event.preventDefault();
+    const currentPasswordInput = document.getElementById("current-password");
+    const newPasswordInput = document.getElementById("new-password");
+    const confirmPasswordInput = document.getElementById("confirm-password");
+    const errorEl = document.getElementById("password-reset-error");
+    const successEl = document.getElementById("password-reset-success");
+    const submitBtn = document.getElementById("password-reset-submit-btn");
+    if (!currentPasswordInput || !newPasswordInput || !confirmPasswordInput || !errorEl || !successEl || !submitBtn)
+        return;
+    errorEl.style.display = "none";
+    successEl.style.display = "none";
+    const currentPassword = currentPasswordInput.value;
+    const newPassword = newPasswordInput.value;
+    const confirmPassword = confirmPasswordInput.value;
+    if (newPassword !== confirmPassword) {
+        errorEl.textContent = "New passwords do not match";
+        errorEl.style.display = "block";
+        return;
+    }
+    if (newPassword.length < 6) {
+        errorEl.textContent = "New password must be at least 6 characters";
+        errorEl.style.display = "block";
+        return;
+    }
+    submitBtn.disabled = true;
+    submitBtn.textContent = "Updating...";
+    const token = localStorage.getItem("token");
+    try {
+        const response = await fetch(buildApiUrl("/api/v1/password_reset"), {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${token}`,
+            },
+            body: JSON.stringify({ currentPassword, newPassword }),
+        });
+        const data = await response.json();
+        if (response.ok) {
+            successEl.textContent = "Password changed successfully";
+            successEl.style.display = "block";
+            currentPasswordInput.value = "";
+            newPasswordInput.value = "";
+            confirmPasswordInput.value = "";
+            // Close modal after success
+            setTimeout(() => {
+                closePasswordChangeModal();
+                submitBtn.disabled = false;
+                submitBtn.textContent = "Confirm";
+            }, 1500);
+        }
+        else {
+            errorEl.textContent = data.error || "Failed to change password";
+            errorEl.style.display = "block";
+            submitBtn.disabled = false;
+            submitBtn.textContent = "Confirm";
+        }
+    }
+    catch (error) {
+        console.error("Password reset error:", error);
+        errorEl.textContent = "An error occurred. Please try again.";
+        errorEl.style.display = "block";
+        submitBtn.disabled = false;
+        submitBtn.textContent = "Confirm";
+    }
+}
+document.addEventListener("mousedown", (event) => {
+    const modal = document.getElementById("password-reset-modal");
+    if (!modal || modal.style.display !== "flex") {
+        return;
+    }
+    if (event.target === modal) {
+        closePasswordChangeModal();
+    }
+});
+document.addEventListener("keydown", (event) => {
+    const modal = document.getElementById("password-reset-modal");
+    if (!modal || modal.style.display !== "flex") {
+        return;
+    }
+    if (event.key === "Escape") {
+        closePasswordChangeModal();
+    }
+});
 async function adminFetch(endpoint, options = {}) {
     const token = adminToken || localStorage.getItem("token");
     const headers = new Headers(options.headers || {});
     if (token) {
         headers.set("Authorization", `Bearer ${token}`);
     }
-    return fetch(endpoint, {
+    return fetch(buildApiUrl(endpoint), {
         ...options,
         headers
     });
@@ -2765,7 +2948,7 @@ async function handleLogin(event) {
     errorElement.style.display = "none";
     errorElement.textContent = "";
     try {
-        const response = await fetch("/api/v1/login", {
+        const response = await fetch(buildApiUrl("/api/v1/login"), {
             method: "POST",
             headers: {
                 "Content-Type": "application/json"
@@ -5390,6 +5573,25 @@ window.addEventListener("popstate", async (event) => {
     }
 });
 document.addEventListener("DOMContentLoaded", async () => {
+    if (IS_CAPACITOR) {
+        const link = document.getElementById("login-register-link");
+        if (link) {
+            link.addEventListener("click", (e) => {
+                e.preventDefault();
+                window.open("https://ftcvanguard.org/register", "_blank");
+            });
+        }
+        // Desktop nav buttons (back/forward)
+        if (!IS_NATIVE_MOBILE) {
+            document.body.classList.add("capacitor-desktop");
+            const backBtn = document.getElementById("cap-back-btn");
+            const forwardBtn = document.getElementById("cap-forward-btn");
+            if (backBtn)
+                backBtn.addEventListener("click", () => history.back());
+            if (forwardBtn)
+                forwardBtn.addEventListener("click", () => history.forward());
+        }
+    }
     // Mobile menu initialization
     const mobileMenuBtn = document.getElementById("mobile-menu-btn");
     const sidebarOverlay = document.getElementById("sidebar-overlay");
@@ -5547,6 +5749,9 @@ window.clearNotificationHistory = clearNotificationHistory;
 window.vacuumDatabase = vacuumDatabase;
 window.switchAdminSection = switchAdminSection;
 window.switchSettingsSection = switchSettingsSection;
+window.showPasswordChangeModal = showPasswordChangeModal;
+window.closePasswordChangeModal = closePasswordChangeModal;
+window.handlePasswordChange = handlePasswordChange;
 window.loadAdminRegistrations = loadAdminRegistrations;
 window.approveRegistration = approveRegistration;
 window.denyRegistration = denyRegistration;

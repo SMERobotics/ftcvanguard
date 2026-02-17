@@ -17,3 +17,8 @@ default.db-wal
 
 node_modules/
 dockerbp.sh
+
+.DS_Store
+
+# App dist secrets
+google-services.json
