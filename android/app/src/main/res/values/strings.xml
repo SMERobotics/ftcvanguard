@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Vanguard</string>
+    <string name="title_activity_main">Vanguard</string>
+    <string name="package_name">org.ftcvanguard.vanguard</string>
+    <string name="custom_url_scheme">org.ftcvanguard.vanguard</string>
+</resources>

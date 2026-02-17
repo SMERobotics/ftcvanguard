@@ -35,10 +35,14 @@
 
         
         <link rel="stylesheet" type="text/css" href="/assets/style.css">
-        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/chart.js/dist/chart.umd.min.js"></script>
     </head>
     <body>
         <div id="header">
+            <div id="capacitor-nav-buttons" class="capacitor-nav-buttons">
+                <button id="cap-back-btn" class="cap-nav-btn" aria-label="Back" title="Back">&lt;</button>
+                <button id="cap-forward-btn" class="cap-nav-btn" aria-label="Forward" title="Forward">&gt;</button>
+            </div>
             <div class="header-content">
                 <button id="mobile-menu-btn" class="mobile-menu-btn" aria-label="Menu">
                     <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -236,8 +240,10 @@
             <div class="view" id="view-about" style="display: none;">
                 <div id="about-container">
                     <div class="about-content">
-                        <br>
-                        <h2>Vanguard</h2>
+                        <div class="about-brand">
+                            <img src="/assets/icon.png" alt="Vanguard logo" class="about-brand-icon">
+                            <h2>Vanguard</h2>
+                        </div>
                         <p id="version-number" style="cursor: pointer; user-select: none;" title="👀">v1.0</p>
                         <br>
                         <p class="team-credit">Made with 🤍 by <a href="/app?view=insights&insights=26855" target="_self" class="team-highlight team-26855">26855</a> in collaboration with <a href="/app?view=insights&insights=6547" target="_self" class="team-highlight team-6547">6547</a>.</p>
@@ -254,7 +260,17 @@
 
                     <div class="settings-nav">
                         <button id="settings-nav-notifications" class="settings-nav-btn settings-nav-active" onclick="switchSettingsSection('notifications')">Notifications</button>
+                        <button id="settings-nav-security" class="settings-nav-btn" onclick="switchSettingsSection('security')">Security</button>
                         <button id="settings-nav-management" class="settings-nav-btn" onclick="switchSettingsSection('management')">Management</button>
+                    </div>
+
+                    <div id="settings-section-security" class="settings-section" style="display: none;">
+                        <h2>Security</h2>
+                        <div class="settings-card">
+                            <h3>Change Password</h3>
+                            <p class="settings-card-description">Update your account password to keep your account secure.</p>
+                            <button class="settings-action-button" onclick="showPasswordChangeModal()">Change Password</button>
+                        </div>
                     </div>
 
                     <div id="settings-section-notifications" class="settings-section">
@@ -505,7 +521,34 @@
                     </div>
                     <button type="submit" id="login-button">Login</button>
                     <p id="login-error"></p>
-                    <a href="/register" class="login-register-link">Register</a>
+                    <a id="login-register-link" class="login-register-link" target="_system" href="https://ftcvanguard.org/register">Register</a>
+                </form>
+            </div>
+        </div>
+        <div id="password-reset-modal" class="password-modal-overlay" style="display: none;" aria-hidden="true">
+            <div class="password-modal-container" role="dialog" aria-modal="true" aria-labelledby="password-modal-title">
+                <button type="button" class="password-modal-close" onclick="closePasswordChangeModal()" aria-label="Close password reset dialog">×</button>
+                <h3 id="password-modal-title" class="password-modal-title">Change Password</h3>
+                <p class="password-modal-description">Enter your current password and choose a new one! <i>Minimum length of 8 characters.</i></p>
+                <form id="password-reset-form" onsubmit="handlePasswordChange(event)">
+                    <div class="password-modal-form-group">
+                        <label for="current-password">Current Password</label>
+                        <input type="password" id="current-password" placeholder="Enter current password" autocomplete="current-password" required>
+                    </div>
+                    <div class="password-modal-form-group">
+                        <label for="new-password">New Password</label>
+                        <input type="password" id="new-password" placeholder="Enter new password" autocomplete="new-password" required minlength="8">
+                    </div>
+                    <div class="password-modal-form-group">
+                        <label for="confirm-password">Confirm Password</label>
+                        <input type="password" id="confirm-password" placeholder="Confirm new password" autocomplete="new-password" required minlength="8">
+                    </div>
+                    <div class="password-modal-actions">
+                        <button type="button" class="password-modal-cancel-btn" onclick="closePasswordChangeModal()">Cancel</button>
+                        <button type="submit" id="password-reset-submit-btn" class="password-modal-confirm-btn">Confirm</button>
+                    </div>
+                    <p id="password-reset-error" class="settings-form-error" style="display: none;" role="alert" aria-live="assertive"></p>
+                    <p id="password-reset-success" class="settings-form-success" style="display: none;" role="status" aria-live="polite"></p>
                 </form>
             </div>
         </div>
