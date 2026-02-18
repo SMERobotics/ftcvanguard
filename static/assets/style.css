@@ -2289,9 +2289,10 @@ textarea:focus-visible {
 
 .about-brand {
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 12px;
+    gap: 16px;
     margin-bottom: 8px;
 }
 
@@ -2300,11 +2301,19 @@ textarea:focus-visible {
 }
 
 .about-brand-icon {
-    width: 42px;
-    height: 42px;
+    width: 120px;
+    height: 120px;
     border-radius: 50%;
     object-fit: cover;
     flex-shrink: 0;
+}
+
+.about-tagline {
+    text-align: center;
+    color: #cccccc;
+    font-size: 16px;
+    margin: 0 0 8px;
+    font-weight: 500;
 }
 
 .about-content h2 {
@@ -2315,7 +2324,7 @@ textarea:focus-visible {
     text-align: center;
 }
 
-.about-content > p:first-of-type {
+#version-number {
     text-align: center;
     color: #868686;
     font-size: 14px;
@@ -2928,12 +2937,17 @@ textarea:focus-visible {
     }
 
     .about-brand {
-        gap: 10px;
+        gap: 12px;
     }
 
     .about-brand-icon {
-        width: 34px;
-        height: 34px;
+        width: 96px;
+        height: 96px;
+    }
+
+    .about-tagline {
+        font-size: 14px;
+        margin-bottom: 4px;
     }
 
     /* Strategy Mobile */
