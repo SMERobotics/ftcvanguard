@@ -26,7 +26,7 @@ To set up Vanguard, you'll need a linux server operating system, `Docker`, and `
 ```yaml
 services:
   ftcvanguard:
-    image: milesmuehlbach/ftcvanguard:1.0 # :master if you want beta
+    image: milesmuehlbach/ftcvanguard:v1.0.0 # :master if you want beta
     container_name: ftcvanguard
     restart: unless-stopped
     ports:
