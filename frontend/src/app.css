@@ -1,0 +1,39 @@
+:root {
+  font-family: "JetBrains Mono", monospace;
+  color: #cccccc;
+  background: #181818;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: #181818;
+  color: #cccccc;
+}
+
+a {
+  color: inherit;
+}
+
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+}
+
+.container {
+  width: min(1120px, calc(100vw - 32px));
+  margin: 0 auto;
+}
+
+.card {
+  background: #1f1f1f;
+  border: 1px solid #333333;
+  border-radius: 12px;
+}
