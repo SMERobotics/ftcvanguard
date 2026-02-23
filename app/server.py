@@ -9,6 +9,7 @@ app = FastAPI(title="ftcvanguard")
 app.include_router(api, prefix="/api")
 
 app.mount("/_app", StaticFiles(directory="build/_app"))
+app.mount("/assets", StaticFiles(directory="build/assets"))
 
 @app.get("/")
 async def _root():
@@ -17,3 +18,7 @@ async def _root():
 @app.get("/app")
 async def _app():
     return FileResponse("build/index.html")
+
+@app.get("/favicon.ico")
+async def _favicon():
+    return FileResponse("build/assets/favicon.ico")
