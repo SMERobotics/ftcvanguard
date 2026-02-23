@@ -3,7 +3,7 @@
 	import Header from "./Header.svelte";
 	import Content from "./Content.svelte";
 	import Sidebar from "./Sidebar.svelte";
-	import type { ViewId } from "./views";
+	import type { ViewId } from "./../views/views.ts";
 
 	let selectedView = $state<ViewId>("schedule");
 </script>

@@ -1,18 +1,16 @@
 <script lang="ts">
-	import RankingsView from "./views/RankingsView.svelte";
-	import ScheduleView from "./views/ScheduleView.svelte";
-	import SettingsView from "./views/SettingsView.svelte";
-	import AboutView from "./views/AboutView.svelte";
-	import AdminView from "./views/AdminView.svelte";
-	import LogoutView from "./views/LogoutView.svelte";
-	import type { ViewId } from "./views";
+	import RankingsView from "./../views/RankingsView.svelte";
+	import ScheduleView from "./../views/ScheduleView.svelte";
+	import AboutView from "./../views/AboutView.svelte";
+	import AdminView from "./../views/AdminView.svelte";
+	import LogoutView from "./../views/LogoutView.svelte";
+	import type { ViewId } from "./../views/views.ts";
 
 	let { selectedView }: { selectedView: ViewId } = $props();
 
 	const viewComponents: Record<ViewId, typeof RankingsView> = {
 		schedule: ScheduleView,
 		rankings: RankingsView,
-		settings: SettingsView,
 		about: AboutView,
 		admin: AdminView,
 		logout: LogoutView
