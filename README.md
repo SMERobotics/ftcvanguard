@@ -15,7 +15,7 @@ To recreate this project with the same configuration:
 
 ```sh
 # recreate this project
-bun x sv create --template minimal --types ts --add prettier mcp="ide:opencode,vscode+setup:remote" tailwindcss="plugins:typography,forms" --install bun .
+bun x sv create --template minimal --types ts --add prettier sveltekit-adapter="adapter:static" tailwindcss="plugins:typography,forms" mcp="ide:opencode,vscode+setup:remote" --install bun .
 ```
 
 ## Developing
