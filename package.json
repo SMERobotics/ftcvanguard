@@ -4,10 +4,10 @@
 	"version": "2.0.0",
 	"type": "module",
 	"scripts": {
-		"dev": "vite build && python main.py",
+		"dev": "vite build && python3 main.py",
 		"build": "vite build",
-        "copy": "vite build && cap copy",
-        "sync": "vite build && cap sync",
+		"copy": "vite build && cap copy",
+		"sync": "vite build && cap sync",
 		"preview": "vite preview",
 		"prepare": "svelte-kit sync || echo ''",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
