@@ -4,7 +4,7 @@
 	"version": "2.0.0",
 	"type": "module",
 	"scripts": {
-		"dev": "vite build && python3 main.py",
+		"dev": "vite build && uv run main.py",
 		"build": "vite build",
 		"copy": "vite build && cap copy",
 		"sync": "vite build && cap sync",

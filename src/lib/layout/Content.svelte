@@ -1,9 +1,6 @@
 <script lang="ts">
 	import RankingsView from "./../views/RankingsView.svelte";
 	import ScheduleView from "./../views/ScheduleView.svelte";
-	import AboutView from "./../views/AboutView.svelte";
-	import AdminView from "./../views/AdminView.svelte";
-	import LogoutView from "./../views/LogoutView.svelte";
 	import type { ViewId } from "./../views/views.ts";
 
 	let { selectedView }: { selectedView: ViewId } = $props();
@@ -11,17 +8,14 @@
 	const viewComponents: Record<ViewId, typeof RankingsView> = {
 		schedule: ScheduleView,
 		rankings: RankingsView,
-		about: AboutView,
-		admin: AdminView,
-		logout: LogoutView
 	};
 
 	const ActiveView = $derived(viewComponents[selectedView] ?? ScheduleView);
 </script>
 
-<main class="content">
+<content class="content">
 	<ActiveView />
-</main>
+</content>
 
 <style>
 	.content {
