@@ -28,5 +28,12 @@
 		"tailwindcss": "^4.1.18",
 		"typescript": "^5.9.3",
 		"vite": "^7.3.1"
+	},
+	"dependencies": {
+		"@capacitor-community/electron": "^5.0.1",
+		"@capacitor/android": "^8.1.0",
+		"@capacitor/cli": "^8.1.0",
+		"@capacitor/core": "^8.1.0",
+		"@capacitor/ios": "^8.1.0"
 	}
 }
