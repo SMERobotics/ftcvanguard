@@ -245,52 +245,6 @@
             text-decoration: underline;
         }
 
-        .checkbox-group {
-            margin-bottom: 20px;
-        }
-
-        .checkbox-label {
-            display: flex;
-            align-items: flex-start;
-            gap: 10px;
-            font-size: 12px;
-            color: #cccccc;
-            cursor: pointer;
-            line-height: 1.5;
-        }
-
-        .checkbox-label input[type="checkbox"] {
-            width: auto;
-            margin-top: 3px;
-            cursor: pointer;
-            flex-shrink: 0;
-        }
-
-        .checkbox-label a {
-            color: #0078d4;
-            text-decoration: none;
-        }
-
-        .checkbox-label a:hover {
-            text-decoration: underline;
-        }
-
-        .info-box {
-            background-color: rgba(78, 201, 176, 0.08);
-            border: 1px solid rgba(78, 201, 176, 0.3);
-            border-radius: 6px;
-            padding: 16px;
-            margin-top: 32px;
-            font-size: 12px;
-            line-height: 1.6;
-        }
-
-        .info-box strong {
-            color: #4ec9b0;
-            display: block;
-            margin-bottom: 8px;
-        }
-
         @media (max-width: 1000px) {
             .content {
                 grid-template-columns: 1fr;
@@ -331,26 +285,26 @@
             <div class="info">
                 <h1>Register Your Team</h1>
                 <p>
-                    Create your team account instantly. Choose a password and start using Vanguard right away.
+                    Vanguard accounts are manually approved to verify each team is who they say they are.
+                    Once approved, you will receive a temporary password via email.
+                </p>
+                <p>
+                    Please include a clear image of your robot with team number signs visible and a piece of paper that says "Vanguard".
                 </p>
                 <ul>
-                    <li>Your team number must match your official FTC team number</li>
-                    <li>Use a strong password with at least 8 characters</li>
-                    <li>Contact email will be used for account recovery and important updates</li>
-                    <li>You can log in immediately after registration</li>
+                    <li>Approval usually happens quickly during the day (Chicago time)</li>
+                    <li>It will make you reset your temporary password after first login</li>
+                    <li>Use an image host like Imgur or Google Drive with public access</li>
+                    <li>It doesn't have to be together! If you're in the middle of a rebuild and your bot is in pieces, just lean a number sign on that and you're good! Alternatively, DM us on instagram from your team account at @vanguardftc, or talk to one of us at a competition. (Teams 26855 & 6547)</li>
                 </ul>
-                <div class="info-box">
-                    <strong>Team Already Registered?</strong>
-                    If your team is already registered and someone on your team did not register for you, shoot us an email at <a href="mailto:support@ftcvanguard.org" style="color: #4ec9b0; text-decoration: none;">support@ftcvanguard.org</a> with a photo of your bot with the number signs, and a piece of paper saying "Vanguard", all in the same frame. We will delete the old account and register you a new one with a temporary password.
-                </div>
                 <p style="margin-top: 32px; font-size: 13px;">
                     Need help? <a href="mailto:support@ftcvanguard.org" style="color: #0078d4; text-decoration: none;">support@ftcvanguard.org</a>
                 </p>
             </div>
 
             <div class="form-card">
-                <h2>Create Account</h2>
-                <p>All fields are required. Your information is secure and will only be used for account management.</p>
+                <h2>Submit Registration</h2>
+                <p>All fields are required. We will only use your email to send login details.</p>
                 
                 <div id="message" class="message"></div>
 
@@ -360,25 +314,18 @@
                         <input type="number" id="teamnumber" name="teamnumber" required placeholder="e.g. 26855" inputmode="numeric">
                     </div>
                     <div class="form-group">
-                        <label for="contactemail">Contact Email</label>
-                        <input type="email" id="contactemail" name="contactemail" required placeholder="team@example.com" autocomplete="email">
-                        <div class="hint">Used for account recovery and important updates</div>
+                        <label for="email">Your Email</label>
+                        <input type="email" id="email" name="email" required placeholder="team@example.com" autocomplete="email">
                     </div>
                     <div class="form-group">
-                        <label for="password">Password</label>
-                        <input type="password" id="password" name="password" required placeholder="Minimum 8 characters" autocomplete="new-password" minlength="8">
-                        <div class="hint">Choose a strong password with at least 8 characters</div>
+                        <label for="imagelink">Verification Image Link</label>
+                        <input type="url" id="imagelink" name="imagelink" required placeholder="https://imgur.com/...">
+                        <div class="hint">Show your robot, team number signage, and a paper that says "Vanguard". It doesn't have to all be together!</div>
                     </div>
-                    <div class="checkbox-group">
-                        <label class="checkbox-label">
-                            <input type="checkbox" id="agreedToTerms" name="agreedToTerms" required>
-                            <span>I agree to the <a href="/tos" target="_blank">Terms of Service</a> and <a href="/privacy" target="_blank">Privacy Policy</a></span>
-                        </label>
-                    </div>
-                    <button type="submit" id="submit-btn">Create Account</button>
+                    <button type="submit" id="submit-btn">Submit Request</button>
                 </form>
 
-                <div class="alt-link">Already have an account? <a href="/app">Log in to Vanguard</a></div>
+                <div class="alt-link">Already approved? <a href="/app">Log in to Vanguard</a></div>
             </div>
         </div>
     </div>
@@ -391,13 +338,10 @@
             const messageEl = document.getElementById("message");
             
             submitBtn.disabled = true;
-            submitBtn.textContent = "Creating account...";
+            submitBtn.textContent = "Submitting...";
             messageEl.style.display = "none";
 
             const formData = new FormData(e.target);
-            
-            const agreedToTerms = document.getElementById("agreedToTerms").checked;
-            formData.set("agreedToTerms", agreedToTerms.toString());
             
             try {
                 const response = await fetch("/api/v1/uaregister", {
@@ -409,13 +353,9 @@
 
                 if (response.ok) {
                     messageEl.className = "message success";
-                    messageEl.textContent = "Account created successfully! Redirecting to login...";
+                    messageEl.textContent = "Registration submitted successfully! You will receive an email once approved.";
                     messageEl.style.display = "block";
                     e.target.reset();
-                    
-                    setTimeout(() => {
-                        window.location.href = "/app";
-                    }, 2000);
                 } else {
                     messageEl.className = "message error";
                     messageEl.textContent = data.error || "Registration failed. Please try again.";
@@ -427,7 +367,7 @@
                 messageEl.style.display = "block";
             } finally {
                 submitBtn.disabled = false;
-                submitBtn.textContent = "Create Account";
+                submitBtn.textContent = "Submit Request";
             }
         });
     </script>

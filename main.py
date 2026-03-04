@@ -486,12 +486,10 @@ if len(NTFY_TEAMS) > 0:
 def _root():
     return app.send_static_file("index.html")
 
-
 @sitemapper.include(lastmod="2026-02-16")
 @app.route("/favicon.ico", methods=["GET"])
 def _favicon():
     return send_from_directory("static/assets", "favicon.ico")
-
 
 @sitemapper.include(lastmod="2026-02-14")
 @app.route("/app", methods=["GET"])
@@ -519,28 +517,18 @@ def _assets(path):
 def _api_v1_uaregister():
     data = request.form if request.form else request.json or {}
     team_number = data.get("teamnumber") or data.get("teamNumber")
-    contact_email = data.get("contactemail") or data.get("contactEmail")
-    password = data.get("password")
-    agreed_to_terms = data.get("agreedToTerms")
+    email = data.get("email")
+    image_link = data.get("imagelink") or data.get("imageLink")
 
-    if not team_number or not contact_email or not password:
+    if not team_number or not email or not image_link:
         return {"status": "fuck", "error": "missing required fields"}, 400
-
-    if not agreed_to_terms or str(agreed_to_terms).lower() != "true":
-        return {"status": "fuck", "error": "must agree to terms"}, 400
 
     try:
         team_number = int(team_number)
     except ValueError:
         return {"status": "fuck", "error": "team number must be int"}, 400
 
-    if len(password) < 8:
-        return {
-            "status": "fuck",
-            "error": "password must be at least 8 characters",
-        }, 400
-
-    password_hash = ph.hash(password)
+    submitted_at = int(datetime.now().timestamp())
 
     try:
         db = get_db()
@@ -553,18 +541,27 @@ def _api_v1_uaregister():
             return {"status": "fuck", "error": "team already registered"}, 409
 
         cursor.execute(
-            "INSERT INTO users (id, password, contact_email) VALUES (?, ?, ?)",
-            (team_number, password_hash, contact_email.strip()),
+            "SELECT id FROM registrations WHERE team_number = ? AND status = 'pending'",
+            (team_number,),
+        )
+        if cursor.fetchone() is not None:
+            cursor.close()
+            db.close()
+            return {"status": "fuck", "error": "registration pending"}, 409
+
+        cursor.execute(
+            """INSERT INTO registrations (team_number, email, image_link, status, submitted_at)
+               VALUES (?, ?, ?, 'pending', ?)""",
+            (team_number, email.strip(), image_link.strip(), submitted_at),
         )
         db.commit()
         cursor.close()
         db.close()
-
         requests.post(
             REGISTRATION_NOTIF_URL,
-            data=f"Team {team_number} registered on Vanguard with contact email {contact_email}.",
+            data=f"Team {team_number} is registering for Vanguard. Please review.",
             headers={
-                "Title": "Vanguard Registration",
+                "Title": "Vanguard Registration Alert",
             },
         )
         return {"status": "success"}, 201
@@ -705,9 +702,7 @@ def _api_v1_password_reset():
         ph.verify(stored_hash, current_password)
 
         new_hash = ph.hash(new_password)
-        cursor.execute(
-            "UPDATE users SET password = ? WHERE id = ?", (new_hash, team_id)
-        )
+        cursor.execute("UPDATE users SET password = ? WHERE id = ?", (new_hash, team_id))
         db.commit()
         cursor.close()
         db.close()
