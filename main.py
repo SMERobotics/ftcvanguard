@@ -15,7 +15,7 @@ import time
 import tomllib
 
 FTC_API_URL = "https://ftc-api.firstinspires.org/v2.0"
-BLOCK_REGISTRATION = True
+BLOCK_REGISTRATION = False
 RSA_PUBLIC_KEY = ""
 RSA_PRIVATE_KEY = ""
 
