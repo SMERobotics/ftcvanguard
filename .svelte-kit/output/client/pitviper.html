@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Vanguard PitViper (beta)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <link rel="stylesheet" type="text/css" href="/assets/pitviper.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js/dist/chart.umd.min.js"></script>
+</head>
+<body>
+    <div id="pitviper-header">
+        <div class="pv-logo">
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="width: 2em; height: 2em; margin-right: 10px;">
+                <path d="M4 6h16v12H4z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+                <path d="M8 21h8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                <path d="M12 18v3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+            <h1>Vanguard PitViper <span class="beta-tag">BETA</span></h1>
+        </div>
+        <div class="pv-event-selector-container">
+            <select id="pv-meet-selector"></select>
+            <button id="pv-exit" onclick="window.location.href='/app'">Exit</button>
+        </div>
+    </div>
+
+    <div id="pitviper-container" style="display: none;">
+        <!-- Left Column: Stream and Your Team Stats -->
+        <div class="pv-col pv-col-left">
+            <div class="pv-card" id="pv-stream-card">
+                <div class="pv-card-header">
+                    <h2>Live Stream</h2>
+                </div>
+                <div class="pv-card-content" id="pv-stream-container">
+                    <div class="pv-empty">No stream loaded</div>
+                </div>
+            </div>
+
+            <div class="pv-card" id="pv-team-stats">
+                <div class="pv-card-header">
+                    <h2>Your Team (<span id="pv-your-team-num"></span>)</h2>
+                </div>
+                <div class="pv-card-content">
+                    <div class="pv-stats-row">
+                        <div class="pv-stat-box">
+                            <span class="pv-stat-title">Rank</span>
+                            <span class="pv-stat-val" id="pv-team-rank">--</span>
+                        </div>
+                        <div class="pv-stat-box">
+                            <span class="pv-stat-title">OPR</span>
+                            <span class="pv-stat-val" id="pv-team-opr">--</span>
+                        </div>
+                        <div class="pv-stat-box">
+                            <span class="pv-stat-title">W-L-T</span>
+                            <span class="pv-stat-val" id="pv-team-wlt">--</span>
+                        </div>
+                        <div class="pv-stat-box">
+                            <span class="pv-stat-title">Next Match</span>
+                            <span class="pv-stat-val pv-highlight" id="pv-team-next-match-num">--</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pv-card" id="pv-match-intel">
+                <div class="pv-card-header">
+                    <h2>Next Match Intel</h2>
+                </div>
+                <div class="pv-card-content">
+                    <div id="pv-match-teams-info"></div>
+                </div>
+            </div>
+            
+            <div class="pv-card" id="pv-playoffs-card" style="display: none;">
+                <div class="pv-card-header">
+                    <h2>Playoff Bracket</h2>
+                </div>
+                <div class="pv-card-content" id="pv-bracket-container">
+                    <!-- Dynamic bracket injected here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Column: Rankings and Upcoming Matches -->
+        <div class="pv-col pv-col-right">
+            <div class="pv-card" id="pv-event-info">
+                <div class="pv-card-header">
+                    <h2>Event Overview</h2>
+                </div>
+                <div class="pv-card-content">
+                    <div class="pv-stats-grid">
+                        <div class="pv-stat">
+                            <span class="pv-stat-label">Currently Running</span>
+                            <span class="pv-stat-value pv-highlight" id="pv-current-match">--</span>
+                        </div>
+                        <div class="pv-stat">
+                            <span class="pv-stat-label">Event Progress</span>
+                            <span class="pv-stat-value" id="pv-event-progress">--%</span>
+                        </div>
+                    </div>
+                    <h3>Top Teams</h3>
+                    <table class="pv-table" id="pv-top-teams-table">
+                        <thead>
+                            <tr>
+                                <th>Rank</th>
+                                <th>Team</th>
+                                <th>OPR</th>
+                                <th>W-L-T</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="pv-card" id="pv-upcoming-matches">
+                <div class="pv-card-header">
+                    <h2>Upcoming Matches</h2>
+                </div>
+                <div class="pv-card-content">
+                    <div id="pv-upcoming-list"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Login Prompt if unauthenticated -->
+    <div id="pv-login-overlay" style="display: none;">
+        <div class="pv-login-box">
+            <h2>Vanguard Authentication Required</h2>
+            <p>Please log in from the main app first.</p>
+            <button onclick="window.location.href='/'">Go to Login</button>
+        </div>
+    </div>
+
+    <script src="/assets/pitviper.js"></script>
+</body>
+</html>
