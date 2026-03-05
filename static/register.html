@@ -285,26 +285,20 @@
             <div class="info">
                 <h1>Register Your Team</h1>
                 <p>
-                    Vanguard accounts are manually approved to verify each team is who they say they are.
-                    Once approved, you will receive a temporary password via email.
+                    Create your team account and start using Vanguard immediately. Your account will be active as soon as you complete registration.
                 </p>
-                <p>
-                    Please include a clear image of your robot with team number signs visible and a piece of paper that says "Vanguard".
+                <p style="margin-top: 24px; padding: 16px; background-color: #2d2d30; border-left: 3px solid #0078d4; border-radius: 4px; font-size: 13px; line-height: 1.6;">
+                    <strong style="color: #ffffff; display: block; margin-bottom: 8px;">Team Already Registered?</strong>
+                    If your team is already registered and someone on your team did not register for you, shoot us an email at <a href="mailto:support@ftcvanguard.org" style="color: #0078d4; text-decoration: none;">support@ftcvanguard.org</a> with a photo of your bot with the number signs, and a piece of paper saying "Vanguard", all in the same frame. We will delete the old account and register you a new one with a temporary password.
                 </p>
-                <ul>
-                    <li>Approval usually happens quickly during the day (Chicago time)</li>
-                    <li>It will make you reset your temporary password after first login</li>
-                    <li>Use an image host like Imgur or Google Drive with public access</li>
-                    <li>It doesn't have to be together! If you're in the middle of a rebuild and your bot is in pieces, just lean a number sign on that and you're good! Alternatively, DM us on instagram from your team account at @vanguardftc, or talk to one of us at a competition. (Teams 26855 & 6547)</li>
-                </ul>
                 <p style="margin-top: 32px; font-size: 13px;">
                     Need help? <a href="mailto:support@ftcvanguard.org" style="color: #0078d4; text-decoration: none;">support@ftcvanguard.org</a>
                 </p>
             </div>
 
             <div class="form-card">
-                <h2>Submit Registration</h2>
-                <p>All fields are required. We will only use your email to send login details.</p>
+                <h2>Create Account</h2>
+                <p>All fields are required. Choose a secure password for your team account.</p>
                 
                 <div id="message" class="message"></div>
 
@@ -314,18 +308,30 @@
                         <input type="number" id="teamnumber" name="teamnumber" required placeholder="e.g. 26855" inputmode="numeric">
                     </div>
                     <div class="form-group">
-                        <label for="email">Your Email</label>
+                        <label for="email">Contact Email</label>
                         <input type="email" id="email" name="email" required placeholder="team@example.com" autocomplete="email">
                     </div>
                     <div class="form-group">
-                        <label for="imagelink">Verification Image Link</label>
-                        <input type="url" id="imagelink" name="imagelink" required placeholder="https://imgur.com/...">
-                        <div class="hint">Show your robot, team number signage, and a paper that says "Vanguard". It doesn't have to all be together!</div>
+                        <label for="password">Password</label>
+                        <input type="password" id="password" name="password" required placeholder="Choose a secure password" autocomplete="new-password" minlength="8">
+                        <div class="hint">At least 8 characters</div>
                     </div>
-                    <button type="submit" id="submit-btn">Submit Request</button>
+                    <div class="form-group">
+                        <label for="confirmpassword">Confirm Password</label>
+                        <input type="password" id="confirmpassword" name="confirmpassword" required placeholder="Re-enter your password" autocomplete="new-password" minlength="8">
+                    </div>
+                    <div class="form-group" style="margin-top: 24px;">
+                        <label style="display: flex; align-items: start; cursor: pointer; user-select: none;">
+                            <input type="checkbox" id="tos" name="tos" required style="width: auto; margin-right: 10px; margin-top: 2px; cursor: pointer;">
+                            <span style="font-size: 12px; line-height: 1.5;">
+                                I agree to the <a href="/terms" target="_blank" style="color: #0078d4; text-decoration: none;">Terms of Service</a> and <a href="/privacy" target="_blank" style="color: #0078d4; text-decoration: none;">Privacy Policy</a>
+                            </span>
+                        </label>
+                    </div>
+                    <button type="submit" id="submit-btn">Create Account</button>
                 </form>
 
-                <div class="alt-link">Already approved? <a href="/app">Log in to Vanguard</a></div>
+                <div class="alt-link">Already have an account? <a href="/app">Log in to Vanguard</a></div>
             </div>
         </div>
     </div>
@@ -337,25 +343,46 @@
             const submitBtn = document.getElementById("submit-btn");
             const messageEl = document.getElementById("message");
             
+            const password = document.getElementById("password").value;
+            const confirmPassword = document.getElementById("confirmpassword").value;
+            
+            if (password !== confirmPassword) {
+                messageEl.className = "message error";
+                messageEl.textContent = "Passwords do not match.";
+                messageEl.style.display = "block";
+                return;
+            }
+            
             submitBtn.disabled = true;
-            submitBtn.textContent = "Submitting...";
+            submitBtn.textContent = "Creating account...";
             messageEl.style.display = "none";
 
-            const formData = new FormData(e.target);
+            const teamNumber = document.getElementById("teamnumber").value;
+            const email = document.getElementById("email").value;
             
             try {
-                const response = await fetch("/api/v1/uaregister", {
+                const response = await fetch("/api/v1/register", {
                     method: "POST",
-                    body: formData
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        id: parseInt(teamNumber),
+                        email: email,
+                        password: password
+                    })
                 });
 
                 const data = await response.json();
 
                 if (response.ok) {
                     messageEl.className = "message success";
-                    messageEl.textContent = "Registration submitted successfully! You will receive an email once approved.";
+                    messageEl.textContent = "Account created successfully! Redirecting to login...";
                     messageEl.style.display = "block";
                     e.target.reset();
+                    setTimeout(() => {
+                        window.location.href = "/app";
+                    }, 2000);
                 } else {
                     messageEl.className = "message error";
                     messageEl.textContent = data.error || "Registration failed. Please try again.";
@@ -367,7 +394,7 @@
                 messageEl.style.display = "block";
             } finally {
                 submitBtn.disabled = false;
-                submitBtn.textContent = "Submit Request";
+                submitBtn.textContent = "Create Account";
             }
         });
     </script>

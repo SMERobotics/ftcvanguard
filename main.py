@@ -15,7 +15,7 @@ import time
 import tomllib
 
 FTC_API_URL = "https://ftc-api.firstinspires.org/v2.0"
-BLOCK_REGISTRATION = True
+BLOCK_REGISTRATION = False
 RSA_PUBLIC_KEY = ""
 RSA_PRIVATE_KEY = ""
 
@@ -296,7 +296,16 @@ def notification_loop():
 sitemapper = Sitemapper()
 
 app = Flask(__name__)
-CORS(app, origins=["https://ftcvanguard.org", "http://localhost", "https://localhost", "capacitor://localhost"])
+CORS(
+    app,
+    origins=[
+        "https://ftcvanguard.org",
+        "http://localhost",
+        "https://localhost",
+        "capacitor://localhost",
+        r"capacitor-electron://.*",
+    ],
+)
 sitemapper.init_app(app)
 
 ph = PasswordHasher()
@@ -478,6 +487,12 @@ def _root():
     return app.send_static_file("index.html")
 
 
+@sitemapper.include(lastmod="2026-02-16")
+@app.route("/favicon.ico", methods=["GET"])
+def _favicon():
+    return send_from_directory("static/assets", "favicon.ico")
+
+
 @sitemapper.include(lastmod="2026-02-14")
 @app.route("/app", methods=["GET"])
 def _app():
@@ -559,25 +574,9 @@ def _api_v1_uaregister():
 
 @app.route("/api/v1/register", methods=["POST"])
 def _api_v1_register():
-    auth_header = request.headers.get("Authorization")
-    admin_scope = False
-
-    if auth_header and auth_header.startswith("Bearer "):
-        token = auth_header.split(" ")[1]
-        try:
-            payload = jwt.decode(token, RSA_PUBLIC_KEY, algorithms=["RS256"])
-            if "admin" in payload.get("scope", []):
-                admin_scope = True
-        except jwt.ExpiredSignatureError:
-            return {"status": "fuck", "error": "token expired"}, 401
-        except jwt.InvalidTokenError:
-            return {"status": "fuck", "error": "invalid token"}, 401
-
-    if BLOCK_REGISTRATION and not admin_scope:
-        return {"status": "fuck", "error": "nrn try again ltr"}, 403
-
     data = request.json
     id = data.get("id")
+    email = data.get("email")
 
     try:
         team_id = int(id)
@@ -585,6 +584,13 @@ def _api_v1_register():
         return {"status": "fuck", "error": "id must be int"}, 400
 
     password = data.get("password")
+
+    if not password or len(password) < 8:
+        return {
+            "status": "fuck",
+            "error": "password must be at least 8 characters",
+        }, 400
+
     hash = ph.hash(password)
 
     try:
@@ -592,7 +598,7 @@ def _api_v1_register():
         cursor = db.cursor()
         cursor.execute("SELECT id FROM users WHERE id = ?", (team_id,))
         if cursor.fetchone() is not None:
-            return {"status": "fuck", "error": "no hallucinations"}, 409
+            return {"status": "fuck", "error": "team already registered"}, 409
 
         cursor.execute(
             "INSERT INTO users (id, password) VALUES (?, ?)", (team_id, hash)
@@ -600,13 +606,6 @@ def _api_v1_register():
         db.commit()
         cursor.close()
         db.close()
-        requests.post(
-            REGISTRATION_NOTIF_URL,
-            data=f"Team {team_id} just registered for Vanguard!",
-            headers={
-                "Title": "Vanguard Registration Alert",
-            },
-        )
         return {"status": "success!"}, 201
     except Exception as e:
         print(e)
@@ -696,7 +695,9 @@ def _api_v1_password_reset():
         ph.verify(stored_hash, current_password)
 
         new_hash = ph.hash(new_password)
-        cursor.execute("UPDATE users SET password = ? WHERE id = ?", (new_hash, team_id))
+        cursor.execute(
+            "UPDATE users SET password = ? WHERE id = ?", (new_hash, team_id)
+        )
         db.commit()
         cursor.close()
         db.close()

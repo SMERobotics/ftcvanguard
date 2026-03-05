@@ -3,6 +3,57 @@ const CAPACITOR_REF = window.Capacitor;
 const CAPACITOR_PLATFORM = typeof CAPACITOR_REF?.getPlatform === "function"
     ? CAPACITOR_REF.getPlatform()
     : CAPACITOR_REF?.platform;
+const CAPACITOR_CUSTOM_PLATFORM = window.CapacitorCustomPlatform;
+const APP_PROTOCOL = window.location.protocol;
+const IS_NATIVE = typeof CAPACITOR_PLATFORM === "string" && CAPACITOR_PLATFORM !== "web";
+const IS_NATIVE_MOBILE = CAPACITOR_PLATFORM === "ios" || CAPACITOR_PLATFORM === "android";
+const IS_ELECTRON_PLATFORM = CAPACITOR_CUSTOM_PLATFORM?.name === "electron" || APP_PROTOCOL === "capacitor-electron:";
+const IS_CAPACITOR_SCHEME = APP_PROTOCOL === "capacitor:";
+const IS_CAPACITOR = IS_NATIVE || IS_ELECTRON_PLATFORM || IS_CAPACITOR_SCHEME;
+const BASE_URL = IS_CAPACITOR ? "https://ftcvanguard.org" : "";
+let nativeViewportListenersAttached = false;
+function updateNativeViewportInsets() {
+    if (!IS_NATIVE_MOBILE)
+        return;
+    const body = document.body;
+    if (!body)
+        return;
+    const viewport = window.visualViewport;
+    if (!viewport) {
+        body.style.setProperty("--native-viewport-offset-top", "0px");
+        body.style.setProperty("--native-viewport-offset-bottom", "0px");
+        return;
+    }
+    const topInset = Math.min(90, Math.max(0, Math.round(viewport.offsetTop)));
+    const viewportHeight = Math.round(viewport.height);
+    const windowHeight = Math.round(window.innerHeight);
+    const rawBottomInset = Math.max(0, windowHeight - viewportHeight - topInset);
+    const bottomInset = rawBottomInset > 120 ? 0 : rawBottomInset;
+    body.style.setProperty("--native-viewport-offset-top", `${topInset}px`);
+    body.style.setProperty("--native-viewport-offset-bottom", `${bottomInset}px`);
+}
+function setupNativeMobileSafeAreaHandling() {
+    if (!IS_NATIVE_MOBILE)
+        return;
+    const body = document.body;
+    if (!body)
+        return;
+    body.classList.add("native-mobile");
+    body.dataset.nativePlatform = CAPACITOR_PLATFORM;
+    updateNativeViewportInsets();
+    if (nativeViewportListenersAttached)
+        return;
+    nativeViewportListenersAttached = true;
+    window.addEventListener("resize", updateNativeViewportInsets);
+    window.addEventListener("orientationchange", updateNativeViewportInsets);
+    window.visualViewport?.addEventListener("resize", updateNativeViewportInsets);
+    window.visualViewport?.addEventListener("scroll", updateNativeViewportInsets);
+}
+setupNativeMobileSafeAreaHandling();
+const CAPACITOR_REF = window.Capacitor;
+const CAPACITOR_PLATFORM = typeof CAPACITOR_REF?.getPlatform === "function"
+    ? CAPACITOR_REF.getPlatform()
+    : CAPACITOR_REF?.platform;
 const IS_NATIVE = typeof CAPACITOR_PLATFORM === "string" && CAPACITOR_PLATFORM !== "web";
 const IS_NATIVE_MOBILE = CAPACITOR_PLATFORM === "ios" || CAPACITOR_PLATFORM === "android";
 const BASE_URL = IS_NATIVE ? "https://ftcvanguard.org" : "";
@@ -164,8 +215,19 @@ async function assertAuthorized(response) {
     }
     return response;
 }
+function buildApiUrl(path) {
+    if (!BASE_URL) {
+        return path;
+    }
+    if (path.startsWith("http://") || path.startsWith("https://") || path.startsWith("//")) {
+        return path;
+    }
+    return path.startsWith("/") ? `${BASE_URL}${path}` : `${BASE_URL}/${path}`;
+}
 async function authFetch(input, init) {
     const url = typeof input === "string" ? `${BASE_URL}${input}` : input;
+    const res = await fetch(url, init);
+    const url = typeof input === "string" ? buildApiUrl(input) : input;
     const res = await fetch(url, init);
     return assertAuthorized(res);
 }
@@ -903,7 +965,7 @@ async function handlePasswordChange(event) {
     submitBtn.textContent = "Updating...";
     const token = localStorage.getItem("token");
     try {
-        const response = await fetch(`${BASE_URL}/api/v1/password_reset`, {
+        const response = await fetch(buildApiUrl("/api/v1/password_reset"), {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
@@ -964,7 +1026,7 @@ async function adminFetch(endpoint, options = {}) {
     if (token) {
         headers.set("Authorization", `Bearer ${token}`);
     }
-    return fetch(`${BASE_URL}${endpoint}`, {
+    return fetch(buildApiUrl(endpoint), {
         ...options,
         headers
     });
@@ -2934,7 +2996,7 @@ async function handleLogin(event) {
     errorElement.style.display = "none";
     errorElement.textContent = "";
     try {
-        const response = await fetch(`${BASE_URL}/api/v1/login`, {
+        const response = await fetch(buildApiUrl("/api/v1/login"), {
             method: "POST",
             headers: {
                 "Content-Type": "application/json"

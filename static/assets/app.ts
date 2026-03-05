@@ -2,9 +2,14 @@ const CAPACITOR_REF = (window as any).Capacitor;
 const CAPACITOR_PLATFORM = typeof CAPACITOR_REF?.getPlatform === "function"
     ? CAPACITOR_REF.getPlatform()
     : CAPACITOR_REF?.platform;
+const CAPACITOR_CUSTOM_PLATFORM = (window as any).CapacitorCustomPlatform;
+const APP_PROTOCOL = window.location.protocol;
 const IS_NATIVE = typeof CAPACITOR_PLATFORM === "string" && CAPACITOR_PLATFORM !== "web";
 const IS_NATIVE_MOBILE = CAPACITOR_PLATFORM === "ios" || CAPACITOR_PLATFORM === "android";
-const BASE_URL = IS_NATIVE ? "https://ftcvanguard.org" : "";
+const IS_ELECTRON_PLATFORM = CAPACITOR_CUSTOM_PLATFORM?.name === "electron" || APP_PROTOCOL === "capacitor-electron:";
+const IS_CAPACITOR_SCHEME = APP_PROTOCOL === "capacitor:";
+const IS_CAPACITOR = IS_NATIVE || IS_ELECTRON_PLATFORM || IS_CAPACITOR_SCHEME;
+const BASE_URL = IS_CAPACITOR ? "https://ftcvanguard.org" : "";
 
 let nativeViewportListenersAttached: boolean = false;
 
@@ -362,8 +367,18 @@ async function assertAuthorized(response: Response): Promise<Response> {
     return response;
 }
 
+function buildApiUrl(path: string): string {
+    if (!BASE_URL) {
+        return path;
+    }
+    if (path.startsWith("http://") || path.startsWith("https://") || path.startsWith("//")) {
+        return path;
+    }
+    return path.startsWith("/") ? `${BASE_URL}${path}` : `${BASE_URL}/${path}`;
+}
+
 async function authFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
-    const url = typeof input === "string" ? `${BASE_URL}${input}` : input;
+    const url = typeof input === "string" ? buildApiUrl(input) : input;
     const res = await fetch(url, init);
     return assertAuthorized(res);
 }
@@ -1156,7 +1171,7 @@ async function handlePasswordChange(event: Event): Promise<void> {
     const token = localStorage.getItem("token");
 
     try {
-        const response = await fetch(`${BASE_URL}/api/v1/password_reset`, {
+        const response = await fetch(buildApiUrl("/api/v1/password_reset"), {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
@@ -1225,7 +1240,7 @@ async function adminFetch(endpoint: string, options: RequestInit = {}): Promise<
         headers.set("Authorization", `Bearer ${token}`);
     }
     
-    return fetch(`${BASE_URL}${endpoint}`, {
+    return fetch(buildApiUrl(endpoint), {
         ...options,
         headers
     });
@@ -3465,7 +3480,7 @@ async function handleLogin(event: Event) {
     errorElement.textContent = "";
 
     try {
-        const response = await fetch(`${BASE_URL}/api/v1/login`, {
+        const response = await fetch(buildApiUrl("/api/v1/login"), {
             method: "POST",
             headers: {
                 "Content-Type": "application/json"
@@ -6441,6 +6456,25 @@ window.addEventListener("popstate", async (event) => {
 });
 
 document.addEventListener("DOMContentLoaded", async () => {
+    if (IS_CAPACITOR) {
+        const link = document.getElementById("login-register-link");
+        if (link) {
+            link.addEventListener("click", (e) => {
+                e.preventDefault();
+                window.open("https://ftcvanguard.org/register", "_blank");
+            });
+        }
+
+        // Desktop nav buttons (back/forward)
+        if (!IS_NATIVE_MOBILE) {
+            document.body.classList.add("capacitor-desktop");
+            const backBtn = document.getElementById("cap-back-btn");
+            const forwardBtn = document.getElementById("cap-forward-btn");
+            if (backBtn) backBtn.addEventListener("click", () => history.back());
+            if (forwardBtn) forwardBtn.addEventListener("click", () => history.forward());
+        }
+    }
+
     // Mobile menu initialization
     const mobileMenuBtn = document.getElementById("mobile-menu-btn");
     const sidebarOverlay = document.getElementById("sidebar-overlay");

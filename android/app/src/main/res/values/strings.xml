@@ -2,6 +2,6 @@
 <resources>
     <string name="app_name">Vanguard</string>
     <string name="title_activity_main">Vanguard</string>
-    <string name="package_name">org.technodot.ftcvanguard</string>
-    <string name="custom_url_scheme">org.technodot.ftcvanguard</string>
+    <string name="package_name">org.ftcvanguard.vanguard</string>
+    <string name="custom_url_scheme">org.ftcvanguard.vanguard</string>
 </resources>

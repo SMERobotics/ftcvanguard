@@ -18,6 +18,7 @@ default.db-wal
 node_modules/
 dockerbp.sh
 
-# Capacitor build files
-# android/
-# ios/
+.DS_Store
+
+# App dist secrets
+google-services.json
