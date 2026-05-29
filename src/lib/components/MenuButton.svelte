@@ -10,7 +10,7 @@
     let { label, children, type = "button", class: className = "", ...rest }: Props = $props();
 </script>
 
-<button {...rest} {type} class={`rounded-md bg-transparent py-[5px] pl-[8px] pr-[8px] font-sans text-sm text-(--inactive) hover:bg-(--border) hover:text-(--active) ${className}`}>
+<button {...rest} {type} class={`rounded-md bg-transparent py-[5px] pl-[8px] pr-[12px] font-sans text-sm text-(--inactive) hover:bg-(--border) hover:text-(--active) ${className}`}>
     {#if label}
         <u>{label[0]}</u>{label.slice(1)}
     {:else}
