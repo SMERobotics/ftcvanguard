@@ -42,7 +42,7 @@
         <!-- separator -->
         <div class="flex w-full items-center gap-2 py-5">
             <div class="h-px flex-1 bg-(--seperate)"></div>
-            <span class="font-sans text-sm text-(--text-primary)">or</span>
+            <span class="font-sans text-sm text-(--text-primary)">or, sign in personal</span>
             <div class="h-px flex-1 bg-(--seperate)"></div>
         </div>
 
@@ -50,7 +50,7 @@
         <div class="flex w-full flex-col items-center gap-2">
             <button class="flex h-[40px] w-full items-center justify-center gap-2 bg-(--secondary) text-(--text-primary) font-serif text-sm border border-(--border) rounded-[6px] hover:bg-(--secondary-hover) active:bg-(--secondary-active) cursor-pointer transition-colors duration-80">
                 <Mail class="h-4 w-4 shrink-0" />
-                Continue as personal
+                Continue with email
             </button>
 
             <button class="flex h-[40px] w-full items-center justify-center gap-2 bg-(--secondary) text-(--text-primary) font-serif text-sm border border-(--border) rounded-[6px] hover:bg-(--secondary-hover) active:bg-(--secondary-active) cursor-pointer transition-colors duration-80">
