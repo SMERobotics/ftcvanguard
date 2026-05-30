@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 import os
 from uuid import UUID, uuid4
 
-from sqlalchemy import Column, DateTime, text
+from sqlalchemy import Column, DateTime
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
     create_async_engine,
@@ -61,7 +61,7 @@ class RootIdentity(SQLModel, table=True):
     )
     email: str  # NOTE: does not need index and should not be unique!
     password_argon2: str
-    
+
     created_at: datetime = Field(
         default_factory=utc_now,
         sa_column=Column(DateTime(timezone=True), nullable=False),

@@ -203,9 +203,7 @@
         {error}
     />
 {:else if activeAuthView === "account"}
-    <AccountView
-        onSignOut={showSignIn}
-    />
+    <AccountView onSignOut={showSignIn} />
 {:else}
     <ActiveAuthView />
 {/if}

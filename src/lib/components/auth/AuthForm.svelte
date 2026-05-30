@@ -27,7 +27,10 @@
     {@render children?.()}
 
     {#if error}
-        <p class="w-full font-sans text-sm text-(--text-error)" aria-live="polite">
+        <p
+            class="w-full font-sans text-sm text-(--text-error)"
+            aria-live="polite"
+        >
             {error}
         </p>
     {/if}

@@ -6,7 +6,12 @@ import {
     setSessionToken,
 } from "./auth-token";
 
-export { SESSION_TOKEN_KEY, clearSessionToken, getSessionToken, setSessionToken };
+export {
+    SESSION_TOKEN_KEY,
+    clearSessionToken,
+    getSessionToken,
+    setSessionToken,
+};
 
 export interface RootCredential {
     number: number;

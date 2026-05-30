@@ -47,6 +47,7 @@ def _load_public_key(key: bytes):
 private_key = _load_private_key(RSA_PRIVATE_KEY)
 public_key = _load_public_key(RSA_PUBLIC_KEY)
 
+
 def sign_jwt(payload: dict) -> str:
     payload = {
         **payload,
@@ -59,6 +60,7 @@ def sign_jwt(payload: dict) -> str:
 
 def verify_jwt(token: str) -> dict:
     return jwt.decode(token, public_key, algorithms=["PS256"])
+
 
 ph = PasswordHasher()
 argon2_hash: Callable[[str], str] = ph.hash
