@@ -71,7 +71,7 @@ def _root_token(root: RootIdentity) -> Token:
         token=sign_jwt(
             {
                 "sub": f"root:{root.number}",
-                "account_type": "root",
+                "type": "root",
                 "number": root.number,
             }
         )
@@ -83,7 +83,7 @@ def _personal_token(personal: PersonalIdentity) -> Token:
         token=sign_jwt(
             {
                 "sub": f"personal:{personal.uuid}",
-                "account_type": "personal",
+                "type": "personal",
                 "uuid": str(personal.uuid),
             }
         )
