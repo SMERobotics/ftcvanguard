@@ -165,7 +165,7 @@
             class="overflow-hidden bg-(--fg) rounded-[14px] border border-(--border)"
             class:border-0={!panelOpen}
         >
-            {#each panelEntries as [view, Panel]}
+            {#each panelEntries as [view, Panel] (view)}
                 <div class="h-full" hidden={activePanel !== view}>
                     <Panel />
                 </div>

@@ -3,7 +3,6 @@
     import { onMount, type Component } from "svelte";
 
     import auth, {
-        type CurrentAccount,
         type PersonalAccount,
         type PersonalCredential,
         type RootAccount,
@@ -30,7 +29,6 @@
     let activeAuthView = $state<AuthView>("signIn");
     let pending = $state(false);
     let error = $state<string | null>(null);
-    let currentAccount = $state<CurrentAccount | null>(null);
     const ActiveAuthView = $derived(authViews[activeAuthView]);
 
     function getDetailMessage(detail: unknown): string | null {
@@ -93,7 +91,7 @@
     }
 
     async function showCurrentAccount() {
-        currentAccount = await auth.me();
+        await auth.me();
         showView("account");
     }
 
@@ -158,7 +156,6 @@
             await showCurrentAccount();
         } catch {
             auth.logout();
-            currentAccount = null;
             activeAuthView = "signIn";
         } finally {
             pending = false;
