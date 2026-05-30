@@ -1,4 +1,5 @@
 from argon2 import PasswordHasher
+from collections.abc import Callable
 from cryptography.hazmat.primitives import serialization
 from datetime import datetime, timedelta, timezone
 import jwt
@@ -46,9 +47,6 @@ def _load_public_key(key: bytes):
 private_key = _load_private_key(RSA_PRIVATE_KEY)
 public_key = _load_public_key(RSA_PUBLIC_KEY)
 
-ph = PasswordHasher()
-
-
 def sign_jwt(payload: dict) -> str:
     payload = {
         **payload,
@@ -61,3 +59,7 @@ def sign_jwt(payload: dict) -> str:
 
 def verify_jwt(token: str) -> dict:
     return jwt.decode(token, public_key, algorithms=["PS256"])
+
+ph = PasswordHasher()
+argon2_hash: Callable[[str], str] = ph.hash
+argon2_verify: Callable[[str, str], bool] = ph.verify

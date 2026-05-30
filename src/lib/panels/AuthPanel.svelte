@@ -1,6 +1,15 @@
 <script lang="ts">
-    import type { Component } from "svelte";
+    import axios from "axios";
+    import { onMount, type Component } from "svelte";
 
+    import auth, {
+        type CurrentAccount,
+        type PersonalAccount,
+        type PersonalCredential,
+        type RootAccount,
+        type RootCredential,
+    } from "../auth";
+    import AccountView from "./auth/AccountView.svelte";
     import ForgotPasswordView from "./auth/ForgotPasswordView.svelte";
     import RegisterNumberView from "./auth/RegisterNumberView.svelte";
     import RegisterView from "./auth/RegisterView.svelte";
@@ -8,43 +17,195 @@
     import SignInView from "./auth/SignInView.svelte";
 
     const authViews = {
+        account: AccountView,
         signIn: SignInView,
         register: RegisterView,
         signInEmail: SignInEmailView,
         registerNumber: RegisterNumberView,
-        forgotPassword: ForgotPasswordView,
+        forgotPassword: ForgotPasswordView, // TODO: implement forgot password flow and view
     } satisfies Record<string, Component>;
 
     type AuthView = keyof typeof authViews;
 
     let activeAuthView = $state<AuthView>("signIn");
+    let pending = $state(false);
+    let error = $state<string | null>(null);
+    let currentAccount = $state<CurrentAccount | null>(null);
     const ActiveAuthView = $derived(authViews[activeAuthView]);
 
+    function getDetailMessage(detail: unknown): string | null {
+        if (typeof detail === "string") {
+            return detail;
+        }
+
+        if (Array.isArray(detail)) {
+            const messages = detail
+                .map((item) => {
+                    if (
+                        typeof item === "object" &&
+                        item !== null &&
+                        "msg" in item
+                    ) {
+                        const message = (item as { msg?: unknown }).msg;
+                        return typeof message === "string" ? message : null;
+                    }
+
+                    return null;
+                })
+                .filter((message): message is string => message !== null);
+
+            return messages.length > 0 ? messages.join(" ") : null;
+        }
+
+        return null;
+    }
+
+    function getAuthErrorMessage(cause: unknown): string {
+        if (axios.isAxiosError<{ detail?: unknown }>(cause)) {
+            const detail = getDetailMessage(cause.response?.data?.detail);
+            if (detail) {
+                return detail;
+            }
+        }
+
+        return "Unable to complete authentication. Please try again later.";
+    }
+
+    function showView(view: AuthView) {
+        error = null;
+        activeAuthView = view;
+    }
+
     function showRegister() {
-        activeAuthView = "register";
+        showView("register");
     }
 
     function showRegisterNumber() {
-        activeAuthView = "registerNumber";
+        showView("registerNumber");
     }
 
     function showSignInEmail() {
-        activeAuthView = "signInEmail";
+        showView("signInEmail");
     }
 
     function showSignIn() {
-        activeAuthView = "signIn";
+        showView("signIn");
     }
+
+    async function showCurrentAccount() {
+        currentAccount = await auth.me();
+        showView("account");
+    }
+
+    async function runAuth(action: () => Promise<void>) {
+        if (pending) {
+            return;
+        }
+
+        pending = true;
+        error = null;
+
+        try {
+            await action();
+        } catch (cause) {
+            error = getAuthErrorMessage(cause);
+        } finally {
+            pending = false;
+        }
+    }
+
+    function handleRootLogin(credentials: RootCredential) {
+        void runAuth(async () => {
+            await auth.loginRoot(credentials);
+            await showCurrentAccount();
+        });
+    }
+
+    function handlePersonalLogin(credentials: PersonalCredential) {
+        void runAuth(async () => {
+            await auth.loginPersonal(credentials);
+            await showCurrentAccount();
+        });
+    }
+
+    function handleRootRegister(account: RootAccount) {
+        void runAuth(async () => {
+            await auth.registerRoot(account);
+            await auth.loginRoot({
+                number: account.number,
+                password: account.password,
+            });
+            await showCurrentAccount();
+        });
+    }
+
+    function handlePersonalRegister(account: PersonalAccount) {
+        void runAuth(async () => {
+            await auth.registerPersonal(account);
+            await auth.loginPersonal({
+                email: account.email,
+                password: account.password,
+            });
+            await showCurrentAccount();
+        });
+    }
+
+    async function restoreSession() {
+        pending = true;
+        error = null;
+
+        try {
+            await showCurrentAccount();
+        } catch {
+            auth.logout();
+            currentAccount = null;
+            activeAuthView = "signIn";
+        } finally {
+            pending = false;
+        }
+    }
+
+    onMount(() => {
+        if (auth.token.get()) {
+            void restoreSession();
+        }
+    });
 </script>
 
 {#if activeAuthView === "signIn"}
-    <SignInView onRegister={showRegister} onSignInEmail={showSignInEmail} />
+    <SignInView
+        onRegister={showRegister}
+        onSignInEmail={showSignInEmail}
+        onSubmit={handleRootLogin}
+        {pending}
+        {error}
+    />
 {:else if activeAuthView === "register"}
-    <RegisterView onRegisterNumber={showRegisterNumber} onSignIn={showSignIn} />
+    <RegisterView
+        onRegisterNumber={showRegisterNumber}
+        onSignIn={showSignIn}
+        onSubmit={handlePersonalRegister}
+        {pending}
+        {error}
+    />
 {:else if activeAuthView === "signInEmail"}
-    <SignInEmailView onSignInTeam={showSignIn} />
+    <SignInEmailView
+        onSignInTeam={showSignIn}
+        onSubmit={handlePersonalLogin}
+        {pending}
+        {error}
+    />
 {:else if activeAuthView === "registerNumber"}
-    <RegisterNumberView onRegisterPersonal={showRegister} />
+    <RegisterNumberView
+        onRegisterPersonal={showRegister}
+        onSubmit={handleRootRegister}
+        {pending}
+        {error}
+    />
+{:else if activeAuthView === "account"}
+    <AccountView
+        onSignOut={showSignIn}
+    />
 {:else}
     <ActiveAuthView />
 {/if}

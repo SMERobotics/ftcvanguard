@@ -117,7 +117,7 @@
     <header class="flex">
         <!-- logo icon -->
         <div
-            class="h-full w-[42px] flex items-center justify-center translate-x-0.5"
+            class="h-full w-[42px] flex items-center justify-center"
         >
             <img src={logo} alt="Avantium" class="h-[24px] w-[24px]" />
         </div>
