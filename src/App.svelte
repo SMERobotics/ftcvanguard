@@ -25,6 +25,7 @@
     import MenuButton from "./lib/components/MenuButton.svelte";
 
     import AuthPanel from "./lib/panels/AuthPanel.svelte";
+    import { sessionToken } from "./lib/auth-token";
     import { panelContextKey, type PanelContext } from "./lib/panel-context";
 
     import DefaultView from "./lib/views/DefaultView.svelte";
@@ -154,9 +155,12 @@
 
             <!-- bottom buttons -->
             <IconStack>
-                <IconButton icon={User} label="User" />
                 <IconButton icon={Settings} label="Settings" />
-                <IconButton icon={LogIn} label="Sign In" panel="auth" />
+                <IconButton
+                    icon={$sessionToken ? User : LogIn}
+                    label={$sessionToken ? "Account" : "Sign In"}
+                    panel="auth"
+                />
             </IconStack>
         </aside>
 
