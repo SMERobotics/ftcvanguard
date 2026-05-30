@@ -24,7 +24,7 @@
     import IconStack from "./lib/components/IconStack.svelte";
     import MenuButton from "./lib/components/MenuButton.svelte";
 
-    import LoginPanel from "./lib/panels/LoginPanel.svelte";
+    import AuthPanel from "./lib/panels/AuthPanel.svelte";
     import { panelContextKey, type PanelContext } from "./lib/panel-context";
 
     import DefaultView from "./lib/views/DefaultView.svelte";
@@ -32,7 +32,7 @@
     // TODO: refactor panel management (state, resizing)
 
     const panelViews = {
-        login: LoginPanel,
+        auth: AuthPanel,
     } satisfies Record<string, Component>;
 
     type PanelView = keyof typeof panelViews;
@@ -158,7 +158,7 @@
             <IconStack>
                 <IconButton icon={User} label="User" />
                 <IconButton icon={Settings} label="Settings" />
-                <IconButton icon={LogIn} label="Sign In" panel="login" />
+                <IconButton icon={LogIn} label="Sign In" panel="auth" />
             </IconStack>
         </aside>
 
@@ -182,7 +182,7 @@
             aria-valuemax={maxPanelWidth}
             aria-valuenow={panelWidth}
             aria-hidden={!panelResizerVisible}
-            class={`${panelResizerVisible ? "cursor-col-resize" : "pointer-events-none"} ${panelResizing ? "bg-(--primary) transition-colors delay-0 duration-150" : "bg-transparent transition-colors delay-0 duration-150 hover:delay-[350ms] hover:bg-(--primary)"} w-[2px]`}
+            class={`${panelResizerVisible ? "cursor-col-resize" : "pointer-events-none"} ${panelOpen ? "my-[12px]" : ""} transition-colors delay-0 duration-150 ${panelResizing ? "bg-(--primary)" : "bg-transparent hover:delay-[350ms] hover:bg-(--primary)"} w-[2px]`}
             onpointerdown={startPanelResize}
         ></div>
 

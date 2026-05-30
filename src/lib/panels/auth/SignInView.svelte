@@ -1,6 +1,11 @@
 <script lang="ts">
     import { Mail } from "@lucide/svelte";
-    import githubLogo from "../../assets/icons/sso_github.svg";
+    import githubLogo from "../../../assets/icons/sso_github.svg";
+
+    let {
+        onRegister = () => {},
+        onSignInEmail = () => {},
+    }: { onRegister?: () => void; onSignInEmail?: () => void } = $props();
 
     // pre-event hook to prevent non-digit input
     function checkDigits(event: InputEvent) {
@@ -18,7 +23,7 @@
 
 <!-- TODO: redesign login ui along the lines of :sparkles: invidualism :sparkles: iykwim -->
 
-<div class="flex h-full flex-col items-center justify-center px-[29px]">
+<div class="flex h-full flex-col items-center justify-center px-[24px]">
     <div class="flex w-full max-w-[360px] flex-col">
         <!-- header -->
         <h1
@@ -42,8 +47,8 @@
                     inputmode="numeric"
                     pattern="[0-9]*"
                     required
-                    on:beforeinput={checkDigits}
-                    on:input={sanitizeDigits}
+                    onbeforeinput={checkDigits}
+                    oninput={sanitizeDigits}
                 />
             </div>
             <div class="flex w-full flex-col gap-1">
@@ -85,6 +90,8 @@
         <div class="flex w-full flex-col items-center gap-2">
             <button
                 class="flex h-[40px] w-full items-center justify-center gap-2 bg-(--secondary) text-(--text-primary) font-serif text-sm border border-(--border) rounded-[6px] hover:bg-(--secondary-hover) active:bg-(--secondary-active) cursor-pointer transition-colors duration-80"
+                type="button"
+                onclick={onSignInEmail}
             >
                 <Mail class="h-4 w-4 shrink-0" />
                 Continue with email
@@ -165,10 +172,12 @@
             </button>
         </div>
 
-        <span class="text-(--text-primary) font-sans text-sm mt-5">
+        <span class="text-(--text-primary) font-sans text-sm mt-6">
             New to Vanguard?
-            <span class="text-(--text-accent) font-sans text-sm hover:underline"
-                >Create an account</span
+            <button
+                class="cursor-pointer appearance-none border-0 bg-transparent p-0 font-sans text-sm text-(--text-accent) hover:underline"
+                type="button"
+                onclick={onRegister}>Create an account</button
             >
         </span>
     </div>
