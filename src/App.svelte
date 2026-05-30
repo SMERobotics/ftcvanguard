@@ -1,7 +1,22 @@
 <script lang="ts">
     import { setContext, type Component } from "svelte";
 
-    import { Bell, Home, Search, Settings, Star, User, LogIn, Ellipsis, ClipboardClock, ChartColumnStacked, NotebookPen, Brain, Microscope, Telescope } from "@lucide/svelte";
+    import {
+        Bell,
+        Home,
+        Search,
+        Settings,
+        Star,
+        User,
+        LogIn,
+        Ellipsis,
+        ClipboardClock,
+        ChartColumnStacked,
+        NotebookPen,
+        Brain,
+        Microscope,
+        Telescope,
+    } from "@lucide/svelte";
     import logo from "./assets/icons/logo.png";
 
     import IconButton from "./lib/components/IconButton.svelte";
@@ -76,7 +91,10 @@
             }
 
             activePanel = panelBeforeResize;
-            panelWidth = Math.min(maxPanelWidth, Math.max(minPanelWidth, requestedWidth));
+            panelWidth = Math.min(
+                maxPanelWidth,
+                Math.max(minPanelWidth, requestedWidth),
+            );
         }
 
         function stopResize() {
@@ -98,7 +116,9 @@
     <!-- header 42px tall -->
     <header class="flex">
         <!-- logo icon -->
-        <div class="h-full w-[42px] flex items-center justify-center translate-x-0.5">
+        <div
+            class="h-full w-[42px] flex items-center justify-center translate-x-0.5"
+        >
             <img src={logo} alt="Avantium" class="h-[24px] w-[24px]" />
         </div>
 
@@ -112,7 +132,10 @@
         </div>
     </header>
 
-    <div class="grid grid-cols-[40px_var(--panel-width)_var(--panel-resizer-width)_1fr]" style={`--panel-width: ${panelColumn}px; --panel-resizer-width: ${panelResizerColumn}px;`}>
+    <div
+        class="grid grid-cols-[40px_var(--panel-width)_var(--panel-resizer-width)_1fr]"
+        style={`--panel-width: ${panelColumn}px; --panel-resizer-width: ${panelResizerColumn}px;`}
+    >
         <!-- sidebar 40px wide -->
         <aside class="flex flex-col justify-between">
             <!-- top buttons -->
@@ -140,7 +163,10 @@
         </aside>
 
         <!-- panel -->
-        <section class="overflow-hidden bg-(--fg) rounded-[14px] border border-(--border)" class:border-0={!panelOpen}>
+        <section
+            class="overflow-hidden bg-(--fg) rounded-[14px] border border-(--border)"
+            class:border-0={!panelOpen}
+        >
             {#each panelEntries as [view, Panel]}
                 <div class="h-full" hidden={activePanel !== view}>
                     <Panel />
@@ -149,11 +175,22 @@
         </section>
 
         <!-- resizer handle -->
-        <div role="separator" aria-orientation="vertical" aria-valuemin={minPanelWidth} aria-valuemax={maxPanelWidth} aria-valuenow={panelWidth} aria-hidden={!panelResizerVisible} class={`${panelResizerVisible ? "cursor-col-resize" : "pointer-events-none"} ${panelResizing ? "bg-(--primary) transition-colors delay-0 duration-150" : "bg-transparent transition-colors delay-0 duration-150 hover:delay-[350ms] hover:bg-(--primary)"} w-[2px]`} onpointerdown={startPanelResize}></div>
+        <div
+            role="separator"
+            aria-orientation="vertical"
+            aria-valuemin={minPanelWidth}
+            aria-valuemax={maxPanelWidth}
+            aria-valuenow={panelWidth}
+            aria-hidden={!panelResizerVisible}
+            class={`${panelResizerVisible ? "cursor-col-resize" : "pointer-events-none"} ${panelResizing ? "bg-(--primary) transition-colors delay-0 duration-150" : "bg-transparent transition-colors delay-0 duration-150 hover:delay-[350ms] hover:bg-(--primary)"} w-[2px]`}
+            onpointerdown={startPanelResize}
+        ></div>
 
         <!-- main view -->
         <!-- NOTE: `border-r-0` because no right panel currently exists, remove when one is added -->
-        <main class="bg-(--fg) rounded-l-[14px] border border-(--border) border-r-0">
+        <main
+            class="bg-(--fg) rounded-l-[14px] border border-(--border) border-r-0"
+        >
             <DefaultView />
         </main>
     </div>
