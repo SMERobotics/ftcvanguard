@@ -37,13 +37,28 @@
                 >
                 <input
                     id="team-number"
-                    class="h-[40px] w-full px-[12px] bg-(--bg) text-(--text-primary) placeholder:text-(--text-secondary) border border-(--border) rounded-[6px] focus:outline-none focus:ring-2 focus:ring-(--primary)"
+                    class="h-[40px] w-full px-[12px] bg-(--bg) text-(--text-primary) border border-(--border) rounded-[6px] focus:outline-none focus:ring-2 focus:ring-(--primary)"
                     type="text"
+                    placeholder="26855"
                     inputmode="numeric"
                     pattern="[0-9]*"
                     required
                     onbeforeinput={checkDigits}
                     oninput={sanitizeDigits}
+                />
+            </div>
+            <div class="flex w-full flex-col gap-1">
+                <label
+                    for="team-email"
+                    class="text-(--text-primary) font-serif text-sm"
+                    >Team email</label
+                >
+                <input
+                    id="team-email"
+                    class="h-[40px] w-full px-[12px] bg-(--bg) text-(--text-primary) border border-(--border) rounded-[6px] focus:outline-none focus:ring-2 focus:ring-(--primary)"
+                    type="email"
+                    placeholder="team@example.com"
+                    required
                 />
             </div>
             <div class="flex w-full flex-col gap-1">
@@ -55,8 +70,9 @@
                 </label>
                 <input
                     id="team-password"
-                    class="h-[40px] w-full px-[12px] bg-(--bg) text-(--text-primary) placeholder:text-(--text-secondary) border border-(--border) rounded-[6px] focus:outline-none focus:ring-2 focus:ring-(--primary)"
+                    class="h-[40px] w-full px-[12px] bg-(--bg) text-(--text-primary) border border-(--border) rounded-[6px] focus:outline-none focus:ring-2 focus:ring-(--primary)"
                     type="password"
+                    placeholder="••••••••••••••••"
                     required
                 />
             </div>

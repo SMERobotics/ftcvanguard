@@ -42,8 +42,9 @@
                 >
                 <input
                     id="team-number"
-                    class="h-[40px] w-full px-[12px] bg-(--bg) text-(--text-primary) placeholder:text-(--text-secondary) border border-(--border) rounded-[6px] focus:outline-none focus:ring-2 focus:ring-(--primary)"
+                    class="h-[40px] w-full px-[12px] bg-(--bg) text-(--text-primary) border border-(--border) rounded-[6px] focus:outline-none focus:ring-2 focus:ring-(--primary)"
                     type="text"
+                    placeholder="26855"
                     inputmode="numeric"
                     pattern="[0-9]*"
                     required
@@ -64,8 +65,9 @@
                 </label>
                 <input
                     id="team-password"
-                    class="h-[40px] w-full px-[12px] bg-(--bg) text-(--text-primary) placeholder:text-(--text-secondary) border border-(--border) rounded-[6px] focus:outline-none focus:ring-2 focus:ring-(--primary)"
+                    class="h-[40px] w-full px-[12px] bg-(--bg) text-(--text-primary) border border-(--border) rounded-[6px] focus:outline-none focus:ring-2 focus:ring-(--primary)"
                     type="password"
+                    placeholder="••••••••••••••••"
                     required
                 />
             </div>
@@ -79,11 +81,11 @@
 
         <!-- separator -->
         <div class="flex w-full items-center gap-2 py-5">
-            <div class="h-px flex-1 bg-(--seperate)"></div>
+            <div class="h-px flex-1 bg-(--separate)"></div>
             <span class="font-sans text-sm text-(--text-primary)"
                 >or, sign in personal</span
             >
-            <div class="h-px flex-1 bg-(--seperate)"></div>
+            <div class="h-px flex-1 bg-(--separate)"></div>
         </div>
 
         <!-- alternate sign in options -->

@@ -20,43 +20,7 @@
         </h1>
 
         <!-- personal account register -->
-        <div class="flex w-full flex-col items-center gap-4">
-            <div class="flex w-full flex-col gap-1">
-                <label
-                    for="personal-email"
-                    class="text-(--text-primary) font-serif text-sm"
-                    >Personal email</label
-                >
-                <input
-                    id="personal-email"
-                    class="h-[40px] w-full px-[12px] bg-(--bg) text-(--text-primary) placeholder:text-(--text-secondary) border border-(--border) rounded-[6px] focus:outline-none focus:ring-2 focus:ring-(--primary)"
-                    type="email"
-                    required
-                />
-            </div>
-            <div class="flex w-full flex-col gap-1">
-                <label
-                    for="personal-password"
-                    class="text-(--text-primary) font-serif text-sm"
-                >
-                    Password
-                </label>
-                <input
-                    id="personal-password"
-                    class="h-[40px] w-full px-[12px] bg-(--bg) text-(--text-primary) placeholder:text-(--text-secondary) border border-(--border) rounded-[6px] focus:outline-none focus:ring-2 focus:ring-(--primary)"
-                    type="password"
-                    required
-                />
-            </div>
-            <button
-                class="h-[40px] w-full bg-(--confirm) text-(--text-primary) font-serif text-sm border border-(--border) rounded-[6px] hover:bg-(--confirm-hover) active:bg-(--confirm-active) cursor-pointer transition-colors duration-80"
-                type="submit"
-            >
-                Register
-            </button>
-        </div>
-
-        <div class="flex w-full flex-col items-center gap-2 mt-4">
+        <div class="flex w-full flex-col items-center gap-2">
             <button
                 class="flex h-[40px] w-full items-center justify-center gap-2 bg-(--secondary) text-(--text-primary) font-serif text-sm border border-(--border) rounded-[6px] hover:bg-(--secondary-hover) active:bg-(--secondary-active) cursor-pointer transition-colors duration-80"
             >
@@ -132,13 +96,65 @@
             </button>
         </div>
 
+        <div class="flex w-full flex-col items-center gap-4 mt-4">
+            <div class="flex w-full flex-col gap-1">
+                <label
+                    for="personal-name"
+                    class="text-(--text-primary) font-serif text-sm"
+                    >Display name</label
+                >
+                <input
+                    id="personal-name"
+                    class="h-[40px] w-full px-[12px] bg-(--bg) text-(--text-primary) border border-(--border) rounded-[6px] focus:outline-none focus:ring-2 focus:ring-(--primary)"
+                    type="text"
+                    placeholder="Preferred name or nickname"
+                    required
+                />
+            </div>
+            <div class="flex w-full flex-col gap-1">
+                <label
+                    for="personal-email"
+                    class="text-(--text-primary) font-serif text-sm"
+                    >Personal email</label
+                >
+                <input
+                    id="personal-email"
+                    class="h-[40px] w-full px-[12px] bg-(--bg) text-(--text-primary) border border-(--border) rounded-[6px] focus:outline-none focus:ring-2 focus:ring-(--primary)"
+                    type="email"
+                    placeholder="you@example.com"
+                    required
+                />
+            </div>
+            <div class="flex w-full flex-col gap-1">
+                <label
+                    for="personal-password"
+                    class="text-(--text-primary) font-serif text-sm"
+                >
+                    Password
+                </label>
+                <input
+                    id="personal-password"
+                    class="h-[40px] w-full px-[12px] bg-(--bg) text-(--text-primary) border border-(--border) rounded-[6px] focus:outline-none focus:ring-2 focus:ring-(--primary)"
+                    type="password"
+                    placeholder="••••••••••••••••"
+                    required
+                />
+            </div>
+            <button
+                class="h-[40px] w-full bg-(--confirm) text-(--text-primary) font-serif text-sm border border-(--border) rounded-[6px] hover:bg-(--confirm-hover) active:bg-(--confirm-active) cursor-pointer transition-colors duration-80"
+                type="submit"
+            >
+                Register personally
+            </button>
+        </div>
+
         <!-- separator -->
         <div class="flex w-full items-center gap-2 py-5">
-            <div class="h-px flex-1 bg-(--seperate)"></div>
+            <div class="h-px flex-1 bg-(--separate)"></div>
             <span class="font-sans text-sm text-(--text-primary)"
                 >or, register as a team</span
             >
-            <div class="h-px flex-1 bg-(--seperate)"></div>
+            <div class="h-px flex-1 bg-(--separate)"></div>
         </div>
 
         <!-- alternate sign in options -->
@@ -153,7 +169,7 @@
             </button>
         </div>
 
-        <span class="text-(--text-primary) font-sans text-sm mt-4">
+        <span class="text-(--text-primary) font-sans text-sm mt-6">
             Already have an account?
             <button
                 class="cursor-pointer appearance-none border-0 bg-transparent p-0 font-sans text-sm text-(--text-accent) hover:underline"

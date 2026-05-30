@@ -10,6 +10,11 @@
         <h1
             class="mb-[24px] text-(--text-primary) font-serif text-3xl align-left"
         >
+            <!-- emphasizes the method of sign in -->
+            <!-- Sign in with email -->
+
+            <!-- emphasizes the type of account, more necessary? -->
+            <!-- we don't want a team account to accidentally try signing in here -->
             Sign in personally
         </h1>
 
@@ -23,8 +28,9 @@
                 >
                 <input
                     id="personal-email"
-                    class="h-[40px] w-full px-[12px] bg-(--bg) text-(--text-primary) placeholder:text-(--text-secondary) border border-(--border) rounded-[6px] focus:outline-none focus:ring-2 focus:ring-(--primary)"
+                    class="h-[40px] w-full px-[12px] bg-(--bg) text-(--text-primary) border border-(--border) rounded-[6px] focus:outline-none focus:ring-2 focus:ring-(--primary)"
                     type="email"
+                    placeholder="you@example.com"
                     required
                 />
             </div>
@@ -37,8 +43,9 @@
                 </label>
                 <input
                     id="personal-password"
-                    class="h-[40px] w-full px-[12px] bg-(--bg) text-(--text-primary) placeholder:text-(--text-secondary) border border-(--border) rounded-[6px] focus:outline-none focus:ring-2 focus:ring-(--primary)"
+                    class="h-[40px] w-full px-[12px] bg-(--bg) text-(--text-primary) border border-(--border) rounded-[6px] focus:outline-none focus:ring-2 focus:ring-(--primary)"
                     type="password"
+                    placeholder="••••••••••••••••"
                     required
                 />
             </div>
