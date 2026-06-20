@@ -7,57 +7,18 @@ const CAPACITOR_CUSTOM_PLATFORM = window.CapacitorCustomPlatform;
 const APP_PROTOCOL = window.location.protocol;
 const IS_NATIVE = typeof CAPACITOR_PLATFORM === "string" && CAPACITOR_PLATFORM !== "web";
 const IS_NATIVE_MOBILE = CAPACITOR_PLATFORM === "ios" || CAPACITOR_PLATFORM === "android";
+const IS_IOS_NATIVE = CAPACITOR_PLATFORM === "ios";
 const IS_ELECTRON_PLATFORM = CAPACITOR_CUSTOM_PLATFORM?.name === "electron" || APP_PROTOCOL === "capacitor-electron:";
 const IS_CAPACITOR_SCHEME = APP_PROTOCOL === "capacitor:";
 const IS_CAPACITOR = IS_NATIVE || IS_ELECTRON_PLATFORM || IS_CAPACITOR_SCHEME;
 const BASE_URL = IS_CAPACITOR ? "https://ftcvanguard.org" : "";
+const PUSH_NOTIFICATIONS_PLUGIN = typeof CAPACITOR_REF?.registerPlugin === "function"
+    ? CAPACITOR_REF.registerPlugin("PushNotifications")
+    : null;
+const IOS_PUSH_TOKEN_STORAGE_KEY = "iosPushDeviceToken";
 let nativeViewportListenersAttached = false;
-function updateNativeViewportInsets() {
-    if (!IS_NATIVE_MOBILE)
-        return;
-    const body = document.body;
-    if (!body)
-        return;
-    const viewport = window.visualViewport;
-    if (!viewport) {
-        body.style.setProperty("--native-viewport-offset-top", "0px");
-        body.style.setProperty("--native-viewport-offset-bottom", "0px");
-        return;
-    }
-    const topInset = Math.min(90, Math.max(0, Math.round(viewport.offsetTop)));
-    const viewportHeight = Math.round(viewport.height);
-    const windowHeight = Math.round(window.innerHeight);
-    const rawBottomInset = Math.max(0, windowHeight - viewportHeight - topInset);
-    const bottomInset = rawBottomInset > 120 ? 0 : rawBottomInset;
-    body.style.setProperty("--native-viewport-offset-top", `${topInset}px`);
-    body.style.setProperty("--native-viewport-offset-bottom", `${bottomInset}px`);
-}
-function setupNativeMobileSafeAreaHandling() {
-    if (!IS_NATIVE_MOBILE)
-        return;
-    const body = document.body;
-    if (!body)
-        return;
-    body.classList.add("native-mobile");
-    body.dataset.nativePlatform = CAPACITOR_PLATFORM;
-    updateNativeViewportInsets();
-    if (nativeViewportListenersAttached)
-        return;
-    nativeViewportListenersAttached = true;
-    window.addEventListener("resize", updateNativeViewportInsets);
-    window.addEventListener("orientationchange", updateNativeViewportInsets);
-    window.visualViewport?.addEventListener("resize", updateNativeViewportInsets);
-    window.visualViewport?.addEventListener("scroll", updateNativeViewportInsets);
-}
-setupNativeMobileSafeAreaHandling();
-const CAPACITOR_REF = window.Capacitor;
-const CAPACITOR_PLATFORM = typeof CAPACITOR_REF?.getPlatform === "function"
-    ? CAPACITOR_REF.getPlatform()
-    : CAPACITOR_REF?.platform;
-const IS_NATIVE = typeof CAPACITOR_PLATFORM === "string" && CAPACITOR_PLATFORM !== "web";
-const IS_NATIVE_MOBILE = CAPACITOR_PLATFORM === "ios" || CAPACITOR_PLATFORM === "android";
-const BASE_URL = IS_NATIVE ? "https://ftcvanguard.org" : "";
-let nativeViewportListenersAttached = false;
+let iosPushListenersAttached = false;
+let iosPushRegistrationRequested = false;
 function updateNativeViewportInsets() {
     if (!IS_NATIVE_MOBILE)
         return;
@@ -225,11 +186,100 @@ function buildApiUrl(path) {
     return path.startsWith("/") ? `${BASE_URL}${path}` : `${BASE_URL}/${path}`;
 }
 async function authFetch(input, init) {
-    const url = typeof input === "string" ? `${BASE_URL}${input}` : input;
-    const res = await fetch(url, init);
     const url = typeof input === "string" ? buildApiUrl(input) : input;
     const res = await fetch(url, init);
     return assertAuthorized(res);
+}
+function normalizeIosDeviceToken(token) {
+    if (!token)
+        return "";
+    return token.trim().replace(/[<>\s]/g, "").toLowerCase();
+}
+async function syncIosDeviceTokenWithBackend(deviceToken) {
+    const token = localStorage.getItem("token");
+    const normalizedToken = normalizeIosDeviceToken(deviceToken);
+    if (!token || !normalizedToken)
+        return;
+    try {
+        await fetch(buildApiUrl("/api/v1/notifications/ios/device"), {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${token}`
+            },
+            body: JSON.stringify({ deviceToken: normalizedToken })
+        });
+    }
+    catch (error) {
+        console.error("Failed to sync iOS push token:", error);
+    }
+}
+async function unregisterIosDeviceTokenFromBackend(deviceToken) {
+    const token = localStorage.getItem("token");
+    const normalizedToken = normalizeIosDeviceToken(deviceToken);
+    if (!token || !normalizedToken)
+        return;
+    try {
+        await fetch(buildApiUrl("/api/v1/notifications/ios/device"), {
+            method: "DELETE",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${token}`
+            },
+            body: JSON.stringify({ deviceToken: normalizedToken })
+        });
+    }
+    catch (error) {
+        console.error("Failed to unregister iOS push token:", error);
+    }
+}
+async function setupIosPushNotifications() {
+    if (!IS_IOS_NATIVE || !PUSH_NOTIFICATIONS_PLUGIN)
+        return;
+    if (!iosPushListenersAttached) {
+        iosPushListenersAttached = true;
+        await PUSH_NOTIFICATIONS_PLUGIN.addListener("registration", async (tokenData) => {
+            const deviceToken = normalizeIosDeviceToken(tokenData?.value);
+            if (!deviceToken)
+                return;
+            localStorage.setItem(IOS_PUSH_TOKEN_STORAGE_KEY, deviceToken);
+            await syncIosDeviceTokenWithBackend(deviceToken);
+        });
+        await PUSH_NOTIFICATIONS_PLUGIN.addListener("registrationError", (error) => {
+            console.error("iOS push registration error:", error);
+        });
+        await PUSH_NOTIFICATIONS_PLUGIN.addListener("pushNotificationActionPerformed", (notification) => {
+            const data = notification?.notification?.data;
+            const clickPath = typeof data?.click === "string" ? data.click : "";
+            if (!clickPath)
+                return;
+            if (clickPath.startsWith("http://") || clickPath.startsWith("https://")) {
+                window.location.href = clickPath;
+                return;
+            }
+            window.location.href = buildApiUrl(clickPath);
+        });
+    }
+    const existingToken = localStorage.getItem(IOS_PUSH_TOKEN_STORAGE_KEY);
+    if (existingToken) {
+        await syncIosDeviceTokenWithBackend(existingToken);
+    }
+    if (iosPushRegistrationRequested)
+        return;
+    iosPushRegistrationRequested = true;
+    try {
+        const permStatus = await PUSH_NOTIFICATIONS_PLUGIN.requestPermissions();
+        if (permStatus?.receive !== "granted") {
+            return;
+        }
+        await PUSH_NOTIFICATIONS_PLUGIN.register();
+    }
+    catch (error) {
+        console.error("Failed to initialize iOS push notifications:", error);
+    }
+}
+function clearStoredIosPushToken() {
+    localStorage.removeItem(IOS_PUSH_TOKEN_STORAGE_KEY);
 }
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
 const REALTIME_POLL_INTERVAL_MS = 15000;
@@ -3010,6 +3060,7 @@ async function handleLogin(event) {
             currentUserScopes = ["user"];
             isAdminAuthenticated = false;
             hideLogin();
+            await setupIosPushNotifications();
             await loadScheduleOffset(false);
             startScheduleOffsetSync();
             startRealtimeEventSync();
@@ -5425,10 +5476,15 @@ function initStrategyEventListeners() {
     });
 }
 function handleLogout() {
+    const storedIosToken = localStorage.getItem(IOS_PUSH_TOKEN_STORAGE_KEY);
+    if (storedIosToken) {
+        void unregisterIosDeviceTokenFromBackend(storedIosToken);
+    }
     stopScheduleOffsetSync();
     stopRealtimeEventSync();
     closeScheduleOffsetMenu();
     localStorage.removeItem("token");
+    clearStoredIosPushToken();
     loggedInTeamId = null;
     currentMatches = [];
     currentRankings = [];
@@ -5621,6 +5677,25 @@ window.addEventListener("popstate", async (event) => {
     }
 });
 document.addEventListener("DOMContentLoaded", async () => {
+    if (IS_CAPACITOR) {
+        const link = document.getElementById("login-register-link");
+        if (link) {
+            link.addEventListener("click", (e) => {
+                e.preventDefault();
+                window.open("https://ftcvanguard.org/register", "_blank");
+            });
+        }
+        // Desktop nav buttons (back/forward)
+        if (!IS_NATIVE_MOBILE) {
+            document.body.classList.add("capacitor-desktop");
+            const backBtn = document.getElementById("cap-back-btn");
+            const forwardBtn = document.getElementById("cap-forward-btn");
+            if (backBtn)
+                backBtn.addEventListener("click", () => history.back());
+            if (forwardBtn)
+                forwardBtn.addEventListener("click", () => history.forward());
+        }
+    }
     // Mobile menu initialization
     const mobileMenuBtn = document.getElementById("mobile-menu-btn");
     const sidebarOverlay = document.getElementById("sidebar-overlay");
@@ -5748,6 +5823,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         const isValid = await verifyToken(token);
         if (isValid) {
             hideLogin();
+            await setupIosPushNotifications();
             await loadScheduleOffset(false);
             startScheduleOffsetSync();
             startRealtimeEventSync();

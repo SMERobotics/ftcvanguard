@@ -11,6 +11,7 @@ dependencies = [
     "flask-cors>=6.0.2",
     "flask-sitemapper>=1.8.2",
     "gunicorn>=23.0.0",
+    "httpx[http2]>=0.28.1",
     "pyjwt[crypto]>=2.10.1",
     "pyotp>=2.9.0",
     "requests>=2.32.5",

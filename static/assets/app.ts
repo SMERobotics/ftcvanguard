@@ -6,12 +6,19 @@ const CAPACITOR_CUSTOM_PLATFORM = (window as any).CapacitorCustomPlatform;
 const APP_PROTOCOL = window.location.protocol;
 const IS_NATIVE = typeof CAPACITOR_PLATFORM === "string" && CAPACITOR_PLATFORM !== "web";
 const IS_NATIVE_MOBILE = CAPACITOR_PLATFORM === "ios" || CAPACITOR_PLATFORM === "android";
+const IS_IOS_NATIVE = CAPACITOR_PLATFORM === "ios";
 const IS_ELECTRON_PLATFORM = CAPACITOR_CUSTOM_PLATFORM?.name === "electron" || APP_PROTOCOL === "capacitor-electron:";
 const IS_CAPACITOR_SCHEME = APP_PROTOCOL === "capacitor:";
 const IS_CAPACITOR = IS_NATIVE || IS_ELECTRON_PLATFORM || IS_CAPACITOR_SCHEME;
 const BASE_URL = IS_CAPACITOR ? "https://ftcvanguard.org" : "";
+const PUSH_NOTIFICATIONS_PLUGIN = typeof CAPACITOR_REF?.registerPlugin === "function"
+    ? CAPACITOR_REF.registerPlugin("PushNotifications")
+    : null;
+const IOS_PUSH_TOKEN_STORAGE_KEY = "iosPushDeviceToken";
 
 let nativeViewportListenersAttached: boolean = false;
+let iosPushListenersAttached: boolean = false;
+let iosPushRegistrationRequested: boolean = false;
 
 function updateNativeViewportInsets() {
     if (!IS_NATIVE_MOBILE) return;
@@ -381,6 +388,101 @@ async function authFetch(input: RequestInfo | URL, init?: RequestInit): Promise<
     const url = typeof input === "string" ? buildApiUrl(input) : input;
     const res = await fetch(url, init);
     return assertAuthorized(res);
+}
+
+function normalizeIosDeviceToken(token: string | null | undefined): string {
+    if (!token) return "";
+    return token.trim().replace(/[<>\s]/g, "").toLowerCase();
+}
+
+async function syncIosDeviceTokenWithBackend(deviceToken: string): Promise<void> {
+    const token = localStorage.getItem("token");
+    const normalizedToken = normalizeIosDeviceToken(deviceToken);
+    if (!token || !normalizedToken) return;
+
+    try {
+        await fetch(buildApiUrl("/api/v1/notifications/ios/device"), {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${token}`
+            },
+            body: JSON.stringify({ deviceToken: normalizedToken })
+        });
+    } catch (error) {
+        console.error("Failed to sync iOS push token:", error);
+    }
+}
+
+async function unregisterIosDeviceTokenFromBackend(deviceToken: string): Promise<void> {
+    const token = localStorage.getItem("token");
+    const normalizedToken = normalizeIosDeviceToken(deviceToken);
+    if (!token || !normalizedToken) return;
+
+    try {
+        await fetch(buildApiUrl("/api/v1/notifications/ios/device"), {
+            method: "DELETE",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${token}`
+            },
+            body: JSON.stringify({ deviceToken: normalizedToken })
+        });
+    } catch (error) {
+        console.error("Failed to unregister iOS push token:", error);
+    }
+}
+
+async function setupIosPushNotifications(): Promise<void> {
+    if (!IS_IOS_NATIVE || !PUSH_NOTIFICATIONS_PLUGIN) return;
+
+    if (!iosPushListenersAttached) {
+        iosPushListenersAttached = true;
+
+        await PUSH_NOTIFICATIONS_PLUGIN.addListener("registration", async (tokenData: { value?: string }) => {
+            const deviceToken = normalizeIosDeviceToken(tokenData?.value);
+            if (!deviceToken) return;
+            localStorage.setItem(IOS_PUSH_TOKEN_STORAGE_KEY, deviceToken);
+            await syncIosDeviceTokenWithBackend(deviceToken);
+        });
+
+        await PUSH_NOTIFICATIONS_PLUGIN.addListener("registrationError", (error: unknown) => {
+            console.error("iOS push registration error:", error);
+        });
+
+        await PUSH_NOTIFICATIONS_PLUGIN.addListener("pushNotificationActionPerformed", (notification: any) => {
+            const data = notification?.notification?.data;
+            const clickPath = typeof data?.click === "string" ? data.click : "";
+            if (!clickPath) return;
+            if (clickPath.startsWith("http://") || clickPath.startsWith("https://")) {
+                window.location.href = clickPath;
+                return;
+            }
+            window.location.href = buildApiUrl(clickPath);
+        });
+    }
+
+    const existingToken = localStorage.getItem(IOS_PUSH_TOKEN_STORAGE_KEY);
+    if (existingToken) {
+        await syncIosDeviceTokenWithBackend(existingToken);
+    }
+
+    if (iosPushRegistrationRequested) return;
+    iosPushRegistrationRequested = true;
+
+    try {
+        const permStatus = await PUSH_NOTIFICATIONS_PLUGIN.requestPermissions();
+        if (permStatus?.receive !== "granted") {
+            return;
+        }
+        await PUSH_NOTIFICATIONS_PLUGIN.register();
+    } catch (error) {
+        console.error("Failed to initialize iOS push notifications:", error);
+    }
+}
+
+function clearStoredIosPushToken(): void {
+    localStorage.removeItem(IOS_PUSH_TOKEN_STORAGE_KEY);
 }
 
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
@@ -3496,6 +3598,7 @@ async function handleLogin(event: Event) {
             currentUserScopes = ["user"];
             isAdminAuthenticated = false;
             hideLogin();
+            await setupIosPushNotifications();
             await loadScheduleOffset(false);
             startScheduleOffsetSync();
             startRealtimeEventSync();
@@ -6245,10 +6348,16 @@ function initStrategyEventListeners() {
 }
 
 function handleLogout() {
+    const storedIosToken = localStorage.getItem(IOS_PUSH_TOKEN_STORAGE_KEY);
+    if (storedIosToken) {
+        void unregisterIosDeviceTokenFromBackend(storedIosToken);
+    }
+
     stopScheduleOffsetSync();
     stopRealtimeEventSync();
     closeScheduleOffsetMenu();
     localStorage.removeItem("token");
+    clearStoredIosPushToken();
     loggedInTeamId = null;
     currentMatches = [];
     currentRankings = [];
@@ -6617,6 +6726,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         const isValid = await verifyToken(token);
         if (isValid) {
             hideLogin();
+            await setupIosPushNotifications();
             await loadScheduleOffset(false);
             startScheduleOffsetSync();
             startRealtimeEventSync();

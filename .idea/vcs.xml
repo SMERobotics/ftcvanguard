@@ -2,5 +2,6 @@
 <project version="4">
   <component name="VcsDirectoryMappings">
     <mapping directory="$PROJECT_DIR$" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/ios/DerivedData/00008120-001A69090E44A01E/SourcePackages/checkouts/capacitor-swift-pm" vcs="Git" />
   </component>
 </project>

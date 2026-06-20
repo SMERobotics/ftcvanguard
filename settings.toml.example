@@ -7,6 +7,16 @@ ntfy_server_url = "https://ntfy.sh"
 ntfy_topic = "FTC-{}"
 ntfy_teams = [26855, 6547]
 
+[apns]
+enabled = false
+environment = "production" # production or sandbox
+team_id = "ABC123DEFG"
+key_id = "ABC123DEFG"
+topic = "org.ftcvanguard.ios"
+# Use exactly one of the next two options.
+private_key_path = "data/AuthKey_ABC123DEFG.p8"
+private_key = ""
+
 [server]
 vanguard_url = "https://ftc.technodot.org"
 

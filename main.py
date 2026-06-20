@@ -1,18 +1,22 @@
 import argon2
+import base64
 from argon2 import PasswordHasher
 from datetime import datetime, timedelta
 from flask import Flask, request, send_from_directory, jsonify
 from flask_cors import CORS
 from flask_sitemapper import Sitemapper
+import json
 import jwt
 import os
 import pyotp
+import re
 import requests
 import sqlite3
 import secrets
 import threading
 import time
 import tomllib
+import httpx
 
 FTC_API_URL = "https://ftc-api.firstinspires.org/v2.0"
 BLOCK_REGISTRATION = False
@@ -31,11 +35,181 @@ VANGUARD_URL = settings["server"]["vanguard_url"]
 ADMIN_TEAMS = settings["admin"]["admin_teams"]
 ADMIN_SECRET = settings["admin"]["admin_secret"]
 REGISTRATION_NOTIF_URL = settings["admin"]["registration_notification_url"]
+APNS_SETTINGS = settings.get("apns", {})
+APNS_ENABLED = bool(APNS_SETTINGS.get("enabled", False))
+APNS_KEY_ID = str(APNS_SETTINGS.get("key_id", "")).strip()
+APNS_TEAM_ID = str(APNS_SETTINGS.get("team_id", "")).strip()
+APNS_TOPIC = str(APNS_SETTINGS.get("topic", "")).strip()
+APNS_PRIVATE_KEY_PATH = str(APNS_SETTINGS.get("private_key_path", "")).strip()
+APNS_PRIVATE_KEY = str(APNS_SETTINGS.get("private_key", "")).strip()
+APNS_ENVIRONMENT = str(APNS_SETTINGS.get("environment", "production")).strip().lower()
 SCHEDULE_OFFSET_MINUTES_MIN = -180
 SCHEDULE_OFFSET_MINUTES_MAX = 180
 
 get_db = lambda: sqlite3.connect("data/default.db", check_same_thread=True)
 get_totp = lambda: pyotp.TOTP(ADMIN_SECRET)
+apns_client = None
+
+
+def normalize_ios_device_token(device_token: str | None) -> str:
+    if not device_token:
+        return ""
+    clean_token = (
+        device_token.strip().replace(" ", "").replace("<", "").replace(">", "")
+    )
+    return clean_token.lower()
+
+
+def to_apns_priority(priority: int) -> str:
+    return "10" if priority >= 4 else "5"
+
+
+class APNSClient:
+    def __init__(
+        self,
+        key_id: str,
+        team_id: str,
+        topic: str,
+        private_key: str,
+        environment: str,
+    ):
+        self.key_id = key_id
+        self.team_id = team_id
+        self.topic = topic
+        self.private_key = private_key
+        self.environment = environment
+        self.host = (
+            "api.development.push.apple.com"
+            if environment == "sandbox"
+            else "api.push.apple.com"
+        )
+        self._jwt_token = ""
+        self._jwt_issued_at = 0
+        self._http_client = httpx.Client(http2=True, timeout=15)
+
+    def _get_auth_token(self) -> str:
+        now_ts = int(time.time())
+        if self._jwt_token and (now_ts - self._jwt_issued_at) < 3000:
+            return self._jwt_token
+
+        payload = {"iss": self.team_id, "iat": now_ts}
+        headers = {"alg": "ES256", "kid": self.key_id}
+        token = jwt.encode(
+            payload,
+            self.private_key,
+            algorithm="ES256",
+            headers=headers,
+        )
+        self._jwt_token = token
+        self._jwt_issued_at = now_ts
+        return token
+
+    def send_notification(
+        self,
+        device_token: str,
+        title: str,
+        message: str,
+        priority: int = 3,
+        click: str = "",
+    ) -> tuple[bool, bool]:
+        auth_token = self._get_auth_token()
+        request_headers = {
+            "authorization": f"bearer {auth_token}",
+            "apns-topic": self.topic,
+            "apns-push-type": "alert",
+            "apns-priority": to_apns_priority(priority),
+            "apns-expiration": "0",
+        }
+        body = {
+            "aps": {
+                "alert": {"title": title, "body": message},
+                "sound": "default",
+            }
+        }
+        if click:
+            body["click"] = click
+
+        endpoint = f"https://{self.host}/3/device/{device_token}"
+        try:
+            response = self._http_client.post(
+                endpoint,
+                headers=request_headers,
+                json=body,
+            )
+            if response.status_code == 200:
+                return True, False
+
+            should_drop_token = response.status_code in (400, 410)
+            if should_drop_token:
+                try:
+                    reason = response.json().get("reason", "")
+                except Exception:
+                    reason = ""
+                if reason and reason not in (
+                    "BadDeviceToken",
+                    "Unregistered",
+                    "DeviceTokenNotForTopic",
+                ):
+                    should_drop_token = False
+
+            print(
+                f"APNs send failed for token {device_token[:8]}...: {response.status_code} {response.text}"
+            )
+            return False, should_drop_token
+        except Exception as e:
+            print(f"APNs request error for token {device_token[:8]}...: {e}")
+            return False, False
+
+
+def load_apns_private_key() -> str:
+    if APNS_PRIVATE_KEY:
+        try:
+            decoded = base64.b64decode(APNS_PRIVATE_KEY.encode("utf-8"), validate=True)
+            if decoded.startswith(b"-----BEGIN PRIVATE KEY-----"):
+                return decoded.decode("utf-8")
+        except Exception:
+            pass
+        return APNS_PRIVATE_KEY.replace("\\n", "\n")
+
+    if not APNS_PRIVATE_KEY_PATH:
+        return ""
+
+    try:
+        with open(APNS_PRIVATE_KEY_PATH, "r") as f:
+            return f.read()
+    except Exception as e:
+        print(f"Failed to read APNs private key file: {e}")
+        return ""
+
+
+def build_apns_client() -> APNSClient | None:
+    if not APNS_ENABLED:
+        return None
+
+    if APNS_ENVIRONMENT not in ("production", "sandbox"):
+        print(f"Invalid APNs environment: {APNS_ENVIRONMENT}")
+        return None
+
+    if not APNS_KEY_ID or not APNS_TEAM_ID or not APNS_TOPIC:
+        print("APNs disabled: missing key_id, team_id, or topic")
+        return None
+
+    private_key = load_apns_private_key()
+    if not private_key:
+        print("APNs disabled: missing private key")
+        return None
+
+    try:
+        return APNSClient(
+            key_id=APNS_KEY_ID,
+            team_id=APNS_TEAM_ID,
+            topic=APNS_TOPIC,
+            private_key=private_key,
+            environment=APNS_ENVIRONMENT,
+        )
+    except Exception as e:
+        print(f"Failed to initialize APNs client: {e}")
+        return None
 
 
 def clamp_schedule_offset(offset_minutes: int) -> int:
@@ -194,6 +368,7 @@ def send_notification(
         return True
 
     print(f"Sending notification to team {team_id}: {title} - {message}")
+    ntfy_success = False
     topic = NTFY_TOPIC.format(team_id)
     url = f"{NTFY_SERVER_URL}/{topic}"
     headers = {
@@ -205,21 +380,60 @@ def send_notification(
 
     try:
         r = requests.post(url, data=message.encode("utf-8"), headers=headers)
-        if r.status_code == 200:
-            sent_at = int(datetime.now().timestamp())
-            cursor.execute(
-                "INSERT OR IGNORE INTO notifications (team_id, title, message, sent_at) VALUES (?, ?, ?, ?)",
-                (team_id, title, message, sent_at),
-            )
-            db.commit()
-        cursor.close()
-        db.close()
-        return r.status_code == 200
+        ntfy_success = r.status_code == 200
+        if not ntfy_success:
+            print(f"ntfy send failed for team {team_id}: {r.status_code} {r.text}")
     except Exception as e:
-        print(f"Error sending notification to team {team_id}: {e}")
-        cursor.close()
-        db.close()
-        return False
+        print(f"Error sending ntfy notification to team {team_id}: {e}")
+
+    apns_sent_count = 0
+    stale_ios_device_ids = []
+    if apns_client is not None:
+        cursor.execute(
+            "SELECT id, device_token FROM ios_devices WHERE team_id = ?",
+            (team_id,),
+        )
+        ios_rows = cursor.fetchall()
+        for row in ios_rows:
+            device_id = int(row[0])
+            device_token = str(row[1])
+            apns_success, should_drop_token = apns_client.send_notification(
+                device_token=device_token,
+                title=title,
+                message=message,
+                priority=priority,
+                click=click,
+            )
+            if apns_success:
+                apns_sent_count += 1
+                cursor.execute(
+                    "UPDATE ios_devices SET last_success_at = ?, updated_at = ? WHERE id = ?",
+                    (
+                        int(datetime.now().timestamp()),
+                        int(datetime.now().timestamp()),
+                        device_id,
+                    ),
+                )
+            elif should_drop_token:
+                stale_ios_device_ids.append(device_id)
+
+    if stale_ios_device_ids:
+        cursor.executemany(
+            "DELETE FROM ios_devices WHERE id = ?",
+            [(device_id,) for device_id in stale_ios_device_ids],
+        )
+
+    send_success = ntfy_success or apns_sent_count > 0
+    if send_success:
+        sent_at = int(datetime.now().timestamp())
+        cursor.execute(
+            "INSERT OR IGNORE INTO notifications (team_id, title, message, sent_at) VALUES (?, ?, ?, ?)",
+            (team_id, title, message, sent_at),
+        )
+    db.commit()
+    cursor.close()
+    db.close()
+    return send_success
 
 
 def notification_callback():
@@ -356,6 +570,15 @@ cursor.execute("""CREATE TABLE IF NOT EXISTS notifications (
     sent_at INTEGER NOT NULL,
     UNIQUE(team_id, title, message)
 )""")
+cursor.execute("""CREATE TABLE IF NOT EXISTS ios_devices (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    team_id INTEGER NOT NULL,
+    device_token TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    last_success_at INTEGER,
+    UNIQUE(team_id, device_token)
+)""")
 cursor.execute("""CREATE TABLE IF NOT EXISTS strategy (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     team_id INTEGER NOT NULL,
@@ -479,6 +702,12 @@ db.close()
 if len(NTFY_TEAMS) > 0:
     thread = threading.Thread(target=notification_loop, daemon=True)
     thread.start()
+
+apns_client = build_apns_client()
+if apns_client is not None:
+    print(
+        f"APNs enabled for topic {APNS_TOPIC} ({APNS_ENVIRONMENT})"
+    )
 
 
 @sitemapper.include(lastmod="2026-02-14")
@@ -734,6 +963,97 @@ def _api_v1_verify():
         return {"status": "fuck", "error": "token expired"}, 401
     except:
         return {"status": "fuck", "error": "invalid token"}, 401
+
+
+@app.route("/api/v1/notifications/ios/device", methods=["POST"])
+def _api_v1_ios_device_register():
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return {"status": "fuck", "error": "no auth"}, 401
+
+    token = auth_header.split(" ")[1]
+    try:
+        payload = jwt.decode(token, RSA_PUBLIC_KEY, algorithms=["RS256"])
+        team_id = payload.get("id")
+    except jwt.ExpiredSignatureError:
+        return {"status": "fuck", "error": "token expired"}, 401
+    except jwt.InvalidTokenError:
+        return {"status": "fuck", "error": "invalid token"}, 401
+
+    data = request.json or {}
+    raw_device_token = data.get("deviceToken")
+    device_token = normalize_ios_device_token(raw_device_token)
+
+    if not device_token:
+        return {"status": "fuck", "error": "missing deviceToken"}, 400
+
+    if not re.fullmatch(r"[0-9a-f]+", device_token):
+        return {"status": "fuck", "error": "invalid deviceToken"}, 400
+
+    if len(device_token) < 64 or len(device_token) > 200:
+        return {"status": "fuck", "error": "invalid deviceToken length"}, 400
+
+    now_ts = int(datetime.now().timestamp())
+    try:
+        db = get_db()
+        cursor = db.cursor()
+        cursor.execute(
+            """INSERT INTO ios_devices (team_id, device_token, created_at, updated_at)
+               VALUES (?, ?, ?, ?)
+               ON CONFLICT(team_id, device_token)
+               DO UPDATE SET updated_at = excluded.updated_at""",
+            (team_id, device_token, now_ts, now_ts),
+        )
+        db.commit()
+        cursor.close()
+        db.close()
+        return {
+            "status": "success",
+            "teamId": team_id,
+            "deviceToken": device_token,
+            "apnsEnabled": apns_client is not None,
+        }, 200
+    except Exception as e:
+        print(e)
+        return {"status": "fuck", "error": "idk"}, 500
+
+
+@app.route("/api/v1/notifications/ios/device", methods=["DELETE"])
+def _api_v1_ios_device_unregister():
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return {"status": "fuck", "error": "no auth"}, 401
+
+    token = auth_header.split(" ")[1]
+    try:
+        payload = jwt.decode(token, RSA_PUBLIC_KEY, algorithms=["RS256"])
+        team_id = payload.get("id")
+    except jwt.ExpiredSignatureError:
+        return {"status": "fuck", "error": "token expired"}, 401
+    except jwt.InvalidTokenError:
+        return {"status": "fuck", "error": "invalid token"}, 401
+
+    data = request.json or {}
+    raw_device_token = data.get("deviceToken")
+    device_token = normalize_ios_device_token(raw_device_token)
+    if not device_token:
+        return {"status": "fuck", "error": "missing deviceToken"}, 400
+
+    try:
+        db = get_db()
+        cursor = db.cursor()
+        cursor.execute(
+            "DELETE FROM ios_devices WHERE team_id = ? AND device_token = ?",
+            (team_id, device_token),
+        )
+        db.commit()
+        deleted = cursor.rowcount
+        cursor.close()
+        db.close()
+        return {"status": "success", "removed": deleted > 0}, 200
+    except Exception as e:
+        print(e)
+        return {"status": "fuck", "error": "idk"}, 500
 
 
 @app.route("/api/v1/events", methods=["GET"])
@@ -1323,8 +1643,6 @@ def _api_v1_strategy_post():
 
     if phase not in ("auto", "teleop", "endgame"):
         return {"status": "fuck", "error": "invalid phase"}, 400
-
-    import json
 
     strokes_str = json.dumps(strokes) if strokes else None
 

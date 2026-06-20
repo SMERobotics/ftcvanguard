@@ -8,6 +8,7 @@
     "@capacitor/assets": "^3.0.5",
     "@capacitor/cli": "^8.1.0",
     "@capacitor/core": "^8.1.0",
-    "@capacitor/ios": "^8.1.0"
+    "@capacitor/ios": "^8.1.0",
+    "@capacitor/push-notifications": "^8.1.0"
   }
 }
