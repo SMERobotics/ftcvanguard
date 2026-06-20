@@ -11,7 +11,7 @@ const IS_IOS_NATIVE = CAPACITOR_PLATFORM === "ios";
 const IS_ELECTRON_PLATFORM = CAPACITOR_CUSTOM_PLATFORM?.name === "electron" || APP_PROTOCOL === "capacitor-electron:";
 const IS_CAPACITOR_SCHEME = APP_PROTOCOL === "capacitor:";
 const IS_CAPACITOR = IS_NATIVE || IS_ELECTRON_PLATFORM || IS_CAPACITOR_SCHEME;
-const BASE_URL = IS_CAPACITOR ? "https://ftcvanguard.org" : "";
+const BASE_URL = IS_CAPACITOR ? "https://beta.ftcvanguard.org" : "";
 const PUSH_NOTIFICATIONS_PLUGIN = typeof CAPACITOR_REF?.registerPlugin === "function"
     ? CAPACITOR_REF.registerPlugin("PushNotifications")
     : null;
