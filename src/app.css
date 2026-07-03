@@ -51,8 +51,8 @@
 } */
 
 :root {
-    --bg: #0d1117; /* vscode - gh */
-    --fg: #010409; /* vscode - gh */
+    --bg: #1f1f1f; /* vscode - gh */
+    --fg: #181818; /* vscode - gh */
 
     --border: rgba(255, 255, 255, 0.067);
 
