@@ -1,4 +1,4 @@
-import { get, post } from "./api";
+import { post } from "./api";
 import {
     SESSION_TOKEN_KEY,
     clearSessionToken,
@@ -108,10 +108,6 @@ export function registerPersonal(
     );
 }
 
-export function me(): Promise<CurrentAccount> {
-    return get<CurrentAccount>("/auth/me");
-}
-
 export function logout(): void {
     clearSessionToken();
 }
@@ -128,7 +124,6 @@ export const auth = {
     loginPersonal,
     registerRoot,
     registerPersonal,
-    me,
     logout,
     token,
 } as const;

@@ -2,6 +2,7 @@
     import { onMount } from "svelte";
 
     import auth, { type CurrentAccount } from "../../auth";
+    import { get } from "../../api";
 
     let {
         onSignOut = () => {},
@@ -19,7 +20,7 @@
         error = null;
 
         try {
-            account = await auth.me();
+            account = await get<CurrentAccount>("/auth/me");
         } catch {
             error = "Unable to load account.";
         } finally {

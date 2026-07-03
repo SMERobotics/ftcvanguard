@@ -25,6 +25,7 @@
     import MenuButton from "./lib/components/MenuButton.svelte";
 
     import AuthPanel from "./lib/panels/AuthPanel.svelte";
+    import SchedulePanel from "./lib/panels/SchedulePanel.svelte";
     import { sessionToken } from "./lib/auth-token";
     import { panelContextKey, type PanelContext } from "./lib/panel-context";
 
@@ -34,6 +35,7 @@
 
     const panelViews = {
         auth: AuthPanel,
+        schedule: SchedulePanel,
     } satisfies Record<string, Component>;
 
     type PanelView = keyof typeof panelViews;
@@ -144,7 +146,7 @@
                 <IconButton icon={Star} label="Starred" />
                 <IconButton icon={Bell} label="Activity" />
                 <IconDivider />
-                <IconButton icon={ClipboardClock} label="Schedule" />
+                <IconButton icon={ClipboardClock} label="Schedule" panel="schedule" />
                 <IconButton icon={ChartColumnStacked} label="Rankings" />
                 <IconButton icon={NotebookPen} label="Scouting" />
                 <IconButton icon={Telescope} label="Insights" />

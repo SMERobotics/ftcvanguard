@@ -90,8 +90,7 @@
         showView("signIn");
     }
 
-    async function showCurrentAccount() {
-        await auth.me();
+    function showCurrentAccount() {
         showView("account");
     }
 
@@ -115,14 +114,14 @@
     function handleRootLogin(credentials: RootCredential) {
         void runAuth(async () => {
             await auth.loginRoot(credentials);
-            await showCurrentAccount();
+            showCurrentAccount();
         });
     }
 
     function handlePersonalLogin(credentials: PersonalCredential) {
         void runAuth(async () => {
             await auth.loginPersonal(credentials);
-            await showCurrentAccount();
+            showCurrentAccount();
         });
     }
 
@@ -133,7 +132,7 @@
                 number: account.number,
                 password: account.password,
             });
-            await showCurrentAccount();
+            showCurrentAccount();
         });
     }
 
@@ -144,7 +143,7 @@
                 email: account.email,
                 password: account.password,
             });
-            await showCurrentAccount();
+            showCurrentAccount();
         });
     }
 
@@ -153,7 +152,7 @@
         error = null;
 
         try {
-            await showCurrentAccount();
+            showCurrentAccount();
         } catch {
             auth.logout();
             activeAuthView = "signIn";
