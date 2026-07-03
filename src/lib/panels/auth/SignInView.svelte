@@ -47,10 +47,22 @@
 </script>
 
 <AuthLayout title="Sign in to Vanguard">
+
+    <AuthButtonGroup>
+        <SocialAuthButtons {pending} />
+        <AuthButton variant="primary" onclick={onSignInEmail} disabled={pending}>
+            <Mail class="h-4 w-4 shrink-0" />
+            Continue with email
+        </AuthButton>
+    </AuthButtonGroup>
+
+    <AuthSeparator label="or, sign in as a team" />
+
     <AuthForm
         onsubmit={handleSubmit}
         submitLabel="Sign in"
         pendingLabel="Signing in"
+        submitActive={teamNumber !== "" || password !== ""}
         {pending}
         {error}
     >
@@ -73,16 +85,6 @@
             {/snippet}
         </AuthTextField>
     </AuthForm>
-
-    <AuthSeparator label="or, sign in personal" />
-
-    <AuthButtonGroup>
-        <AuthButton onclick={onSignInEmail} disabled={pending}>
-            <Mail class="h-4 w-4 shrink-0" />
-            Continue with email
-        </AuthButton>
-        <SocialAuthButtons {pending} />
-    </AuthButtonGroup>
 
     <AuthInlineAction
         prompt="New to Vanguard?"

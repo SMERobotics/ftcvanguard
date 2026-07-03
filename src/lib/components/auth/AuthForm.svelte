@@ -7,6 +7,7 @@
         error?: string | null;
         pending?: boolean;
         pendingLabel?: string;
+        submitActive?: boolean;
         submitLabel: string;
         onsubmit?: (event: SubmitEvent) => void;
         class?: string;
@@ -17,6 +18,7 @@
         error = null,
         pending = false,
         pendingLabel,
+        submitActive = true,
         submitLabel,
         onsubmit,
         class: className = "",
@@ -35,7 +37,11 @@
         </p>
     {/if}
 
-    <AuthButton variant="primary" type="submit" disabled={pending}>
+    <AuthButton
+        variant={submitActive ? "primary" : "secondary"}
+        type="submit"
+        disabled={pending}
+    >
         {pending ? (pendingLabel ?? submitLabel) : submitLabel}
     </AuthButton>
 </form>

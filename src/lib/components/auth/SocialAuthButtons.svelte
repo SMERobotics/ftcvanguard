@@ -15,7 +15,7 @@
 </script>
 
 <AuthButtonGroup>
-    <AuthButton disabled={pending || !onGoogle} onclick={onGoogle}>
+    <AuthButton onclick={onGoogle}>
         <svg
             aria-hidden="true"
             xmlns="http://www.w3.org/2000/svg"
@@ -43,7 +43,7 @@
         Continue with Google
     </AuthButton>
 
-    <AuthButton disabled={pending || !onGitHub} onclick={onGitHub}>
+    <AuthButton onclick={onGitHub}>
         <img
             class="h-4 w-4 shrink-0"
             src={githubLogo}
@@ -53,7 +53,7 @@
         Continue with GitHub
     </AuthButton>
 
-    <AuthButton disabled={pending || !onApple} onclick={onApple}>
+    <AuthButton onclick={onApple}>
         <svg
             aria-hidden="true"
             xmlns="http://www.w3.org/2000/svg"
