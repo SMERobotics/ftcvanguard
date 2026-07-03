@@ -1,5 +1,6 @@
 from collections.abc import AsyncGenerator
 from datetime import datetime, timezone
+from enum import IntEnum
 import os
 from uuid import UUID, uuid4
 
@@ -10,7 +11,7 @@ from sqlalchemy.ext.asyncio import (
     AsyncEngine,
 )
 from sqlalchemy.orm import sessionmaker
-from sqlmodel import Field, SQLModel
+from sqlmodel import CheckConstraint, Field, Relationship, SQLModel
 
 DEVELOPMENT = os.getenv("FTCVANGUARD_DEVELOPMENT", "0") == "1"
 
@@ -52,6 +53,14 @@ def utc_now() -> datetime:
     return datetime.now(timezone.utc)
 
 
+class PermissionLevel(IntEnum):
+    NONE = 0
+    READ = 1
+    WRITE = 2
+    MANAGE = 3
+    ADMIN = 4
+
+
 class RootIdentity(SQLModel, table=True):
     __tablename__ = "root_identity"
 
@@ -71,6 +80,8 @@ class RootIdentity(SQLModel, table=True):
         sa_column=Column(DateTime(timezone=True), nullable=True),
     )
 
+    members: list["TeamAccess"] = Relationship(back_populates="team")
+
 
 # NOTE: not sure how google/github/apple sso will work out but oh well
 class PersonalIdentity(SQLModel, table=True):
@@ -88,4 +99,38 @@ class PersonalIdentity(SQLModel, table=True):
     last_login_at: datetime | None = Field(
         default=None,
         sa_column=Column(DateTime(timezone=True), nullable=True),
+    )
+
+    team_access: list["TeamAccess"] = Relationship(back_populates="user")
+
+
+class TeamAccess(SQLModel, table=True):
+    __tablename__ = "team_access"
+
+    user_uuid: UUID = Field(
+        foreign_key="personal_identity.uuid",
+        primary_key=True,
+    )
+    team_number: int = Field(
+        foreign_key="root_identity.number",
+        primary_key=True,
+    )
+    permission_level: int = Field(
+        default=PermissionLevel.NONE,
+        nullable=False,
+    )
+
+    created_at: datetime = Field(
+        default_factory=utc_now,
+        sa_column=Column(DateTime(timezone=True), nullable=False),
+    )
+
+    user: PersonalIdentity = Relationship(back_populates="team_access")
+    team: RootIdentity = Relationship(back_populates="members")
+
+    __table_args__ = (
+        CheckConstraint(
+            "permission_level >= 0 AND permission_level <= 4",
+            name="check_permission_level",
+        ),
     )
