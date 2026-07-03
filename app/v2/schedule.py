@@ -14,9 +14,11 @@ class ScheduleResponse(BaseModel):
 @schedule.get("/get")
 async def _hello(event: str, _payload: dict = Depends(BearerAuth)) -> ScheduleResponse:
     async with FTCClient() as client:
+        # i'm actually so mad
+        # these ftc api chuds can't document their fucking api properly
         urls = [
-            f"/schedule/{event}?tournamentLevel=qual",
-            f"/schedule/{event}?tournamentLevel=playoff"
+            f"/schedule/{event}/qual/hybrid",
+            f"/schedule/{event}/playoff/hybrid"
         ]
 
         # performance reasons
