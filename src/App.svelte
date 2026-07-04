@@ -47,7 +47,7 @@
     const panelOpen = $derived(activePanel !== null);
     const panelColumn = $derived(panelOpen ? panelWidth : 0);
     const panelResizerVisible = $derived(panelOpen || panelResizing);
-    const panelResizerColumn = $derived(panelResizerVisible ? 2 : 0);
+    const panelResizerColumn = $derived(panelResizerVisible ? 4 : 0);
 
     const minPanelWidth = 300;
     const collapsePanelWidth = 150;
@@ -186,7 +186,7 @@
             aria-valuemax={maxPanelWidth}
             aria-valuenow={panelWidth}
             aria-hidden={!panelResizerVisible}
-            class={`${panelResizerVisible ? "cursor-col-resize" : "pointer-events-none"} ${panelOpen ? "my-[12px]" : ""} transition-colors delay-0 duration-150 ${panelResizing ? "bg-(--primary)" : "bg-transparent hover:delay-[350ms] hover:bg-(--primary)"} w-[2px]`}
+            class={`${panelResizerVisible ? "cursor-col-resize" : "pointer-events-none"} ${panelOpen ? "my-[12px]" : ""} transition-colors delay-0 duration-150 ${panelResizing ? "bg-(--primary)" : "bg-transparent hover:delay-[350ms] hover:bg-(--primary)"} w-[4px]`}
             onpointerdown={startPanelResize}
         ></div>
 
