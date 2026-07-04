@@ -3,7 +3,7 @@ import axios, {
     type AxiosResponse,
     type InternalAxiosRequestConfig,
 } from "axios";
-import { getSessionToken } from "./auth-token";
+import { clearSessionToken, getSessionToken } from "./auth-token";
 
 const BASE_URL = "/api/v2";
 
@@ -25,6 +25,7 @@ export const apiClient = axios.create({
     baseURL: BASE_URL,
 });
 
+// automatically handle auth
 apiClient.interceptors.request.use((config) => {
     const apiConfig = config as ApiInternalRequestConfig;
 
@@ -39,6 +40,15 @@ apiClient.interceptors.request.use((config) => {
     }
 
     return config;
+});
+
+// automatically handle bearer exp
+apiClient.interceptors.response.use(undefined, (error: unknown) => {
+    if (axios.isAxiosError(error) && error.response?.status === 401) {
+        clearSessionToken();
+    }
+
+    return Promise.reject(error);
 });
 
 export async function request<TResponse = unknown, TBody = unknown>(
