@@ -1,1 +1,1 @@
-<div class="h-px w-[24px] bg-(--seperate)"></div>
+<div class="h-px w-[24px] bg-(--separate)"></div>
