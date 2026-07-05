@@ -23,6 +23,7 @@
     import IconDivider from "./lib/components/IconDivider.svelte";
     import IconStack from "./lib/components/IconStack.svelte";
     import MenuButton from "./lib/components/MenuButton.svelte";
+    import TeamDropdown from "./lib/components/TeamDropdown.svelte";
 
     import AuthPanel from "./lib/panels/AuthPanel.svelte";
     import SchedulePanel from "./lib/panels/SchedulePanel.svelte";
@@ -130,6 +131,8 @@
             <MenuButton label="Edit" />
             <MenuButton label="View" />
             <MenuButton label="Help" />
+
+            <TeamDropdown />
         </div>
     </header>
 
