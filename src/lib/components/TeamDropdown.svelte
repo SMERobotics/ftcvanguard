@@ -63,18 +63,34 @@
                 type="button"
                 role="menuitem"
                 onclick={close}
-                class="w-full rounded-[4px] bg-transparent font-sans text-sm text-(--inactive) hover:bg-(--menu-hover) hover:text-(--active)"
+                class="w-full rounded-[4px] bg-transparent font-sans text-sm text-(--inactive) hover:bg-(--menu-hover) hover:text-(--active) py-[5px] flex-col"
             >
                 <!-- TODO: maybe consider swapping places of team name and role? -->
-                <div class="flex h-[24px] items-center py-[5px] pl-[10px] pr-[8px]">
+                <div class="flex h-[24px] items-center pl-[10px] pr-[8px]">
                     <span class="h-5 w-5 mr-[5px] bg-contain bg-center bg-norepeat inline-block team team-{currentTeam?.state}"></span>
                     <span>{currentTeam?.state}</span>
                     <span class="ml-auto text-(--detail)">SME Cavalry</span>
                 </div>
-                <div class="flex h-[24px] items-center py-[5px] pl-[10px] pr-[8px]">
+                <div class="flex h-[20px] items-center pl-[10px] pr-[8px]">
                     <span class="ml-[25px] text-(--detail)">Team Captain</span>
                 </div>
             </button>
+            <button
+            type="button"
+            role="menuitem"
+            onclick={close}
+            class="w-full rounded-[4px] bg-transparent font-sans text-sm text-(--inactive) hover:bg-(--menu-hover) hover:text-(--active) py-[5px] flex-col"
+        >
+            <!-- TODO: maybe consider swapping places of team name and role? -->
+            <div class="flex h-[24px] items-center pl-[10px] pr-[8px]">
+                <span class="h-5 w-5 mr-[5px] bg-contain bg-center bg-norepeat inline-block team team-6547"></span>
+                <span>6547</span>
+                <span class="ml-auto text-(--detail)">Cobalt Colts</span>
+            </div>
+            <div class="flex h-[20px] items-center pl-[10px] pr-[8px]">
+                <span class="ml-[25px] text-(--detail)">Guest</span>
+            </div>
+        </button>
         </div>
     {/if}
 </div>
