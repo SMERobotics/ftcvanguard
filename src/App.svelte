@@ -24,6 +24,7 @@
     import IconStack from "./lib/components/IconStack.svelte";
     import MenuButton from "./lib/components/MenuButton.svelte";
     import TeamDropdown from "./lib/components/TeamDropdown.svelte";
+    import EventDropdown from "./lib/components/EventDropdown.svelte";
 
     import AuthPanel from "./lib/panels/AuthPanel.svelte";
     import SchedulePanel from "./lib/panels/SchedulePanel.svelte";
@@ -133,6 +134,7 @@
             <MenuButton label="Help" />
 
             <TeamDropdown />
+            <EventDropdown />
         </div>
     </header>
 
