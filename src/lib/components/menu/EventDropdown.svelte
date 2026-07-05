@@ -1,10 +1,10 @@
 <script lang="ts">
     import { ChevronDown } from "@lucide/svelte";
 
-    import { currentTeam } from "../states/team-state.svelte";
-    import { currentEvent } from "../states/event-state.svelte";
+    import { currentTeam } from "../../states/team-state.svelte";
+    import { currentEvent } from "../../states/event-state.svelte";
 
-    import { get } from "../api";
+    import { get } from "../../api";
     import EventDropdownOption from "./EventDropdownOption.svelte";
 
     type TeamEvent = {

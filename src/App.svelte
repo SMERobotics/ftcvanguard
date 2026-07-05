@@ -22,9 +22,9 @@
     import IconButton from "./lib/components/IconButton.svelte";
     import IconDivider from "./lib/components/IconDivider.svelte";
     import IconStack from "./lib/components/IconStack.svelte";
-    import MenuButton from "./lib/components/MenuButton.svelte";
-    import TeamDropdown from "./lib/components/TeamDropdown.svelte";
-    import EventDropdown from "./lib/components/EventDropdown.svelte";
+    import MenuButton from "./lib/components/menu/MenuButton.svelte";
+    import TeamDropdown from "./lib/components/menu/TeamDropdown.svelte";
+    import EventDropdown from "./lib/components/menu/EventDropdown.svelte";
 
     import AuthPanel from "./lib/panels/AuthPanel.svelte";
     import SchedulePanel from "./lib/panels/SchedulePanel.svelte";

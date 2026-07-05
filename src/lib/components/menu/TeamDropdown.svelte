@@ -1,7 +1,7 @@
 <script lang="ts">
     import { ChevronDown } from "@lucide/svelte";
 
-    import { currentTeam } from "../states/team-state.svelte";
+    import { currentTeam } from "../../states/team-state.svelte";
 
     let open = $state(false);
     let root: HTMLDivElement;
