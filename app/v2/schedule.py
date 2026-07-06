@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
 from ..ftc import FTCClient
+from ..utils import _raise
 
 from .auth import BearerAuth
 
@@ -27,7 +28,7 @@ async def _get(event: str, _payload: dict = Depends(BearerAuth)) -> ScheduleResp
         # performance reasons
         async def _get_schedule(url: str) -> list[dict]:
             r = await client.get(url)
-            r.raise_for_status()
+            _raise(r)
             return r.json()
 
         responses = await asyncio.gather(*(_get_schedule(url) for url in urls))
