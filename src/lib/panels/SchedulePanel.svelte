@@ -1,6 +1,14 @@
 <script lang="ts">
     import { onMount, tick } from "svelte";
 
+    import {
+        Hash,
+        Sword,
+        Swords,
+    } from "@lucide/svelte";
+
+    import IconButton from "../../lib/components/IconButton.svelte";
+
     import { currentEvent } from "../states/event-state.svelte";
     import { currentTeam } from "../states/team-state.svelte";
 
@@ -57,13 +65,34 @@
     }
 
     let matches = $state<ScheduleMatch[]>([]);
+    let filteredMatches = $derived(
+        matches.filter((match) => {
+            if (filterToTeam && !match.teams.some((team) => team.teamNumber === currentTeam.state)) {
+                return false;
+            }
+            if (filterToQualifications && match.tournamentLevel !== "QUALIFICATION") {
+                return false;
+            }
+            if (filterToPlayoffs && match.tournamentLevel !== "PLAYOFF") {
+                return false;
+            }
+            return true;
+        })
+    );
     let now = $state(Date.now());
+
+    // scrollbar state
     let scroller: HTMLDivElement | undefined;
     let scrollbarVisible = $state(false);
     let scrollbarThumbTop = $state(0);
     let scrollbarThumbHeight = $state(0);
     let scrollbarDragging = $state(false);
     let stopScrollbarDrag: (() => void) | null = null;
+
+    // filter toggle state
+    let filterToTeam = $state(false);
+    let filterToQualifications = $state(false);
+    let filterToPlayoffs = $state(false);
 
     const scrollbarInset = 4;
     const scrollbarMinThumbHeight = 24;
@@ -246,7 +275,7 @@
         matches = Array.isArray(response) ? response : (response.schedule ?? []);
     }
 
-    let cards = $derived(matches.map(toScheduleCard));
+    let cards = $derived(filteredMatches.map(toScheduleCard));
 
     $effect(() => {
         if (currentEvent.state) {
@@ -284,7 +313,35 @@
 </script>
 
 <div class="flex h-full min-h-0 flex-col">
-    <div class="h-10 shrink-0 border-b border-(--border)"></div>
+    <div class="h-10 shrink-0 border-b border-(--border) flex p-[5px] gap-[5px]">
+        <IconButton
+            icon={Hash}
+            label="Filter to team"
+            active={filterToTeam}
+            aria-pressed={filterToTeam}
+            onclick={() => {
+                filterToTeam = !filterToTeam;
+            }}
+        />
+        <IconButton
+            icon={Sword}
+            label="Filter to qualifications"
+            active={filterToQualifications}
+            aria-pressed={filterToQualifications}
+            onclick={() => {
+                filterToQualifications = !filterToQualifications;
+            }}
+        />
+        <IconButton
+            icon={Swords}
+            label="Filter to playoffs"
+            active={filterToPlayoffs}
+            aria-pressed={filterToPlayoffs}
+            onclick={() => {
+                filterToPlayoffs = !filterToPlayoffs;
+            }}
+        />
+    </div>
     <div class="relative min-h-0 flex-1 overflow-hidden">
         <div
             bind:this={scroller}
@@ -292,7 +349,7 @@
             onscroll={updateScrollbar}
         >
             {#each cards as card, index (card.id)}
-                {#if isPlayoffStart(card, index)}
+                {#if isPlayoffStart(card, index) && !(filterToQualifications || filterToPlayoffs)}
                     <div class="col-span-full h-px bg-(--border)"></div>
                 {/if}
                 <ScheduleCard
