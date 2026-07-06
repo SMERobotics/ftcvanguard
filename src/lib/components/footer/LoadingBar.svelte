@@ -2,20 +2,25 @@
     import { writable } from "svelte/store";
 
     const loadingBarVisible = writable(false);
+    let status = $state("");
 
-    export function showLoadingBar() {
+    export function showLoadingBar(target: string) {
         loadingBarVisible.set(true);
+        status = target;
     }
 
     export function hideLoadingBar() {
         loadingBarVisible.set(false);
+        status = "";
     }
+
 </script>
 
-<div class="flex h-full select-none items-center justify-end pr-[12px]">
+<div class="flex h-full select-none items-center justify-end pr-[13px]">
     {#if $loadingBarVisible}
+        <span class="text-sm text-(--detail) mr-2">{status}</span>
         <div
-            class="loading-bar h-[5px] max-w-[calc(100vw-24px)] overflow-hidden rounded-full"
+            class="loading-bar h-[6px] max-w-[calc(100vw-24px)] overflow-hidden rounded-full"
             role="progressbar"
             aria-label="Loading"
         >

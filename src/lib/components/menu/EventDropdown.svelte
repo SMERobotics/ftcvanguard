@@ -1,6 +1,8 @@
 <script lang="ts">
     import { ChevronDown } from "@lucide/svelte";
 
+    import { showLoadingBar, hideLoadingBar } from "../footer/LoadingBar.svelte";
+
     import { currentTeam } from "../../states/team-state.svelte";
     import { currentEvent } from "../../states/event-state.svelte";
 
@@ -29,6 +31,8 @@
     let selectedEvent = $state<TeamEvent | undefined>(undefined);
 
     async function loadEvents(teamNumber: number) {
+        showLoadingBar("Querying events");
+
         const response = await get<EventsResponse>(
             `/events/get?number=${teamNumber}`,
         );
@@ -43,6 +47,8 @@
         }
 
         selectEvent(events.findLast((event) => Date.parse(event.dateStart) <= Date.now()) ?? events[0]);
+
+        hideLoadingBar();
     }
 
     $effect(() => {

@@ -333,7 +333,7 @@
     //
 
     async function loadSchedule(eventCode: string) {
-        showLoadingBar();
+        showLoadingBar("Compiling schedule");
 
         try {
             const response = await get<ScheduleResponse>(
