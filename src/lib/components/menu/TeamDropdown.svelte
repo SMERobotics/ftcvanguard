@@ -41,13 +41,13 @@
     });
 </script>
 
-<div class="relative" bind:this={root}>
+<div class="relative select-none" bind:this={root}>
     <button
         type="button"
         aria-expanded={open}
         aria-haspopup="menu"
         onclick={toggle}
-        class="ml-[8px] flex items-center rounded-md bg-transparent py-[5px] pl-[10px] pr-[8px] font-sans text-sm text-(--inactive) hover:bg-(--border) hover:text-(--active)"
+        class="ml-[8px] flex select-none items-center rounded-md bg-transparent py-[5px] pl-[10px] pr-[8px] font-sans text-sm text-(--inactive) hover:bg-(--border) hover:text-(--active)"
     >
         <span class="h-5 w-5 mr-[5px] bg-contain bg-center bg-norepeat inline-block team team-{currentTeam?.state}"></span>
         <span>{currentTeam?.state}</span>
@@ -63,7 +63,7 @@
                 type="button"
                 role="menuitem"
                 onclick={close}
-                class="w-full rounded-[4px] bg-transparent font-sans text-sm text-(--inactive) hover:bg-(--menu-hover) hover:text-(--active) pt-[2px] pb-[4px] flex-col"
+                class="w-full select-none flex-col rounded-[4px] bg-transparent pt-[2px] pb-[4px] font-sans text-sm text-(--inactive) hover:bg-(--menu-hover) hover:text-(--active)"
             >
                 <!-- TODO: maybe consider swapping places of team name and role? -->
                 <div class="flex h-[24px] items-center pl-[10px] pr-[8px]">
@@ -79,7 +79,7 @@
                 type="button"
                 role="menuitem"
                 onclick={close}
-                class="w-full rounded-[4px] bg-transparent font-sans text-sm text-(--inactive) hover:bg-(--menu-hover) hover:text-(--active) pt-[2px] pb-[4px] flex-col"
+                class="w-full select-none flex-col rounded-[4px] bg-transparent pt-[2px] pb-[4px] font-sans text-sm text-(--inactive) hover:bg-(--menu-hover) hover:text-(--active)"
             >
                 <!-- TODO: maybe consider swapping places of team name and role? -->
                 <div class="flex h-[24px] items-center pl-[10px] pr-[8px]">

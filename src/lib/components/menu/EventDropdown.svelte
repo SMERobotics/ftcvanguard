@@ -97,13 +97,13 @@
     });
 </script>
 
-<div class="relative" bind:this={root}>
+<div class="relative select-none" bind:this={root}>
     <button
         type="button"
         aria-expanded={open}
         aria-haspopup="menu"
         onclick={toggle}
-        class="ml-[8px] flex items-center rounded-md bg-transparent py-[5px] pl-[10px] pr-[8px] font-sans text-sm text-(--inactive) hover:bg-(--border) hover:text-(--active)"
+        class="ml-[8px] flex select-none items-center rounded-md bg-transparent py-[5px] pl-[10px] pr-[8px] font-sans text-sm text-(--inactive) hover:bg-(--border) hover:text-(--active)"
     >
         <span>{selectedEvent?.name ?? "No Events"}</span>
         <ChevronDown class="ml-[4px] h-[15px] w-[15px] text-(--detail)" />
@@ -115,7 +115,7 @@
             role="menu"
         >
             {#if events.length === 0}
-                <div class="px-[10px] py-[8px] font-sans text-sm text-(--detail)">
+                <div class="select-none px-[10px] py-[8px] font-sans text-sm text-(--detail)">
                     low cortisol robotics, am I right?
                 </div>
             {:else}

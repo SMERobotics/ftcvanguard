@@ -78,7 +78,7 @@
         >
             {#snippet labelAction()}
                 <span
-                    class="float-right font-sans text-sm text-(--text-accent) hover:underline"
+                    class="float-right select-none font-sans text-sm text-(--text-accent) hover:underline"
                 >
                     Forgot password?
                 </span>

@@ -21,7 +21,7 @@
 </script>
 
 <div class="flex w-full flex-col gap-1">
-    <label for={id} class="font-serif text-sm text-(--text-primary)">
+    <label for={id} class="select-none font-serif text-sm text-(--text-primary)">
         {label}
         {@render labelAction?.()}
     </label>

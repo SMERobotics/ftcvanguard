@@ -49,10 +49,10 @@
 </script>
 
 <div class="flex h-full flex-col gap-3 p-6 text-(--text-primary)">
-    <h1 class="font-serif text-2xl">Account</h1>
+    <h1 class="select-none font-serif text-2xl">Account</h1>
 
     {#if pending_refresh && account === null}
-        <p class="font-sans text-sm">Loading account...</p>
+        <p class="select-none font-sans text-sm">Loading account...</p>
     {/if}
 
     {#if error}
@@ -61,24 +61,24 @@
 
     {#if account}
         <dl class="font-sans text-sm">
-            <dt>Type</dt>
+            <dt class="select-none">Type</dt>
             <dd>{account.type}</dd>
 
             {#if account.type === "root"}
-                <dt>Team number</dt>
+                <dt class="select-none">Team number</dt>
                 <dd>{account.number}</dd>
             {:else}
-                <dt>Name</dt>
+                <dt class="select-none">Name</dt>
                 <dd>{account.name}</dd>
             {/if}
 
-            <dt>Email</dt>
+            <dt class="select-none">Email</dt>
             <dd>{account.email}</dd>
         </dl>
     {/if}
 
     <button
-        class="w-fit rounded-[6px] border border-(--border) px-3 py-2 font-sans text-sm"
+        class="w-fit select-none rounded-[6px] border border-(--border) px-3 py-2 font-sans text-sm"
         type="button"
         disabled={pending_refresh}
         onclick={() => void loadAccount()}
@@ -87,7 +87,7 @@
     </button>
 
     <button
-        class="w-fit rounded-[6px] border border-(--border) px-3 py-2 font-sans text-sm"
+        class="w-fit select-none rounded-[6px] border border-(--border) px-3 py-2 font-sans text-sm"
         type="button"
         disabled={pending_signout}
         onclick={() => void signOut()}

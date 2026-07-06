@@ -365,7 +365,7 @@
             }}
         />
         <div class="ml-2">
-            <span class="text-sm text-(--text-primary) mr-1">Search:</span>
+            <span class="mr-1 select-none text-sm text-(--text-primary)">Search:</span>
             <InputField
                 class="font-mono max-w-[64px] text-right"
                 placeholder="20181"
@@ -381,13 +381,13 @@
             onscroll={updateScrollbar}
         >
             {#if cards.length === 0}
-                <div class="col-span-full text-center text-(--detail) text-sm mt-2">
+                <div class="col-span-full mt-2 select-none text-center text-sm text-(--detail)">
                     low cortisol robotics, am I right?
                 </div>
             {:else}
                 {#each cards as card, index (card.id)}
                     {#if isPlayoffStart(card, index) && !(filterToQualifications || filterToPlayoffs)}
-                        <div class="col-span-full h-px bg-(--border)"></div>
+                        <div class="col-span-full h-px select-none bg-(--border)"></div>
                     {/if}
                     <ScheduleCard
                         name={card.name}
@@ -412,14 +412,14 @@
 
         {#if scrollbarVisible}
             <div
-                class="pointer-events-none absolute right-[2px] w-[4px]"
+                class="pointer-events-none absolute right-[2px] w-[4px] select-none"
                 style={`top: ${scrollbarInset}px; bottom: ${scrollbarInset}px;`}
             >
                 <button
                     type="button"
                     tabindex="-1"
                     aria-label="Scroll schedule"
-                    class="scrollbar-thumb pointer-events-auto absolute right-0 w-[4px] appearance-none rounded-full border-0 p-0"
+                    class="scrollbar-thumb pointer-events-auto absolute right-0 w-[4px] select-none appearance-none rounded-full border-0 p-0"
                     class:scrollbar-thumb-dragging={scrollbarDragging}
                     style={`height: ${scrollbarThumbHeight}px; transform: translateY(${scrollbarThumbTop}px);`}
                     onpointerdown={startScrollbarDrag}

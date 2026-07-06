@@ -25,7 +25,7 @@
 <button
     {...rest}
     {type}
-    class={`flex items-center justify-center gap-2 h-[40px] w-full rounded-[6px] border border-(--border) font-serif text-sm text-(--text-primary) transition-colors duration-80 cursor-pointer disabled:cursor-not-allowed disabled:opacity-60 ${variantClass} ${className}`}
+    class={`flex h-[40px] w-full select-none items-center justify-center gap-2 rounded-[6px] border border-(--border) font-serif text-sm text-(--text-primary) transition-colors duration-80 cursor-pointer disabled:cursor-not-allowed disabled:opacity-60 ${variantClass} ${className}`}
 >
     {@render children?.()}
 </button>

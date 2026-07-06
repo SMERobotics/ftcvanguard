@@ -47,14 +47,14 @@
     }
 </script>
 
-<div class="group relative h-[30px] w-[30px]">
+<div class="group relative h-[30px] w-[30px] select-none">
     <button
         {...rest}
         {type}
         aria-label={label}
         aria-pressed={panel ? isActive : ariaPressed}
         onclick={handleClick}
-        class={`flex h-[30px] w-[30px] items-center justify-center rounded-[6px] p-0 ${isActive ? "bg-(--primary) text-(--active)" : "bg-transparent text-(--inactive) hover:bg-(--border) hover:text-(--active)"} ${className}`}
+        class={`flex h-[30px] w-[30px] select-none items-center justify-center rounded-[6px] p-0 ${isActive ? "bg-(--primary) text-(--active)" : "bg-transparent text-(--inactive) hover:bg-(--border) hover:text-(--active)"} ${className}`}
     >
         <Icon size={20} aria-hidden="true" />
     </button>

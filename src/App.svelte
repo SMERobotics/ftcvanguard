@@ -120,7 +120,7 @@
 
 <div class="grid h-dvh grid-rows-[42px_1fr_32px] overflow-hidden bg-(--bg)">
     <!-- header 42px tall -->
-    <header class="flex">
+    <header class="flex select-none">
         <!-- logo icon -->
         <div class="h-full w-[42px] flex items-center justify-center">
             <img src={logo} alt="Avantium" class="h-[24px] w-[24px]" />
@@ -192,7 +192,7 @@
             aria-valuemax={maxPanelWidth}
             aria-valuenow={panelWidth}
             aria-hidden={!panelResizerVisible}
-            class={`${panelResizerVisible ? "cursor-col-resize" : "pointer-events-none"} ${panelOpen ? "my-[12px]" : ""} transition-colors delay-0 duration-150 ${panelResizing ? "bg-(--primary)" : "bg-transparent hover:delay-[350ms] hover:bg-(--primary)"} w-[4px]`}
+            class={`${panelResizerVisible ? "cursor-col-resize" : "pointer-events-none"} ${panelOpen ? "my-[12px]" : ""} select-none transition-colors delay-0 duration-150 ${panelResizing ? "bg-(--primary)" : "bg-transparent hover:delay-[350ms] hover:bg-(--primary)"} w-[4px]`}
             onpointerdown={startPanelResize}
         ></div>
 

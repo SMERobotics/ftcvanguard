@@ -14,7 +14,7 @@
     type="button"
     role="menuitem"
     onclick={onSelect}
-    class="flex-col w-full rounded-[4px] bg-transparent py-[5px] font-sans text-sm text-(--inactive) hover:bg-(--menu-hover) hover:text-(--active)"
+    class="w-full select-none flex-col rounded-[4px] bg-transparent py-[5px] font-sans text-sm text-(--inactive) hover:bg-(--menu-hover) hover:text-(--active)"
 >
     <div class="flex h-[20px] items-center pl-[10px] pr-[8px]">
         <span>{name}</span>

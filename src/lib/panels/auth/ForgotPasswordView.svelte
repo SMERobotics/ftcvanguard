@@ -22,7 +22,7 @@
     <div class="flex w-full max-w-[360px] flex-col">
         <!-- header -->
         <h1
-            class="mb-[24px] text-(--text-primary) font-serif text-3xl align-left"
+            class="mb-[24px] select-none text-(--text-primary) font-serif text-3xl align-left"
         >
             Sign in to Vanguard
         </h1>
@@ -32,7 +32,7 @@
             <div class="flex w-full flex-col gap-1">
                 <label
                     for="team-number"
-                    class="text-(--text-primary) font-serif text-sm"
+                    class="select-none text-(--text-primary) font-serif text-sm"
                     >FTC team number</label
                 >
                 <input
@@ -49,11 +49,11 @@
             <div class="flex w-full flex-col gap-1">
                 <label
                     for="team-password"
-                    class="text-(--text-primary) font-serif text-sm"
+                    class="select-none text-(--text-primary) font-serif text-sm"
                 >
                     Password
                     <span
-                        class="text-(--text-accent) font-sans text-sm float-right hover:underline"
+                        class="float-right select-none text-(--text-accent) font-sans text-sm hover:underline"
                         >Forgot password?</span
                     >
                 </label>
@@ -65,7 +65,7 @@
                 />
             </div>
             <button
-                class="h-[40px] w-full bg-(--confirm) text-(--text-primary) font-serif text-sm border border-(--border) rounded-[6px] hover:bg-(--confirm-hover) active:bg-(--confirm-active) cursor-pointer transition-colors duration-80"
+                class="h-[40px] w-full select-none bg-(--confirm) text-(--text-primary) font-serif text-sm border border-(--border) rounded-[6px] hover:bg-(--confirm-hover) active:bg-(--confirm-active) cursor-pointer transition-colors duration-80"
                 type="submit"
             >
                 Sign in
@@ -73,9 +73,9 @@
         </div>
 
         <!-- separator -->
-        <div class="flex w-full items-center gap-2 py-5">
+        <div class="flex w-full select-none items-center gap-2 py-5">
             <div class="h-px flex-1 bg-(--separate)"></div>
-            <span class="font-sans text-sm text-(--text-primary)"
+            <span class="select-none font-sans text-sm text-(--text-primary)"
                 >or, sign in personal</span
             >
             <div class="h-px flex-1 bg-(--separate)"></div>
@@ -84,14 +84,14 @@
         <!-- alternate sign in options -->
         <div class="flex w-full flex-col items-center gap-2">
             <button
-                class="flex h-[40px] w-full items-center justify-center gap-2 bg-(--secondary) text-(--text-primary) font-serif text-sm border border-(--border) rounded-[6px] hover:bg-(--secondary-hover) active:bg-(--secondary-active) cursor-pointer transition-colors duration-80"
+                class="flex h-[40px] w-full select-none items-center justify-center gap-2 bg-(--secondary) text-(--text-primary) font-serif text-sm border border-(--border) rounded-[6px] hover:bg-(--secondary-hover) active:bg-(--secondary-active) cursor-pointer transition-colors duration-80"
             >
                 <Mail class="h-4 w-4 shrink-0" />
                 Continue with email
             </button>
 
             <button
-                class="flex h-[40px] w-full items-center justify-center gap-2 bg-(--secondary) text-(--text-primary) font-serif text-sm border border-(--border) rounded-[6px] hover:bg-(--secondary-hover) active:bg-(--secondary-active) cursor-pointer transition-colors duration-80"
+                class="flex h-[40px] w-full select-none items-center justify-center gap-2 bg-(--secondary) text-(--text-primary) font-serif text-sm border border-(--border) rounded-[6px] hover:bg-(--secondary-hover) active:bg-(--secondary-active) cursor-pointer transition-colors duration-80"
             >
                 <svg
                     aria-hidden="true"
@@ -128,7 +128,7 @@
             </button>
 
             <button
-                class="flex h-[40px] w-full items-center justify-center gap-2 bg-(--secondary) text-(--text-primary) font-serif text-sm border border-(--border) rounded-[6px] hover:bg-(--secondary-hover) active:bg-(--secondary-active) cursor-pointer transition-colors duration-80"
+                class="flex h-[40px] w-full select-none items-center justify-center gap-2 bg-(--secondary) text-(--text-primary) font-serif text-sm border border-(--border) rounded-[6px] hover:bg-(--secondary-hover) active:bg-(--secondary-active) cursor-pointer transition-colors duration-80"
             >
                 <img
                     class="h-4 w-4 shrink-0"
@@ -140,7 +140,7 @@
             </button>
 
             <button
-                class="flex h-[40px] w-full items-center justify-center gap-2 bg-(--secondary) text-(--text-primary) font-serif text-sm border border-(--border) rounded-[6px] hover:bg-(--secondary-hover) active:bg-(--secondary-active) cursor-pointer transition-colors duration-80"
+                class="flex h-[40px] w-full select-none items-center justify-center gap-2 bg-(--secondary) text-(--text-primary) font-serif text-sm border border-(--border) rounded-[6px] hover:bg-(--secondary-hover) active:bg-(--secondary-active) cursor-pointer transition-colors duration-80"
             >
                 <svg
                     aria-hidden="true"
@@ -165,9 +165,9 @@
             </button>
         </div>
 
-        <span class="text-(--text-primary) font-sans text-sm mt-5">
+        <span class="mt-5 select-none text-(--text-primary) font-sans text-sm">
             New to Vanguard?
-            <span class="text-(--text-accent) font-sans text-sm hover:underline"
+            <span class="select-none text-(--text-accent) font-sans text-sm hover:underline"
                 >Create an account</span
             >
         </span>

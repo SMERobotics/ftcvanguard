@@ -16,10 +16,12 @@
     }: Props = $props();
 </script>
 
-<span class={`mt-6 font-sans text-sm text-(--text-primary) ${className}`}>
+<span
+    class={`mt-6 select-none font-sans text-sm text-(--text-primary) ${className}`}
+>
     {prompt}
     <button
-        class="cursor-pointer appearance-none border-0 bg-transparent p-0 font-sans text-sm text-(--text-accent) hover:underline disabled:cursor-not-allowed disabled:opacity-60"
+        class="select-none cursor-pointer appearance-none border-0 bg-transparent p-0 font-sans text-sm text-(--text-accent) hover:underline disabled:cursor-not-allowed disabled:opacity-60"
         type="button"
         {onclick}
         {disabled}

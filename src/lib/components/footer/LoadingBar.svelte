@@ -12,7 +12,7 @@
     }
 </script>
 
-<div class="flex h-full items-center justify-end pr-[12px]">
+<div class="flex h-full select-none items-center justify-end pr-[12px]">
     {#if $loadingBarVisible}
         <div
             class="loading-bar h-[5px] max-w-[calc(100vw-24px)] overflow-hidden rounded-full"
