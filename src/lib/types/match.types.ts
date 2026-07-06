@@ -1,4 +1,5 @@
 const MatchType = {
+    PRACTICE: "practice",
     QUAL: "qual",
     PLAYOFF: "playoff",
 } as const;

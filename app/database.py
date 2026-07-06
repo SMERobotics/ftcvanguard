@@ -134,3 +134,20 @@ class TeamAccess(SQLModel, table=True):
             name="check_permission_level",
         ),
     )
+
+class CachedFTCEventData(SQLModel, table=True):
+    __tablename__ = "cached_ftc_event_data"
+
+    event_code: str = Field(primary_key=True)
+    field_count: int = Field(nullable=False)
+    type: str = Field(nullable=False)
+    region_code: str = Field(nullable=False)
+    league_code: str = Field(nullable=False)
+    timezone: str = Field(nullable=False)
+    date_start: str = Field(nullable=False)
+    date_end: str = Field(nullable=False)
+
+    last_updated: datetime = Field(
+        default_factory=utc_now,
+        sa_column=Column(DateTime(timezone=True), nullable=False),
+    )
