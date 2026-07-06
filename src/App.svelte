@@ -25,6 +25,7 @@
     import MenuButton from "./lib/components/menu/MenuButton.svelte";
     import TeamDropdown from "./lib/components/menu/TeamDropdown.svelte";
     import EventDropdown from "./lib/components/menu/EventDropdown.svelte";
+    import LoadingBar from "./lib/components/footer/LoadingBar.svelte";
 
     import AuthPanel from "./lib/panels/AuthPanel.svelte";
     import SchedulePanel from "./lib/panels/SchedulePanel.svelte";
@@ -205,5 +206,7 @@
     </div>
 
     <!-- footer 32px tall -->
-    <footer></footer>
+    <footer>
+        <LoadingBar />
+    </footer>
 </div>

@@ -8,6 +8,7 @@
     } from "@lucide/svelte";
 
     import IconButton from "../../lib/components/IconButton.svelte";
+    import { showLoadingBar, hideLoadingBar } from "../../lib/components/footer/LoadingBar.svelte";
 
     import { currentEvent } from "../states/event-state.svelte";
     import { currentTeam } from "../states/team-state.svelte";
@@ -268,11 +269,19 @@
     //
 
     async function loadSchedule(eventCode: string) {
-        const response = await get<ScheduleResponse | ScheduleMatch[]>(
-            `/schedule/get?event=${eventCode}`,
-        );
+        showLoadingBar();
 
-        matches = Array.isArray(response) ? response : (response.schedule ?? []);
+        try {
+            const response = await get<ScheduleResponse | ScheduleMatch[]>(
+                `/schedule/get?event=${eventCode}`,
+            );
+
+            matches = Array.isArray(response)
+                ? response
+                : (response.schedule ?? []);
+        } finally {
+            hideLoadingBar();
+        }
     }
 
     let cards = $derived(filteredMatches.map(toScheduleCard));
