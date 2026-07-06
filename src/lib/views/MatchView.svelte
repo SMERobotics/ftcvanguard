@@ -5,5 +5,8 @@
 <div class="flex h-full select-none flex-col items-center justify-center gap-2">
     <div>
         <h1 class="text-(--text-primary) font-sans text-4xl">{currentMatch.state}</h1>
+        <h4 class="mt-2 font-sans text-xl text-(--text-secondary)">
+            Field {currentMatch.field || "TBD"}
+        </h4>
     </div>
 </div>

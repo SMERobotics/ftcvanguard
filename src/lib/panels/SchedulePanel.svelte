@@ -20,68 +20,17 @@
         type MatchResult,
         type Alliance,
         type MatchType,
+        type ScheduleMatch,
+        type ScheduleResponse,
+        type ScheduleStation,
     } from "../types/match.types";
 
     import ScheduleCard from "../components/schedule/ScheduleCard.svelte";
 
     import { get } from "../api";
     
-    type ScheduleStation =
-        | "Red1"
-        | "Red2"
-        | "Red3"
-        | "Blue1"
-        | "Blue2"
-        | "Blue3";
-
-    interface ScheduleTeamAttributes {
-        surrogate: boolean;
-        noShow: boolean;
-        dq: boolean;
-        onField: boolean;
-    }
-
-    interface ScheduleTeam {
-        number: number;
-        name: string;
-        station: string;
-        attributes: ScheduleTeamAttributes;
-    }
-
-    interface ScheduleMatchNumber {
-        series: number;
-        match: number;
-    }
-
-    interface ScheduleMatchTimes {
-        scheduled: string | null;
-        queuing: string | null;
-        actual: string | null;
-        results: string | null;
-    }
-
-    interface ScheduleMatchResults {
-        scoreRedFinal: number;
-        scoreBlueFinal: number;
-        redWins: boolean;
-        blueWins: boolean;
-    }
-
-    interface ScheduleMatch {
-        name: string;
-        type: MatchType;
-        number: ScheduleMatchNumber;
-        field: string;
-        times: ScheduleMatchTimes;
-        teams: ScheduleTeam[];
-        results: ScheduleMatchResults | null;
-    }
-
-    interface ScheduleResponse {
-        schedule: ScheduleMatch[];
-    }
-
     interface ScheduleCardData {
+        match: ScheduleMatch;
         id: string;
         name: string;
         time: string;
@@ -195,6 +144,7 @@
         const results = match.results;
 
         return {
+            match,
             id: `${match.type}-${match.number.series}-${match.number.match}-${match.field}`,
             name: match.name,
             time: formatTime(match.times.scheduled),
@@ -341,6 +291,7 @@
             );
 
             matches = response.schedule;
+            currentMatch.sync(matches);
         } finally {
             hideLoadingBar();
         }
@@ -472,14 +423,8 @@
                         blueWins={card.blueWins}
                         countdown={getCountdown(card)}
                         field={card.field}
-                        selected={currentMatch.state === card.name}
-                        onSelect={() => {
-                            if (currentMatch.state !== card.name) {
-                                currentMatch.state = card.name;
-                            } else {
-                                currentMatch.state = "";
-                            }
-                        }}
+                        selected={currentMatch.is(card.match)}
+                        onSelect={() => currentMatch.toggle(card.match)}
                     />
                 {/each}
             {/if}
