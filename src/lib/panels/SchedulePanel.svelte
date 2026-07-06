@@ -52,10 +52,12 @@
         time: string;
         alliance: Alliance;
         result: MatchResult;
-        red1: number;
-        red2: number;
-        blue1: number;
-        blue2: number;
+        red1: number | null;
+        red2: number | null;
+        red3: number | null;
+        blue1: number | null;
+        blue2: number | null;
+        blue3: number | null;
         scoreRedFinal: number;
         scoreBlueFinal: number;
         redWins: boolean;
@@ -121,7 +123,7 @@
 
     function getTeamNumber(match: ScheduleMatch, station: string) {
         return (
-            match.teams.find((team) => team.station === station)?.teamNumber ?? 0
+            match.teams.find((team) => team.station === station)?.teamNumber ?? null
         );
     }
 
@@ -158,8 +160,10 @@
             result: getResult(match, alliance),
             red1: getTeamNumber(match, "Red1"),
             red2: getTeamNumber(match, "Red2"),
+            red3: getTeamNumber(match, "Red3"),
             blue1: getTeamNumber(match, "Blue1"),
             blue2: getTeamNumber(match, "Blue2"),
+            blue3: getTeamNumber(match, "Blue3"),
             scoreRedFinal: match.scoreRedFinal ?? 0,
             scoreBlueFinal: match.scoreBlueFinal ?? 0,
             redWins: match.redWins,
@@ -396,8 +400,10 @@
                         result={card.result}
                         red1={card.red1}
                         red2={card.red2}
+                        red3={card.red3}
                         blue1={card.blue1}
                         blue2={card.blue2}
+                        blue3={card.blue3}
                         scoreRedFinal={card.scoreRedFinal}
                         scoreBlueFinal={card.scoreBlueFinal}
                         redWins={card.redWins}

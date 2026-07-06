@@ -9,10 +9,12 @@
         time: string;
         alliance?: Alliance;
         result?: MatchResult;
-        red1: number;
-        red2: number;
-        blue1: number;
-        blue2: number;
+        red1: number | null;
+        red2: number | null;
+        red3: number | null;
+        blue1: number | null;
+        blue2: number | null;
+        blue3: number | null;
         scoreRedFinal: number;
         scoreBlueFinal: number;
         redWins: boolean;
@@ -22,7 +24,7 @@
         onSelect: () => void;
     }
 
-    let { name, time, alliance = null, result = null, red1, red2, blue1, blue2, scoreRedFinal, scoreBlueFinal, redWins, blueWins, countdown, field, onSelect }: Props = $props();
+    let { name, time, alliance = null, result = null, red1, red2, red3, blue1, blue2, blue3, scoreRedFinal, scoreBlueFinal, redWins, blueWins, countdown, field, onSelect }: Props = $props();
 </script>
 
 <button class="w-full min-w-[282px] select-none text-(--inactive) hover:text-(--active) flex-col {alliance === 'red' ? 'bg-[#230505] hover:bg-[#310606]' : ''} {alliance === 'blue' ? 'bg-[#0c132a] hover:bg-[#111c3f]' : ''} {alliance !== 'red' && alliance !== 'blue' ? 'hover:bg-(--immediate)' : ''} rounded-md pt-1.25 pb-1 px-2 font-mono" onclick={onSelect}>
@@ -31,12 +33,14 @@
         <span class="min-w-[64px] pl-[6px] mt-[2px] ml-auto text-[12px] text-(--detail) text-right">{time}</span>
     </div>
     <div class="flex items-center">
-        <span class="text-[13px]">
-            <span class="text-red-400 {redWins ? 'font-bold underline' : ''}">{red1}</span>,
-            <span class="text-red-400 {redWins ? 'font-bold underline' : ''}">{red2}</span>
+        <span class="text-[13px] text-left">
+            <span class="text-red-400 {redWins ? 'font-bold underline' : ''}">{red1}</span>{red2 !== null ? "," : ""}
+            <span class="text-red-400 {redWins ? 'font-bold underline' : ''}">{red2}</span>{red3 !== null ? "," : ""}
+            <span class="text-red-400 {redWins ? 'font-bold underline' : ''}">{red3}</span>
             vs.
-            <span class="text-blue-400 {blueWins ? 'font-bold underline' : ''}">{blue1}</span>,
-            <span class="text-blue-400 {blueWins ? 'font-bold underline' : ''}">{blue2}</span>
+            <span class="text-blue-400 {blueWins ? 'font-bold underline' : ''}">{blue1}</span>{blue2 !== null ? "," : ""}
+            <span class="text-blue-400 {blueWins ? 'font-bold underline' : ''}">{blue2}</span>{blue3 !== null ? "," : ""}
+            <span class="text-blue-400 {blueWins ? 'font-bold underline' : ''}">{blue3}</span>
         </span>
     </div>
     <div class="flex items-center">
