@@ -27,8 +27,8 @@
 
 <button class="w-full min-w-[282px] text-(--inactive) hover:text-(--active) flex-col {alliance === 'red' ? 'bg-[#230505] hover:bg-[#310606]' : ''} {alliance === 'blue' ? 'bg-[#0c132a] hover:bg-[#111c3f]' : ''} {alliance !== 'red' && alliance !== 'blue' ? 'hover:bg-(--immediate)' : ''} rounded-md pt-1.25 pb-1 px-2 font-mono" onclick={onSelect}>
     <div class="flex items-center">
-        <span class="text-[14px] font-semibold">{name}</span>
-        <span class="ml-auto text-[12px] text-(--detail)">{time}</span>
+        <span class="text-[14px] font-semibold text-left">{name}</span>
+        <span class="min-w-[58px] ml-auto text-[12px] text-(--detail)">{time}</span>
     </div>
     <div class="flex items-center">
         <span class="text-[13px]">
