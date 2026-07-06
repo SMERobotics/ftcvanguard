@@ -3,6 +3,7 @@
 
     import {
         Hash,
+        Shield,
         Sword,
         Swords,
     } from "@lucide/svelte";
@@ -107,6 +108,9 @@
             if (filterToTeam && !match.teams.some((team) => team.number === currentTeam.state)) {
                 return false;
             }
+            if (filterToPractice && match.type !== "practice") {
+                return false;
+            }
             if (filterToQualifications && match.type !== "qual") {
                 return false;
             }
@@ -137,6 +141,7 @@
 
     // filter toggle state
     let filterToTeam = $state(false);
+    let filterToPractice = $state(false);
     let filterToQualifications = $state(false);
     let filterToPlayoffs = $state(false);
     
@@ -234,8 +239,12 @@
         return `Starts in ${seconds}s`;
     }
 
+    function isQualificationStart(card: ScheduleCardData, index: number) {
+        return (card.type === "qual" && cards[index - 1]?.type !== "qual") && (cards.some((match) => match.type === "practice"));
+    }
+
     function isPlayoffStart(card: ScheduleCardData, index: number) {
-        return card.type === "playoff" && cards[index - 1]?.type !== "playoff";
+        return (card.type === "playoff" && cards[index - 1]?.type !== "playoff") && (cards.some((match) => match.type === "qual"));
     }
 
     function getScrollbarData() {
@@ -385,12 +394,24 @@
             }}
         />
         <IconButton
+            icon={Shield}
+            label="Filter to practice"
+            active={filterToPractice}
+            aria-pressed={filterToPractice}
+            onclick={() => {
+                filterToPractice = !filterToPractice;
+                filterToQualifications = false;
+                filterToPlayoffs = false;
+            }}
+        />
+        <IconButton
             icon={Sword}
             label="Filter to qualifications"
             active={filterToQualifications}
             aria-pressed={filterToQualifications}
             onclick={() => {
                 filterToQualifications = !filterToQualifications;
+                filterToPractice = false;
                 filterToPlayoffs = false;
             }}
         />
@@ -401,6 +422,7 @@
             aria-pressed={filterToPlayoffs}
             onclick={() => {
                 filterToPlayoffs = !filterToPlayoffs;
+                filterToPractice = false;
                 filterToQualifications = false;
             }}
         />
@@ -426,7 +448,10 @@
                 </div>
             {:else}
                 {#each cards as card, index (card.id)}
-                    {#if isPlayoffStart(card, index) && !(filterToQualifications || filterToPlayoffs)}
+                    {#if isQualificationStart(card, index)}
+                        <div class="col-span-full h-px select-none bg-(--border)"></div>
+                    {/if}
+                    {#if isPlayoffStart(card, index)}
                         <div class="col-span-full h-px select-none bg-(--border)"></div>
                     {/if}
                     <ScheduleCard
