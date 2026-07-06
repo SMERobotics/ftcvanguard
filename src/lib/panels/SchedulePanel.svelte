@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { onMount } from "svelte";
+    import { onMount, tick } from "svelte";
 
     import { currentEvent } from "../states/event-state.svelte";
     import { currentTeam } from "../states/team-state.svelte";
@@ -58,11 +58,24 @@
 
     let matches = $state<ScheduleMatch[]>([]);
     let now = $state(Date.now());
+    let scroller: HTMLDivElement | undefined;
+    let scrollbarVisible = $state(false);
+    let scrollbarThumbTop = $state(0);
+    let scrollbarThumbHeight = $state(0);
+    let scrollbarDragging = $state(false);
+    let stopScrollbarDrag: (() => void) | null = null;
+
+    const scrollbarInset = 4;
+    const scrollbarMinThumbHeight = 24;
 
     const timeFormatter = new Intl.DateTimeFormat(undefined, {
         hour: "numeric",
         minute: "2-digit",
     });
+
+    function clamp(value: number, min: number, max: number) {
+        return Math.min(max, Math.max(min, value));
+    }
 
     function getTeamNumber(match: ScheduleMatch, station: string) {
         return (
@@ -141,6 +154,88 @@
         return card.tournamentLevel === "PLAYOFF" && cards[index - 1]?.tournamentLevel !== "PLAYOFF";
     }
 
+    function getScrollbarData() {
+        if (!scroller) return null;
+
+        const { clientHeight, scrollHeight, scrollTop } = scroller;
+        const maxScrollTop = scrollHeight - clientHeight;
+        if (maxScrollTop <= 1) return null;
+
+        const trackHeight = Math.max(
+            scrollbarMinThumbHeight,
+            clientHeight - scrollbarInset * 2,
+        );
+        const thumbHeight = clamp(
+            trackHeight * clientHeight / scrollHeight,
+            scrollbarMinThumbHeight,
+            trackHeight,
+        );
+
+        return {
+            maxScrollTop,
+            maxThumbTop: trackHeight - thumbHeight,
+            scrollTop,
+            thumbHeight,
+        };
+    }
+
+    function updateScrollbar() {
+        const metrics = getScrollbarData();
+        scrollbarVisible = Boolean(metrics);
+        scrollbarThumbHeight = metrics?.thumbHeight ?? 0;
+        scrollbarThumbTop = metrics
+            ? metrics.maxThumbTop * (metrics.scrollTop / metrics.maxScrollTop)
+            : 0;
+    }
+
+    function scrollToThumb(thumbTop: number) {
+        const metrics = getScrollbarData();
+        if (!metrics || !scroller) return;
+
+        const nextThumbTop = clamp(thumbTop, 0, metrics.maxThumbTop);
+        const progress =
+            metrics.maxThumbTop === 0 ? 0 : nextThumbTop / metrics.maxThumbTop;
+
+        scroller.scrollTop = progress * metrics.maxScrollTop;
+        updateScrollbar();
+    }
+
+    function startScrollbarDrag(event: PointerEvent) {
+        stopScrollbarDrag?.();
+        event.preventDefault();
+
+        const startY = event.clientY;
+        const startTop = scrollbarThumbTop;
+        scrollbarDragging = true;
+
+        const controller = new AbortController();
+        const previousUserSelect = document.body.style.userSelect;
+        document.body.style.userSelect = "none";
+
+        function updateDrag(moveEvent: PointerEvent) {
+            moveEvent.preventDefault();
+            scrollToThumb(startTop + moveEvent.clientY - startY);
+        }
+
+        function stopDrag() {
+            scrollbarDragging = false;
+            document.body.style.userSelect = previousUserSelect;
+            controller.abort();
+            stopScrollbarDrag = null;
+        }
+
+        stopScrollbarDrag = stopDrag;
+        window.addEventListener("pointermove", updateDrag, {
+            signal: controller.signal,
+        });
+        window.addEventListener("pointerup", stopDrag, {
+            signal: controller.signal,
+        });
+        window.addEventListener("pointercancel", stopDrag, {
+            signal: controller.signal,
+        });
+    }
+
     //
 
     async function loadSchedule(eventCode: string) {
@@ -159,39 +254,102 @@
         }
     });
 
+    $effect(() => {
+        const cardCount = cards.length;
+        void tick().then(() => {
+            if (cardCount === cards.length) {
+                updateScrollbar();
+            }
+        });
+    });
+
     onMount(() => {
         const interval = window.setInterval(() => {
             now = Date.now();
         }, 1000);
 
-        return () => window.clearInterval(interval);
+        const resizeObserver = new ResizeObserver(updateScrollbar);
+        if (scroller) {
+            resizeObserver.observe(scroller);
+        }
+
+        void tick().then(updateScrollbar);
+
+        return () => {
+            stopScrollbarDrag?.();
+            window.clearInterval(interval);
+            resizeObserver.disconnect();
+        };
     });
 </script>
 
-<div class="flex-col">
-    <div class="h-10 border-b border-(--border)"></div>
-    <div class="grid grid-cols-[repeat(auto-fit,minmax(282px,1fr))] gap-[8px] p-[8px]">
-        {#each cards as card, index (card.id)}
-            {#if isPlayoffStart(card, index)}
-                <div class="col-span-full h-px bg-(--border)"></div>
-            {/if}
-            <ScheduleCard
-                name={card.name}
-                time={card.time}
-                alliance={card.alliance}
-                result={card.result}
-                red1={card.red1}
-                red2={card.red2}
-                blue1={card.blue1}
-                blue2={card.blue2}
-                scoreRedFinal={card.scoreRedFinal}
-                scoreBlueFinal={card.scoreBlueFinal}
-                redWins={card.redWins}
-                blueWins={card.blueWins}
-                countdown={getCountdown(card)}
-                field={card.field}
-                onSelect={() => {}}
-            />
-        {/each}
+<div class="flex h-full min-h-0 flex-col">
+    <div class="h-10 shrink-0 border-b border-(--border)"></div>
+    <div class="relative min-h-0 flex-1 overflow-hidden">
+        <div
+            bind:this={scroller}
+            class="schedule-card-list grid h-full min-h-0 content-start grid-cols-[repeat(auto-fit,minmax(282px,1fr))] gap-[8px] p-[8px]"
+            onscroll={updateScrollbar}
+        >
+            {#each cards as card, index (card.id)}
+                {#if isPlayoffStart(card, index)}
+                    <div class="col-span-full h-px bg-(--border)"></div>
+                {/if}
+                <ScheduleCard
+                    name={card.name}
+                    time={card.time}
+                    alliance={card.alliance}
+                    result={card.result}
+                    red1={card.red1}
+                    red2={card.red2}
+                    blue1={card.blue1}
+                    blue2={card.blue2}
+                    scoreRedFinal={card.scoreRedFinal}
+                    scoreBlueFinal={card.scoreBlueFinal}
+                    redWins={card.redWins}
+                    blueWins={card.blueWins}
+                    countdown={getCountdown(card)}
+                    field={card.field}
+                    onSelect={() => {}}
+                />
+            {/each}
+        </div>
+
+        {#if scrollbarVisible}
+            <div
+                class="pointer-events-none absolute right-[2px] w-[4px]"
+                style={`top: ${scrollbarInset}px; bottom: ${scrollbarInset}px;`}
+            >
+                <button
+                    type="button"
+                    tabindex="-1"
+                    aria-label="Scroll schedule"
+                    class="scrollbar-thumb pointer-events-auto absolute right-0 w-[4px] appearance-none rounded-full border-0 p-0"
+                    class:scrollbar-thumb-dragging={scrollbarDragging}
+                    style={`height: ${scrollbarThumbHeight}px; transform: translateY(${scrollbarThumbTop}px);`}
+                    onpointerdown={startScrollbarDrag}
+                ></button>
+            </div>
+        {/if}
     </div>
 </div>
+
+<style>
+    .schedule-card-list {
+        overflow-y: auto;
+        scrollbar-width: none;
+    }
+
+    .schedule-card-list::-webkit-scrollbar {
+        display: none;
+    }
+
+    .scrollbar-thumb {
+        background: rgb(230 237 243 / 18%);
+    }
+
+    .scrollbar-thumb:hover,
+    .scrollbar-thumb-dragging {
+        background: rgb(230 237 243 / 30%);
+    }
+</style>

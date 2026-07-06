@@ -117,7 +117,7 @@
     }
 </script>
 
-<div class="grid min-h-screen grid-rows-[42px_1fr_32px] bg-(--bg)">
+<div class="grid h-dvh grid-rows-[42px_1fr_32px] overflow-hidden bg-(--bg)">
     <!-- header 42px tall -->
     <header class="flex">
         <!-- logo icon -->
@@ -139,7 +139,7 @@
     </header>
 
     <div
-        class="grid grid-cols-[40px_var(--panel-width)_var(--panel-resizer-width)_1fr]"
+        class="grid min-h-0 grid-cols-[40px_var(--panel-width)_var(--panel-resizer-width)_1fr]"
         style={`--panel-width: ${panelColumn}px; --panel-resizer-width: ${panelResizerColumn}px;`}
     >
         <!-- sidebar 40px wide -->
@@ -173,11 +173,11 @@
 
         <!-- panel -->
         <section
-            class="overflow-hidden bg-(--fg) rounded-[14px] border border-(--border)"
+            class="min-h-0 overflow-hidden bg-(--fg) rounded-[14px] border border-(--border)"
             class:border-0={!panelOpen}
         >
             {#each panelEntries as [view, Panel] (view)}
-                <div class="h-full" hidden={activePanel !== view}>
+                <div class="h-full min-h-0" hidden={activePanel !== view}>
                     <Panel />
                 </div>
             {/each}
