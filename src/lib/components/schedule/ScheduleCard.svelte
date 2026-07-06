@@ -32,11 +32,11 @@
     </div>
     <div class="flex items-center">
         <span class="text-[13px]">
-            <span class="text-red-300 {redWins ? 'font-black underline' : ''}">{red1}</span>,
-            <span class="text-red-300 {redWins ? 'font-black underline' : ''}">{red2}</span>
+            <span class="text-red-400 {redWins ? 'font-bold underline' : ''}">{red1}</span>,
+            <span class="text-red-400 {redWins ? 'font-bold underline' : ''}">{red2}</span>
             vs.
-            <span class="text-blue-300 {blueWins ? 'font-black underline' : ''}">{blue1}</span>,
-            <span class="text-blue-300 {blueWins ? 'font-black underline' : ''}">{blue2}</span>
+            <span class="text-blue-400 {blueWins ? 'font-bold underline' : ''}">{blue1}</span>,
+            <span class="text-blue-400 {blueWins ? 'font-bold underline' : ''}">{blue2}</span>
         </span>
     </div>
     <div class="flex items-center">
@@ -47,9 +47,9 @@
         </span>
         <div class="ml-auto">
             <span class="text-[12px]">
-                <span class="text-red-300 {redWins ? 'font-black underline' : ''}">{scoreRedFinal}</span>
+                <span class="text-red-400 {redWins ? 'font-bold underline' : ''}">{scoreRedFinal}</span>
                 -
-                <span class="text-blue-300 {blueWins ? 'font-black underline' : ''}">{scoreBlueFinal}</span>
+                <span class="text-blue-400 {blueWins ? 'font-bold underline' : ''}">{scoreBlueFinal}</span>
             </span>
             <span class="text-[11px] border rounded-xl px-[10px] {result === "win" ? "text-emerald-400 border-emerald-400" : ""}{result === "tie" ? "text-amber-400 border-amber-400" : ""}{result === "loss" ? "text-red-400 border-red-400" : ""}">{result === "win" ? "W" : ""}{result === "tie" ? "T" : ""}{result === "loss" ? "L" : ""}{result !== "win" && result !== "tie" && result !== "loss" ? "-" : ""}</span>    
         </div>
