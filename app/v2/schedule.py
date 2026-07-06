@@ -46,6 +46,7 @@ async def _get(event: str, _payload: dict = Depends(BearerAuth)) -> ScheduleResp
                 "name": name,
                 "type": {"PRACTICE": "practice", "QUALIFICATION": "qual", "PLAYOFF": "playoff"}.get(match.get("tournamentLevel", ""), "qual"),
                 "number": {
+                    "id": match.get("series", 0) * 6767 + match.get("matchNumber", 0), # heheheha
                     "series": match.get("series", 0),
                     "match": match.get("matchNumber", 0)
                 },
