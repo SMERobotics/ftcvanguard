@@ -1,12 +1,12 @@
 from datetime import timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from httpx import HTTPStatusError
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
 from app.database import Session, CachedFTCEventData, utc_now
 
 from ..ftc import FTCClient
+from ..utils import _raise
 
 from .auth import BearerAuth
 
@@ -16,15 +16,6 @@ events = APIRouter(prefix="/events")
 
 class EventsResponse(BaseModel):
     events: list[dict]
-
-
-def _raise_for_status(response) -> None:
-    try:
-        response.raise_for_status()
-    except HTTPStatusError:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE
-        ) from None
 
 
 def _convert_dict(event: CachedFTCEventData) -> dict:
@@ -44,7 +35,7 @@ def _convert_dict(event: CachedFTCEventData) -> dict:
 async def _get(number: int, _payload: dict = Depends(BearerAuth)) -> EventsResponse:
     async with FTCClient() as client:
         r = await client.get(f"/events?teamNumber={number}")
-        _raise_for_status(r)
+        _raise(r)
 
     return EventsResponse(events=r.json().get("events", []))
 
@@ -57,7 +48,7 @@ async def get_event(event_code: str) -> dict | None:
 
         async with FTCClient() as client:
             r = await client.get(f"/events?eventCode={event_code}")
-            _raise_for_status(r)
+            _raise(r)
 
         events = r.json().get("events", [])
         if not events:
