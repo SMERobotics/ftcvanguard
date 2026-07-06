@@ -33,8 +33,9 @@ async def _get(event: str, _payload: dict = Depends(BearerAuth)) -> ScheduleResp
 
         qual_hybrid = {i.get("matchNumber", 0): i for i in responses[0]}
         qual_field = {i.get("matchNumber", 0): i for i in responses[1]}
-        playoff_hybrid = {i.get("matchNumber", 0): i for i in responses[2]}
-        playoff_field = {i.get("matchNumber", 0): i for i in responses[3]}
+        # NOTE: description is used as key bc playoff matches apparently all have matchNumber=1 wtaf
+        playoff_hybrid = {i.get("description", 0): i for i in responses[2]}
+        playoff_field = {i.get("description", 0): i for i in responses[3]}
 
         for i in qual_hybrid.keys():
             if i in qual_field:
