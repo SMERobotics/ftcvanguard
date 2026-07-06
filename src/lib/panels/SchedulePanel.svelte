@@ -330,6 +330,7 @@
             aria-pressed={filterToQualifications}
             onclick={() => {
                 filterToQualifications = !filterToQualifications;
+                filterToPlayoffs = false;
             }}
         />
         <IconButton
@@ -339,6 +340,7 @@
             aria-pressed={filterToPlayoffs}
             onclick={() => {
                 filterToPlayoffs = !filterToPlayoffs;
+                filterToQualifications = false;
             }}
         />
     </div>
@@ -348,28 +350,34 @@
             class="schedule-card-list grid h-full min-h-0 content-start grid-cols-[repeat(auto-fit,minmax(282px,1fr))] gap-[8px] p-[8px]"
             onscroll={updateScrollbar}
         >
-            {#each cards as card, index (card.id)}
-                {#if isPlayoffStart(card, index) && !(filterToQualifications || filterToPlayoffs)}
-                    <div class="col-span-full h-px bg-(--border)"></div>
-                {/if}
-                <ScheduleCard
-                    name={card.name}
-                    time={card.time}
-                    alliance={card.alliance}
-                    result={card.result}
-                    red1={card.red1}
-                    red2={card.red2}
-                    blue1={card.blue1}
-                    blue2={card.blue2}
-                    scoreRedFinal={card.scoreRedFinal}
-                    scoreBlueFinal={card.scoreBlueFinal}
-                    redWins={card.redWins}
-                    blueWins={card.blueWins}
-                    countdown={getCountdown(card)}
-                    field={card.field}
-                    onSelect={() => {}}
-                />
-            {/each}
+            {#if cards.length === 0}
+                <div class="col-span-full text-center text-(--detail) text-sm mt-2">
+                    low cortisol robotics, am I right?
+                </div>
+            {:else}
+                {#each cards as card, index (card.id)}
+                    {#if isPlayoffStart(card, index) && !(filterToQualifications || filterToPlayoffs)}
+                        <div class="col-span-full h-px bg-(--border)"></div>
+                    {/if}
+                    <ScheduleCard
+                        name={card.name}
+                        time={card.time}
+                        alliance={card.alliance}
+                        result={card.result}
+                        red1={card.red1}
+                        red2={card.red2}
+                        blue1={card.blue1}
+                        blue2={card.blue2}
+                        scoreRedFinal={card.scoreRedFinal}
+                        scoreBlueFinal={card.scoreBlueFinal}
+                        redWins={card.redWins}
+                        blueWins={card.blueWins}
+                        countdown={getCountdown(card)}
+                        field={card.field}
+                        onSelect={() => {}}
+                    />
+                {/each}
+            {/if}
         </div>
 
         {#if scrollbarVisible}
