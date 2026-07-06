@@ -42,9 +42,7 @@
             return;
         }
 
-        selectedEvent =
-            events.findLast((event) => Date.parse(event.dateStart) <= Date.now()) ??
-            events[0];
+        selectEvent(events.findLast((event) => Date.parse(event.dateStart) <= Date.now()) ?? events[0]);
     }
 
     $effect(() => {
