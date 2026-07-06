@@ -14,6 +14,7 @@
 
     import { currentEvent } from "../states/event-state.svelte";
     import { currentTeam } from "../states/team-state.svelte";
+    import { currentMatch } from "../states/match-state.svelte";
 
     import {
         type MatchResult,
@@ -471,7 +472,14 @@
                         blueWins={card.blueWins}
                         countdown={getCountdown(card)}
                         field={card.field}
-                        onSelect={() => {}}
+                        selected={currentMatch.state === card.name}
+                        onSelect={() => {
+                            if (currentMatch.state !== card.name) {
+                                currentMatch.state = card.name;
+                            } else {
+                                currentMatch.state = "";
+                            }
+                        }}
                     />
                 {/each}
             {/if}

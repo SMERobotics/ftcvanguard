@@ -49,10 +49,10 @@
 </script>
 
 <div class="flex h-full flex-col gap-3 p-6 text-(--text-primary)">
-    <h1 class="select-none font-serif text-2xl">Account</h1>
+    <h1 class="select-none font-serif text-2xl">account</h1>
 
     {#if pending_refresh && account === null}
-        <p class="select-none font-sans text-sm">Loading account...</p>
+        <p class="select-none font-sans text-sm">account loading</p>
     {/if}
 
     {#if error}
@@ -61,18 +61,18 @@
 
     {#if account}
         <dl class="font-sans text-sm">
-            <dt class="select-none">Type</dt>
+            <dt class="select-none">account type</dt>
             <dd>{account.type}</dd>
 
             {#if account.type === "root"}
-                <dt class="select-none">Team number</dt>
+                <dt class="select-none">team #</dt>
                 <dd>{account.number}</dd>
             {:else}
-                <dt class="select-none">Name</dt>
+                <dt class="select-none">username</dt>
                 <dd>{account.name}</dd>
             {/if}
 
-            <dt class="select-none">Email</dt>
+            <dt class="select-none">email</dt>
             <dd>{account.email}</dd>
         </dl>
     {/if}
@@ -83,7 +83,7 @@
         disabled={pending_refresh}
         onclick={() => void loadAccount()}
     >
-        {pending_refresh ? "Refreshing" : "Refresh"}
+        {pending_refresh ? "loading" : "refresh"}
     </button>
 
     <button
@@ -92,6 +92,6 @@
         disabled={pending_signout}
         onclick={() => void signOut()}
     >
-        {pending_signout ? "Signing out" : "Sign out"}
+        {pending_signout ? "signing out" : "sign out"}
     </button>
 </div>

@@ -33,6 +33,9 @@
     import { panelContextKey, type PanelContext } from "./lib/panel-context";
 
     import DefaultView from "./lib/views/DefaultView.svelte";
+    import MatchView from "./lib/views/MatchView.svelte";
+
+    import { currentMatch } from "./lib/states/match-state.svelte";
 
     // TODO: refactor panel management (state, resizing)
 
@@ -201,7 +204,15 @@
         <main
             class="bg-(--fg) rounded-l-[14px] border border-(--border) border-r-0"
         >
-            <DefaultView />
+            <!-- TODO: store opened views in a stack and navigate through it -->
+            <!-- ts is a future me problem tho not a present me problem -@technodot -->
+            <!-- for now, we can just switch off between DefaultView and MatchView -->
+            
+            {#if currentMatch.state === ""}
+                <DefaultView />
+            {:else}
+                <MatchView />
+            {/if}
         </main>
     </div>
 
