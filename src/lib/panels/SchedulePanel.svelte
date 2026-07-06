@@ -449,10 +449,10 @@
             {:else}
                 {#each cards as card, index (card.id)}
                     {#if isQualificationStart(card, index)}
-                        <div class="col-span-full h-px select-none bg-(--border)"></div>
+                        <div class="col-span-full h-[2px] select-none bg-(--border)"></div>
                     {/if}
                     {#if isPlayoffStart(card, index)}
-                        <div class="col-span-full h-px select-none bg-(--border)"></div>
+                        <div class="col-span-full h-[2px] select-none bg-(--border)"></div>
                     {/if}
                     <ScheduleCard
                         name={card.name}
