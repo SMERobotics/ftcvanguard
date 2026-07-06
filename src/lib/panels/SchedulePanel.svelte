@@ -14,36 +14,69 @@
     import { currentEvent } from "../states/event-state.svelte";
     import { currentTeam } from "../states/team-state.svelte";
 
-    import { type MatchResult, type Alliance } from "../types/match.types";
+    import {
+        type MatchResult,
+        type Alliance,
+        type MatchType,
+    } from "../types/match.types";
 
     import ScheduleCard from "../components/schedule/ScheduleCard.svelte";
 
     import { get } from "../api";
     
-    // api schema returns
+    type ScheduleStation =
+        | "Red1"
+        | "Red2"
+        | "Red3"
+        | "Blue1"
+        | "Blue2"
+        | "Blue3";
+
+    interface ScheduleTeamAttributes {
+        surrogate: boolean;
+        noShow: boolean;
+        dq: boolean;
+        onField: boolean;
+    }
 
     interface ScheduleTeam {
-        teamNumber: number;
+        number: number;
+        name: string;
         station: string;
+        attributes: ScheduleTeamAttributes;
+    }
+
+    interface ScheduleMatchNumber {
+        series: number;
+        match: number;
+    }
+
+    interface ScheduleMatchTimes {
+        scheduled: string | null;
+        queuing: string | null;
+        actual: string | null;
+        results: string | null;
+    }
+
+    interface ScheduleMatchResults {
+        scoreRedFinal: number;
+        scoreBlueFinal: number;
+        redWins: boolean;
+        blueWins: boolean;
     }
 
     interface ScheduleMatch {
-        description: string;
-        tournamentLevel: string;
-        series: number;
-        matchNumber: number;
-        startTime: string;
-        postResultTime: string | null;
-        scoreRedFinal: number | null;
-        scoreBlueFinal: number | null;
-        redWins: boolean;
-        blueWins: boolean;
-        teams: ScheduleTeam[];
+        name: string;
+        type: MatchType;
+        number: ScheduleMatchNumber;
         field: string;
+        times: ScheduleMatchTimes;
+        teams: ScheduleTeam[];
+        results: ScheduleMatchResults | null;
     }
 
     interface ScheduleResponse {
-        schedule?: ScheduleMatch[];
+        schedule: ScheduleMatch[];
     }
 
     interface ScheduleCardData {
@@ -62,8 +95,8 @@
         scoreBlueFinal: number;
         redWins: boolean;
         blueWins: boolean;
-        tournamentLevel: string;
-        startTime: string;
+        type: MatchType;
+        scheduledTime: string | null;
         concluded: boolean;
         field: string;
     }
@@ -71,20 +104,20 @@
     let matches = $state<ScheduleMatch[]>([]);
     let filteredMatches = $derived(
         matches.filter((match) => {
-            if (filterToTeam && !match.teams.some((team) => team.teamNumber === currentTeam.state)) {
+            if (filterToTeam && !match.teams.some((team) => team.number === currentTeam.state)) {
                 return false;
             }
-            if (filterToQualifications && match.tournamentLevel !== "QUALIFICATION") {
+            if (filterToQualifications && match.type !== "qual") {
                 return false;
             }
-            if (filterToPlayoffs && match.tournamentLevel !== "PLAYOFF") {
+            if (filterToPlayoffs && match.type !== "playoff") {
                 return false;
             }
             const teamQuery = searchTeamQuery.trim();
             if (
                 teamQuery &&
                 !match.teams.some((team) =>
-                    String(team.teamNumber).includes(teamQuery),
+                    String(team.number).includes(teamQuery),
                 )
             ) {
                 return false;
@@ -121,15 +154,15 @@
         return Math.min(max, Math.max(min, value));
     }
 
-    function getTeamNumber(match: ScheduleMatch, station: string) {
+    function getTeamNumber(match: ScheduleMatch, station: ScheduleStation) {
         return (
-            match.teams.find((team) => team.station === station)?.teamNumber ?? null
+            match.teams.find((team) => team.station === station)?.number ?? null
         );
     }
 
     function getAlliance(match: ScheduleMatch): Alliance {
         const team = match.teams.find(
-            (matchTeam) => matchTeam.teamNumber === currentTeam.state,
+            (matchTeam) => matchTeam.number === currentTeam.state,
         );
 
         if (team?.station.startsWith("Red")) return "red";
@@ -138,24 +171,27 @@
     }
 
     function getResult(match: ScheduleMatch, alliance: Alliance): MatchResult {
-        if (!match.postResultTime || !alliance) return null;
-        if (match.redWins === match.blueWins) return "tie";
-        if (alliance === "red") return match.redWins ? "win" : "loss";
-        return match.blueWins ? "win" : "loss";
+        if (!match.times.results || !alliance || !match.results) return null;
+        if (match.results.redWins === match.results.blueWins) return "tie";
+        if (alliance === "red") return match.results.redWins ? "win" : "loss";
+        return match.results.blueWins ? "win" : "loss";
     }
 
-    function formatTime(startTime: string) {
-        const date = new Date(startTime);
+    function formatTime(scheduledTime: string | null) {
+        if (!scheduledTime) return "";
+
+        const date = new Date(scheduledTime);
         return Number.isNaN(date.getTime()) ? "" : timeFormatter.format(date);
     }
 
     function toScheduleCard(match: ScheduleMatch): ScheduleCardData {
         const alliance = getAlliance(match);
+        const results = match.results;
 
         return {
-            id: `${match.tournamentLevel}-${match.series}-${match.matchNumber}-${match.field}`,
-            name: match.description,
-            time: formatTime(match.startTime),
+            id: `${match.type}-${match.number.series}-${match.number.match}-${match.field}`,
+            name: match.name,
+            time: formatTime(match.times.scheduled),
             alliance,
             result: getResult(match, alliance),
             red1: getTeamNumber(match, "Red1"),
@@ -164,13 +200,13 @@
             blue1: getTeamNumber(match, "Blue1"),
             blue2: getTeamNumber(match, "Blue2"),
             blue3: getTeamNumber(match, "Blue3"),
-            scoreRedFinal: match.scoreRedFinal ?? 0,
-            scoreBlueFinal: match.scoreBlueFinal ?? 0,
-            redWins: match.redWins,
-            blueWins: match.blueWins,
-            tournamentLevel: match.tournamentLevel,
-            startTime: match.startTime,
-            concluded: Boolean(match.postResultTime),
+            scoreRedFinal: results?.scoreRedFinal ?? 0,
+            scoreBlueFinal: results?.scoreBlueFinal ?? 0,
+            redWins: results?.redWins ?? false,
+            blueWins: results?.blueWins ?? false,
+            type: match.type,
+            scheduledTime: match.times.scheduled,
+            concluded: Boolean(match.times.results),
             field: match.field,
         };
     }
@@ -180,7 +216,9 @@
 
         if (card.concluded) return "Concluded";
 
-        const start = new Date(card.startTime).getTime();
+        if (!card.scheduledTime) return "";
+
+        const start = new Date(card.scheduledTime).getTime();
         if (Number.isNaN(start)) return "";
 
         const seconds = Math.ceil((start - now) / 1000);
@@ -197,7 +235,7 @@
     }
 
     function isPlayoffStart(card: ScheduleCardData, index: number) {
-        return card.tournamentLevel === "PLAYOFF" && cards[index - 1]?.tournamentLevel !== "PLAYOFF";
+        return card.type === "playoff" && cards[index - 1]?.type !== "playoff";
     }
 
     function getScrollbarData() {
@@ -288,13 +326,11 @@
         showLoadingBar();
 
         try {
-            const response = await get<ScheduleResponse | ScheduleMatch[]>(
+            const response = await get<ScheduleResponse>(
                 `/schedule/get?event=${eventCode}`,
             );
 
-            matches = Array.isArray(response)
-                ? response
-                : (response.schedule ?? []);
+            matches = response.schedule;
         } finally {
             hideLoadingBar();
         }
