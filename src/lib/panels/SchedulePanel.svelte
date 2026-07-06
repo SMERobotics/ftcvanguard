@@ -8,6 +8,7 @@
     } from "@lucide/svelte";
 
     import IconButton from "../../lib/components/IconButton.svelte";
+    import InputField from "../../lib/components/InputField.svelte";
     import { showLoadingBar, hideLoadingBar } from "../../lib/components/footer/LoadingBar.svelte";
 
     import { currentEvent } from "../states/event-state.svelte";
@@ -77,6 +78,15 @@
             if (filterToPlayoffs && match.tournamentLevel !== "PLAYOFF") {
                 return false;
             }
+            const teamQuery = searchTeamQuery.trim();
+            if (
+                teamQuery &&
+                !match.teams.some((team) =>
+                    String(team.teamNumber).includes(teamQuery),
+                )
+            ) {
+                return false;
+            }
             return true;
         })
     );
@@ -94,6 +104,8 @@
     let filterToTeam = $state(false);
     let filterToQualifications = $state(false);
     let filterToPlayoffs = $state(false);
+    
+    let searchTeamQuery = $state("");
 
     const scrollbarInset = 4;
     const scrollbarMinThumbHeight = 24;
@@ -352,6 +364,15 @@
                 filterToQualifications = false;
             }}
         />
+        <div class="ml-2">
+            <span class="text-sm text-(--text-primary) mr-1">Search:</span>
+            <InputField
+                class="font-mono max-w-[64px] text-right"
+                placeholder="20181"
+                maxlength={5}
+                bind:value={searchTeamQuery}
+            />
+        </div>
     </div>
     <div class="relative min-h-0 flex-1 overflow-hidden">
         <div
