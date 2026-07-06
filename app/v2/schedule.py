@@ -5,7 +5,6 @@ from pydantic import BaseModel
 from ..ftc import FTCClient
 
 from .auth import BearerAuth
-from .events import get_event
 
 schedule = APIRouter(prefix="/schedule")
 
@@ -33,9 +32,6 @@ async def _get(event: str, _payload: dict = Depends(BearerAuth)) -> ScheduleResp
 
         responses = await asyncio.gather(*(_get_schedule(url) for url in urls))
 
-        # TODO: utilize with dynamic time calculation, future me problem
-        # event_data = await get_event(event)
-
         schedule = responses[1].get("schedule", []) + responses[2].get("schedule", []) + responses[3].get("schedule", [])
         matches = {i.get("description", ""): i for i in responses[0].get("matches", [])}
 
@@ -52,6 +48,7 @@ async def _get(event: str, _payload: dict = Depends(BearerAuth)) -> ScheduleResp
                     "series": match.get("series", 0),
                     "match": match.get("matchNumber", 0)
                 },
+                "field": match.get("field", ""),
                 "times": {
                     "scheduled": match.get("startTime", None),
                     "queuing": None, # TODO
@@ -78,19 +75,5 @@ async def _get(event: str, _payload: dict = Depends(BearerAuth)) -> ScheduleResp
                     "blueWins": scoreBlueFinal > scoreRedFinal
                 } if name in matches else None
             })
-
-        # qual_hybrid = {i.get("matchNumber", 0): i for i in responses[0]}
-        # qual_field = {i.get("matchNumber", 0): i for i in responses[1]}
-        # # NOTE: description is used as key bc playoff matches apparently all have matchNumber=1 wtaf
-        # playoff_hybrid = {i.get("description", 0): i for i in responses[2]}
-        # playoff_field = {i.get("description", 0): i for i in responses[3]}
-
-        # for i in qual_hybrid.keys():
-        #     if i in qual_field:
-        #         qual_hybrid[i]["field"] = qual_field[i].get("field", 1)
-        
-        # for i in playoff_hybrid.keys():
-        #     if i in playoff_field:
-        #         playoff_hybrid[i]["field"] = playoff_field[i].get("field", 1)
 
     return ScheduleResponse(schedule=response)

@@ -53,6 +53,9 @@ def utc_now() -> datetime:
     return datetime.now(timezone.utc)
 
 
+# TODO: refactor schemas lmfaooo -@technodot
+
+
 class PermissionLevel(IntEnum):
     NONE = 0
     READ = 1
