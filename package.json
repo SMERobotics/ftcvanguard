@@ -1,0 +1,21 @@
+{
+  "name": "vanguard",
+  "version": "1.0.0",
+  "private": true,
+  "main": "index.ts",
+  "packageManager": "bun@1.3.14",
+  "scripts": {
+    "start": "bun --bun expo start",
+    "ios": "bun --bun expo start --ios",
+    "typecheck": "bun --bun tsc --noEmit"
+  },
+  "dependencies": {
+    "expo": "~57.0.25",
+    "react": "19.2.3",
+    "react-native": "0.86.3"
+  },
+  "devDependencies": {
+    "@types/react": "~19.2.2",
+    "typescript": "~6.0.3"
+  }
+}

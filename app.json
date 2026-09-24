@@ -1,0 +1,14 @@
+{
+  "expo": {
+    "name": "Vanguard",
+    "slug": "vanguard",
+    "version": "1.0.0",
+    "platforms": ["ios"],
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#000000",
+    "ios": {
+      "supportsTablet": true
+    }
+  }
+}
