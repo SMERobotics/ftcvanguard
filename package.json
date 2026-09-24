@@ -10,7 +10,9 @@
     "typecheck": "bun --bun tsc --noEmit"
   },
   "dependencies": {
+    "@expo-google-fonts/jetbrains-mono": "^0.4.1",
     "expo": "~57.0.25",
+    "expo-font": "^57.0.4",
     "react": "19.2.3",
     "react-native": "0.86.3"
   },

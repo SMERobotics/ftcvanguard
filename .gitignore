@@ -7,3 +7,18 @@ dist/
 .env*.local
 *.tsbuildinfo
 .metro-health-check*
+
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# Config
+.env
+config.toml
