@@ -1,18 +1,19 @@
 # ftcvanguard
 
 ## Stack
+
 backend: FastAPI, httpx, Redis, SQLModel
 iOS: React Native + Expo
 
 ## Practices
 
-Prefer clean, visually simple code and linear execution.
-If advanced Python notation and functions can functionally reimplement a whole chunk of code into a line or two, do it. The humans working here aren't stupid.
-Humans have limited attention spans - Structure should not be inflated if the same task can be done in a more readable and beautifully simple way.
-
-Work in a **lazy, but not careless** mindset. The simplest and least complex approach is the preferred one.
+Core directive: Work in a **lazy, but not careless** mindset. The simplest and generalized abstract approach is the preferred one.
   - Example: Simplifying 500 lines of overly complex and structurally verbose code into 50 lines of clean, linear execution.
   - Anti-pattern: Failing to implement industry-standard SWE practices in favor of writing problematic production code.
+
+Prefer clean, visually simple code and linear execution.
+The humans working here aren't stupid - If advanced Python notation and functions can functionally reimplement a whole chunk of code into a line or two, do it.
+Humans have limited attention spans - Structure should not be inflated if the same task can be done in a more readable and beautifully simple way.
 
 When writing code:
 - Names are for quick identification, not cramming every detail into dozens of references.
