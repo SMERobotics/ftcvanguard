@@ -11,7 +11,9 @@ dependencies = [
     "fastapi>=0.141.1",
     "httpx[socks]>=0.28.1",
     "pydantic-settings>=2.15.0",
+    "redis>=8.1.0",
     "uvicorn>=0.53.0",
+    "websockets>=17.1",
 ]
 
 [project.scripts]
