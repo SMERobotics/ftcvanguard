@@ -11,13 +11,13 @@
   },
   "dependencies": {
     "@expo-google-fonts/jetbrains-mono": "^0.4.1",
-    "expo": "~57.0.25",
-    "expo-font": "^57.0.4",
-    "react": "19.2.3",
-    "react-native": "0.86.3"
+    "expo": "^58.0.22",
+    "expo-font": "~58.0.11",
+    "react": "19.3.0",
+    "react-native": "0.88.1"
   },
   "devDependencies": {
-    "@types/react": "~19.2.2",
+    "@types/react": "~19.3.0",
     "typescript": "~6.0.3"
   }
 }
