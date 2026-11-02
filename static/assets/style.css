@@ -802,7 +802,7 @@ body.capacitor-desktop .capacitor-nav-buttons {
 
 .metric-row + .metric-row { border-top: 1px dashed #333333; padding-top: 6px; }
 
-.metric-value { color: #ffffff; font-weight: 600; }
+.metric-value { color: #ffffff; font-weight: 600; text-align: right; overflow-wrap: anywhere; }
 
 .robot-badges { display: flex; gap: 6px; }
 

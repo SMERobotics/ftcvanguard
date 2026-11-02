@@ -81,7 +81,7 @@ print("Fetching data...")
 
 schedules = {}
 for j in MEETS:
-    r = s.get(f"https://ftc-api.firstinspires.org/v2.0/2025/schedule/{j}?tournamentLevel=qual")
+    r = s.get(f"https://ftc-api.firstinspires.org/v2.0/2026/schedule/{j}?tournamentLevel=qual")
     data = r.json()
     if len(data["schedule"]) == 0: continue
     schedules[j] = data["schedule"]
@@ -89,20 +89,20 @@ for j in MEETS:
 scoring_data = {}
 detailed_scoring_data = {}
 for j in schedules.keys():
-    r = s.get(f"https://ftc-api.firstinspires.org/v2.0/2025/scores/{j}/qual")
+    r = s.get(f"https://ftc-api.firstinspires.org/v2.0/2026/scores/{j}/qual")
     data = r.json()
     if len(data["matchScores"]) == 0: continue
     scoring_data[j] = data["matchScores"]
     detailed_scoring_data[j] = data["matchScores"]
 
 data = {}
-auto_artifacts_data = {}
-teleop_artifacts_data = {}
+auto_hive_tips_data = {}
+teleop_hive_tips_data = {}
 
 for event_code in scoring_data.keys():
     data[event_code] = {}
-    auto_artifacts_data[event_code] = {}
-    teleop_artifacts_data[event_code] = {}
+    auto_hive_tips_data[event_code] = {}
+    teleop_hive_tips_data[event_code] = {}
     
     for schedule_match in schedules[event_code]:
         match_number = str(schedule_match["matchNumber"])
@@ -129,23 +129,23 @@ for event_code in scoring_data.keys():
                     total_points = alliance["totalPoints"]
                     match_data[alliance_name] = total_points
                     
-                    # Extract auto artifacts
-                    auto_artifacts = alliance.get("autoClassifiedArtifacts", 0) + alliance.get("autoOverflowArtifacts", 0)
+                    # Extract auto hive_tips
+                    auto_hive_tips = alliance.get("autoHiveTips", 0)
                     if alliance_name == "Red":
-                        auto_match_data["Red"] = auto_artifacts
+                        auto_match_data["Red"] = auto_hive_tips
                     else:
-                        auto_match_data["Blue"] = auto_artifacts
+                        auto_match_data["Blue"] = auto_hive_tips
                     
-                    # Extract teleop artifacts
-                    teleop_artifacts = alliance.get("teleopClassifiedArtifacts", 0) + alliance.get("teleopOverflowArtifacts", 0)
+                    # Extract teleop hive_tips
+                    teleop_hive_tips = alliance.get("teleopHiveTips", 0)
                     if alliance_name == "Red":
-                        teleop_match_data["Red"] = teleop_artifacts
+                        teleop_match_data["Red"] = teleop_hive_tips
                     else:
-                        teleop_match_data["Blue"] = teleop_artifacts
+                        teleop_match_data["Blue"] = teleop_hive_tips
                 
                 data[event_code][match_number] = match_data
-                auto_artifacts_data[event_code][match_number] = auto_match_data
-                teleop_artifacts_data[event_code][match_number] = teleop_match_data
+                auto_hive_tips_data[event_code][match_number] = auto_match_data
+                teleop_hive_tips_data[event_code][match_number] = teleop_match_data
                 break
 
 print("Calculating OPR metrics...")
@@ -165,15 +165,15 @@ for event_code in data.keys():
 
 opr_season = calculate_opr(all_matches)
 
-# 3. Calculate Auto Artifacts OPR per event
-auto_artifacts_opr_per_event = {}
-for event_code in auto_artifacts_data.keys():
-    auto_artifacts_opr_per_event[event_code] = calculate_opr(auto_artifacts_data[event_code])
+# 3. Calculate Auto Hive Tips OPR per event
+auto_hive_tips_opr_per_event = {}
+for event_code in auto_hive_tips_data.keys():
+    auto_hive_tips_opr_per_event[event_code] = calculate_opr(auto_hive_tips_data[event_code])
 
-# 4. Calculate Teleop Artifacts OPR per event
-teleop_artifacts_opr_per_event = {}
-for event_code in teleop_artifacts_data.keys():
-    teleop_artifacts_opr_per_event[event_code] = calculate_opr(teleop_artifacts_data[event_code])
+# 4. Calculate Teleop Hive Tips OPR per event
+teleop_hive_tips_opr_per_event = {}
+for event_code in teleop_hive_tips_data.keys():
+    teleop_hive_tips_opr_per_event[event_code] = calculate_opr(teleop_hive_tips_data[event_code])
 
 # Add all OPR metrics to each match
 for event_code in data.keys():
@@ -185,8 +185,8 @@ for event_code in data.keys():
                 team_id = match_data[station]
                 match_data[f"{station}_OPR_Event"] = opr_per_event[event_code].get(team_id, 0)
                 match_data[f"{station}_OPR_Season"] = opr_season.get(team_id, 0)
-                match_data[f"{station}_Auto_Artifacts_OPR"] = auto_artifacts_opr_per_event[event_code].get(team_id, 0)
-                match_data[f"{station}_Teleop_Artifacts_OPR"] = teleop_artifacts_opr_per_event[event_code].get(team_id, 0)
+                match_data[f"{station}_Auto_Hive_Tips_OPR"] = auto_hive_tips_opr_per_event[event_code].get(team_id, 0)
+                match_data[f"{station}_Teleop_Hive_Tips_OPR"] = teleop_hive_tips_opr_per_event[event_code].get(team_id, 0)
 
 # print(data)
 
@@ -233,11 +233,11 @@ for k, v in data.items():
 # for i, (bar, value) in enumerate(zip(bars, oprs_season)):
 #     ax2.text(value, i, f" {value:.1f}", va="center", fontsize=9)
 
-# # 3. Auto Artifacts OPR (Average per event, top 15 teams)
+# # 3. Auto Hive Tips OPR (Average per event, top 15 teams)
 # ax3 = axes[1, 0]
 # all_auto_oprs = {}
-# for event_code in auto_artifacts_opr_per_event.keys():
-#     for team, opr in auto_artifacts_opr_per_event[event_code].items():
+# for event_code in auto_hive_tips_opr_per_event.keys():
+#     for team, opr in auto_hive_tips_opr_per_event[event_code].items():
 #         if team not in all_auto_oprs:
 #             all_auto_oprs[team] = []
 #         all_auto_oprs[team].append(opr)
@@ -248,20 +248,20 @@ for k, v in data.items():
 # oprs_auto = [t[1] for t in sorted_auto_opr]
 
 # bars = ax3.barh(teams_auto, oprs_auto, color="green", alpha=0.7)
-# ax3.set_xlabel("Average Auto Artifacts OPR", fontweight="bold")
+# ax3.set_xlabel("Average Auto Hive Tips OPR", fontweight="bold")
 # ax3.set_ylabel("Team Number", fontweight="bold")
-# ax3.set_title("Top 15 Teams - Auto Artifacts Contribution", fontweight="bold")
+# ax3.set_title("Top 15 Teams - Auto Hive Tips Contribution", fontweight="bold")
 # ax3.invert_yaxis()
 # ax3.grid(True, alpha=0.3, axis="x")
 
 # for i, (bar, value) in enumerate(zip(bars, oprs_auto)):
 #     ax3.text(value, i, f" {value:.1f}", va="center", fontsize=9)
 
-# # 4. Teleop Artifacts OPR (Average per event, top 15 teams)
+# # 4. Teleop Hive Tips OPR (Average per event, top 15 teams)
 # ax4 = axes[1, 1]
 # all_teleop_oprs = {}
-# for event_code in teleop_artifacts_opr_per_event.keys():
-#     for team, opr in teleop_artifacts_opr_per_event[event_code].items():
+# for event_code in teleop_hive_tips_opr_per_event.keys():
+#     for team, opr in teleop_hive_tips_opr_per_event[event_code].items():
 #         if team not in all_teleop_oprs:
 #             all_teleop_oprs[team] = []
 #         all_teleop_oprs[team].append(opr)
@@ -272,9 +272,9 @@ for k, v in data.items():
 # oprs_teleop = [t[1] for t in sorted_teleop_opr]
 
 # bars = ax4.barh(teams_teleop, oprs_teleop, color="purple", alpha=0.7)
-# ax4.set_xlabel("Average Teleop Artifacts OPR", fontweight="bold")
+# ax4.set_xlabel("Average Teleop Hive Tips OPR", fontweight="bold")
 # ax4.set_ylabel("Team Number", fontweight="bold")
-# ax4.set_title("Top 15 Teams - Teleop Artifacts Contribution", fontweight="bold")
+# ax4.set_title("Top 15 Teams - Teleop Hive Tips Contribution", fontweight="bold")
 # ax4.invert_yaxis()
 # ax4.grid(True, alpha=0.3, axis="x")
 

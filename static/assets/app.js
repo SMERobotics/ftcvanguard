@@ -1,4 +1,5 @@
 "use strict";
+const FTC_SEASON = 2026;
 const CAPACITOR_REF = window.Capacitor;
 const CAPACITOR_PLATFORM = typeof CAPACITOR_REF?.getPlatform === "function"
     ? CAPACITOR_REF.getPlatform()
@@ -11,52 +12,6 @@ const IS_ELECTRON_PLATFORM = CAPACITOR_CUSTOM_PLATFORM?.name === "electron" || A
 const IS_CAPACITOR_SCHEME = APP_PROTOCOL === "capacitor:";
 const IS_CAPACITOR = IS_NATIVE || IS_ELECTRON_PLATFORM || IS_CAPACITOR_SCHEME;
 const BASE_URL = IS_CAPACITOR ? "https://ftcvanguard.org" : "";
-let nativeViewportListenersAttached = false;
-function updateNativeViewportInsets() {
-    if (!IS_NATIVE_MOBILE)
-        return;
-    const body = document.body;
-    if (!body)
-        return;
-    const viewport = window.visualViewport;
-    if (!viewport) {
-        body.style.setProperty("--native-viewport-offset-top", "0px");
-        body.style.setProperty("--native-viewport-offset-bottom", "0px");
-        return;
-    }
-    const topInset = Math.min(90, Math.max(0, Math.round(viewport.offsetTop)));
-    const viewportHeight = Math.round(viewport.height);
-    const windowHeight = Math.round(window.innerHeight);
-    const rawBottomInset = Math.max(0, windowHeight - viewportHeight - topInset);
-    const bottomInset = rawBottomInset > 120 ? 0 : rawBottomInset;
-    body.style.setProperty("--native-viewport-offset-top", `${topInset}px`);
-    body.style.setProperty("--native-viewport-offset-bottom", `${bottomInset}px`);
-}
-function setupNativeMobileSafeAreaHandling() {
-    if (!IS_NATIVE_MOBILE)
-        return;
-    const body = document.body;
-    if (!body)
-        return;
-    body.classList.add("native-mobile");
-    body.dataset.nativePlatform = CAPACITOR_PLATFORM;
-    updateNativeViewportInsets();
-    if (nativeViewportListenersAttached)
-        return;
-    nativeViewportListenersAttached = true;
-    window.addEventListener("resize", updateNativeViewportInsets);
-    window.addEventListener("orientationchange", updateNativeViewportInsets);
-    window.visualViewport?.addEventListener("resize", updateNativeViewportInsets);
-    window.visualViewport?.addEventListener("scroll", updateNativeViewportInsets);
-}
-setupNativeMobileSafeAreaHandling();
-const CAPACITOR_REF = window.Capacitor;
-const CAPACITOR_PLATFORM = typeof CAPACITOR_REF?.getPlatform === "function"
-    ? CAPACITOR_REF.getPlatform()
-    : CAPACITOR_REF?.platform;
-const IS_NATIVE = typeof CAPACITOR_PLATFORM === "string" && CAPACITOR_PLATFORM !== "web";
-const IS_NATIVE_MOBILE = CAPACITOR_PLATFORM === "ios" || CAPACITOR_PLATFORM === "android";
-const BASE_URL = IS_NATIVE ? "https://ftcvanguard.org" : "";
 let nativeViewportListenersAttached = false;
 function updateNativeViewportInsets() {
     if (!IS_NATIVE_MOBILE)
@@ -225,8 +180,6 @@ function buildApiUrl(path) {
     return path.startsWith("/") ? `${BASE_URL}${path}` : `${BASE_URL}/${path}`;
 }
 async function authFetch(input, init) {
-    const url = typeof input === "string" ? `${BASE_URL}${input}` : input;
-    const res = await fetch(url, init);
     const url = typeof input === "string" ? buildApiUrl(input) : input;
     const res = await fetch(url, init);
     return assertAuthorized(res);
@@ -1874,9 +1827,7 @@ function populateMeetSelector(events) {
     });
 }
 async function fetchOPRData(teamNumbers) {
-    const now = new Date();
-    const seasonDate = new Date(now.getTime() - 34 * 7 * 24 * 60 * 60 * 1000); // 34 weeks ago b/c season starts ~beginning of September
-    const season = seasonDate.getFullYear();
+    const season = FTC_SEASON;
     const seasonStatsName = `TeamEventStats${season}`;
     const promises = teamNumbers.map(async (teamNumber) => {
         try {
@@ -2139,7 +2090,6 @@ function renderRankings(rankings) {
                 <td>${rank.sortOrder2}</td>
                 <td>${rank.sortOrder3}</td>
                 <td>${rank.sortOrder4}</td>
-                <td>${Math.floor(rank.sortOrder6)}</td>
                 <td>${rank.wins}-${rank.losses}-${rank.ties}</td>
                 <td>${rank.matchesPlayed}</td>
             `;
@@ -2153,16 +2103,15 @@ function getRankingValue(rank, column) {
         case "rankingScore": return rank.sortOrder1;
         case "opr": return currentOPRData.get(rank.teamNumber) ?? -Infinity;
         case "matchPoints": return rank.sortOrder2;
-        case "basePoints": return rank.sortOrder3;
+        case "hiveTips": return rank.sortOrder3;
         case "autoPoints": return rank.sortOrder4;
-        case "highScore": return Math.floor(rank.sortOrder6);
         case "wlt": return rank.wins * 10000 + rank.ties * 100 - rank.losses;
         case "played": return rank.matchesPlayed;
         default: return 0;
     }
 }
 function getTiebreakerValue(rank, column) {
-    const order = ["rankingScore", "matchPoints", "basePoints", "autoPoints", "highScore", "opr"];
+    const order = ["rankingScore", "matchPoints", "hiveTips", "autoPoints", "opr"];
     const filtered = order.filter(c => c !== column);
     return filtered.map(c => getRankingValue(rank, c));
 }
@@ -2434,10 +2383,10 @@ function renderMatchRPChips(count, allianceColor) {
 }
 function renderRPLine(alliance, opponent, allianceColor) {
     const matchRP = getMatchRankingPoints(alliance, opponent);
-    const movement = `<span class="rp-chip ${allianceColor} ${alliance.movementRP ? "filled" : ""}" title="Movement RP">Movement</span>`;
-    const goal = `<span class="rp-chip ${allianceColor} ${alliance.goalRP ? "filled" : ""}" title="Goal RP">Goal</span>`;
-    const pattern = `<span class="rp-chip ${allianceColor} ${alliance.patternRP ? "filled" : ""}" title="Pattern RP">Pattern</span>`;
-    return `<div class="rp-line">${renderMatchRPChips(matchRP, allianceColor)}${movement}${goal}${pattern}</div>`;
+    const swarm = `<span class="rp-chip ${allianceColor} ${alliance.swarmRP ? "filled" : ""}" title="Swarm RP">Swarm</span>`;
+    const pollinator1 = `<span class="rp-chip ${allianceColor} ${alliance.pollinator1RP ? "filled" : ""}" title="Pollinator 1 RP">Pollinator 1</span>`;
+    const pollinator2 = `<span class="rp-chip ${allianceColor} ${alliance.pollinator2RP ? "filled" : ""}" title="Pollinator 2 RP">Pollinator 2</span>`;
+    return `<div class="rp-line">${renderMatchRPChips(matchRP, allianceColor)}${swarm}${pollinator1}${pollinator2}</div>`;
 }
 function renderDonutChart(canvasId, values, labels, colors) {
     const canvas = document.getElementById(canvasId);
@@ -2485,22 +2434,22 @@ function renderAllianceBreakdown(scoreMatch, allianceColor, chartJobs) {
     const donutId = `score-donut-${allianceColor}-${scoreMatch.matchNumber}-${Date.now()}`;
     const segmentLabels = [
         "Auto Leave",
-        "Auto Artifact",
-        "Auto Pattern",
-        "Teleop Artifact",
-        "Teleop Depot",
-        "Teleop Pattern",
-        "Teleop Base",
+        "Auto Hive",
+        "Auto Park",
+        "Teleop Hive",
+        "Teleop Garden",
+        "Teleop Flower",
+        "Teleop Park",
         "Penalties Awarded"
     ];
     const segmentValues = [
         alliance.autoLeavePoints || 0,
-        alliance.autoArtifactPoints || 0,
-        alliance.autoPatternPoints || 0,
-        alliance.teleopArtifactPoints || 0,
-        alliance.teleopDepotPoints || 0,
-        alliance.teleopPatternPoints || 0,
-        alliance.teleopBasePoints || 0,
+        alliance.autoHivePoints || 0,
+        alliance.autoParkPoints || 0,
+        alliance.teleopHivePoints || 0,
+        alliance.teleopGardenPoints || 0,
+        alliance.teleopFlowerPoints || 0,
+        alliance.teleopParkPoints || 0,
         penaltyPointsEarned
     ];
     const palette = allianceColor === "red"
@@ -2510,33 +2459,49 @@ function renderAllianceBreakdown(scoreMatch, allianceColor, chartJobs) {
     const autoSection = `
         <div class="score-section">
             <div class="section-title">Autonomous</div>
-            ${renderMetricRow("Auto Classified Artifacts", alliance.autoClassifiedArtifacts ?? 0)}
-            ${renderMetricRow("Auto Overflow Artifacts", alliance.autoOverflowArtifacts ?? 0)}
+            ${renderMetricRow("Hive Tips", alliance.autoHiveTips ?? 0)}
             ${renderMetricRow("Auto Leave Points", alliance.autoLeavePoints ?? 0)}
-            ${renderMetricRow("Auto Pattern Points", alliance.autoPatternPoints ?? 0)}
-            ${renderMetricRow("Auto Artifact Points", alliance.autoArtifactPoints ?? 0)}
+            ${renderMetricRow("Auto Park Points", alliance.autoParkPoints ?? 0)}
+            ${renderMetricRow("Auto Hive Points", alliance.autoHivePoints ?? 0)}
         </div>
     `;
     const teleopSection = `
         <div class="score-section">
             <div class="section-title">Teleop</div>
-            ${renderMetricRow("Teleop Classified Artifacts", alliance.teleopClassifiedArtifacts ?? 0)}
-            ${renderMetricRow("Teleop Overflow Artifacts", alliance.teleopOverflowArtifacts ?? 0)}
-            ${renderMetricRow("Teleop Depot Artifacts", alliance.teleopDepotArtifacts ?? 0)}
-            ${renderMetricRow("Teleop Pattern Points", alliance.teleopPatternPoints ?? 0)}
-            ${renderMetricRow("Teleop Artifact Points", alliance.teleopArtifactPoints ?? 0)}
-            ${renderMetricRow("Teleop Base Points", alliance.teleopBasePoints ?? 0)}
+            ${renderMetricRow("Hive Tips", alliance.teleopHiveTips ?? 0)}
+            ${renderMetricRow("Hive Pollen / Nectar", alliance.teleopHivePollenNectar ?? 0)}
+            ${renderMetricRow("Garden Pollen / Nectar", alliance.teleopGardenPollenNectar ?? 0)}
+            ${renderMetricRow("Teleop Garden Points", alliance.teleopGardenPoints ?? 0)}
+            ${renderMetricRow("Teleop Flower Points", alliance.teleopFlowerPoints ?? 0)}
+            ${renderMetricRow("Teleop Hive Points", alliance.teleopHivePoints ?? 0)}
+            ${renderMetricRow("Teleop Hive Tips", alliance.teleopParkPoints ?? 0)}
         </div>
     `;
     const robotsSection = `
         <div class="score-section">
             <div class="section-title">Robots</div>
             <div class="metric-row">Auto Leave
-                <span class="metric-value robot-badges">${renderRobotPill("R1", alliance.robot1Auto, allianceColor)}${renderRobotPill("R2", alliance.robot2Auto, allianceColor)}</span>
+                <span class="metric-value robot-badges">${renderRobotPill("R1", alliance.autoRobot1Leave, allianceColor)}${renderRobotPill("R2", alliance.autoRobot2Leave, allianceColor)}</span>
+            </div>
+            <div class="metric-row">Auto Park
+                <span class="metric-value robot-badges">${renderRobotPill("R1", alliance.autoRobot1Park ? "Parked" : "Not parked", allianceColor)}${renderRobotPill("R2", alliance.autoRobot2Park ? "Parked" : "Not parked", allianceColor)}</span>
             </div>
             <div class="metric-row">Teleop Park
-                <span class="metric-value robot-badges">${renderRobotPill("R1", alliance.robot1Teleop || "NONE", allianceColor)}${renderRobotPill("R2", alliance.robot2Teleop || "NONE", allianceColor)}</span>
+                <span class="metric-value robot-badges">${renderRobotPill("R1", alliance.teleopRobot1Park ? "Parked" : "Not parked", allianceColor)}${renderRobotPill("R2", alliance.teleopRobot2Park ? "Parked" : "Not parked", allianceColor)}</span>
             </div>
+        </div>
+    `;
+    const flowersSection = `
+        <div class="score-section">
+            <div class="section-title">Flowers</div>
+            ${[
+        ["Red Alliance", alliance.redAllianceFlower],
+        ["Scoring", alliance.scoringFlower],
+        ["Blue Alliance", alliance.blueAllianceFlower],
+        ["Audience", alliance.audienceFlower]
+    ].map(([label, contents]) => renderMetricRow(label, contents === null ? "Unavailable" : contents?.map(element => ({
+        RED_NECTAR: "Red nectar", BLUE_NECTAR: "Blue nectar", POLLEN: "Pollen"
+    })[element]).join(" · ") || "Empty")).join("")}
         </div>
     `;
     const penaltySection = `
@@ -2551,7 +2516,7 @@ function renderAllianceBreakdown(scoreMatch, allianceColor, chartJobs) {
                     <div class="score-card-label">${allianceColor === "red" ? "Red" : "Blue"} Alliance</div>
                     <div class="score-card-total">${alliance.totalPoints ?? 0}</div>
                 </div>
-                ${renderRPLine(alliance, opponent, allianceColor)}
+                ${isQualMatch(scoreMatch) ? renderRPLine(alliance, opponent, allianceColor) : ""}
             </div>
             <div class="score-card-body">
                 <div class="score-donut-block">
@@ -2564,66 +2529,10 @@ function renderAllianceBreakdown(scoreMatch, allianceColor, chartJobs) {
                     ${autoSection}
                     ${teleopSection}
                     ${robotsSection}
+                    ${flowersSection}
                     ${penaltySection}
                 </div>
             </div>
-        </div>
-    `;
-}
-function getRandomizationTarget(randomization) {
-    switch (randomization) {
-        case 1: return ["G", "P", "P", "G", "P", "P", "G", "P", "P"];
-        case 2: return ["P", "G", "P", "P", "G", "P", "P", "G", "P"];
-        case 3: return ["P", "P", "G", "P", "P", "G", "P", "P", "G"];
-        default: return ["-", "-", "-", "-", "-", "-", "-", "-", "-"];
-    }
-}
-function abbreviateState(state) {
-    if (!state)
-        return "-";
-    if (state.toUpperCase() === "PURPLE")
-        return "P";
-    if (state.toUpperCase() === "GREEN")
-        return "G";
-    return "-";
-}
-function renderClassifierRow(label, values, target, accentClass) {
-    const cells = values.map((val, idx) => {
-        const letter = abbreviateState(val);
-        const matches = letter !== "-" && letter === target[idx];
-        const letterClass = letter === "P" ? "classifier-purple" : letter === "G" ? "classifier-green" : "classifier-empty";
-        const content = matches ? `<strong>${letter}</strong>` : letter;
-        return `<span class="classifier-cell ${letterClass}">${content}</span>`;
-    }).join("");
-    return `
-        <div class="classifier-row">
-            <span class="classifier-label ${accentClass}">${label}</span>
-            <div class="classifier-cells">${cells}</div>
-        </div>
-    `;
-}
-function renderClassifierSection(scoreMatch) {
-    if (!scoreMatch) {
-        return `<div class="classifier-section"><div class="classifier-row"><span class="classifier-label">Classifier</span><div class="classifier-cells">Pending scores</div></div></div>`;
-    }
-    const target = getRandomizationTarget(scoreMatch.randomization);
-    const targetCells = target.map(letter => {
-        const cls = letter === "P" ? "classifier-purple" : letter === "G" ? "classifier-green" : "classifier-empty";
-        return `<span class="classifier-cell ${cls}">${letter}</span>`;
-    }).join("");
-    const red = getAllianceFromScore(scoreMatch, "red");
-    const blue = getAllianceFromScore(scoreMatch, "blue");
-    return `
-        <div class="classifier-section">
-            <div class="classifier-row">
-                <span class="classifier-label">Target</span>
-                <div class="classifier-cells">${targetCells}</div>
-            </div>
-            <div class="classifier-separator"></div>
-            ${red ? renderClassifierRow("Red Auto", red.autoClassifierState || [], target, "red") : ""}
-            ${blue ? renderClassifierRow("Blue Auto", blue.autoClassifierState || [], target, "blue") : ""}
-            ${red ? renderClassifierRow("Red Teleop", red.teleopClassifierState || [], target, "red") : ""}
-            ${blue ? renderClassifierRow("Blue Teleop", blue.teleopClassifierState || [], target, "blue") : ""}
         </div>
     `;
 }
@@ -2637,8 +2546,7 @@ function renderScoreBreakdown(scoreMatch, chartJobs) {
             ${renderAllianceBreakdown(scoreMatch, "blue", chartJobs)}
         </div>
     `;
-    const classifier = renderClassifierSection(scoreMatch);
-    return `<div class="score-breakdown"><div class="score-breakdown-title">Score Breakdown</div>${cards}${classifier}</div>`;
+    return `<div class="score-breakdown"><div class="score-breakdown-title">Score Breakdown</div>${cards}</div>`;
 }
 async function renderMatchDetails(match, rankings, teams, options = {}) {
     const detailsContainer = document.getElementById("schedule-details");
@@ -2719,7 +2627,7 @@ async function renderMatchDetails(match, rankings, teams, options = {}) {
                         <th>Rank</th>
                         <th>Ranking Score</th>
                         <th>Match Points</th>
-                        <th>Base Points</th>
+                        <th>Hive Tips</th>
                         <th>Auto Points</th>
                         <th>W-L-T</th>
                         <th>Plays</th>
@@ -3238,12 +3146,12 @@ async function renderNotesEditor(team, eventCode) {
             
             <div class="notes-section">
                 <label class="notes-label" for="notes-auto">Autonomous Performance</label>
-                <textarea class="notes-textarea" id="notes-auto" placeholder="Describe autonomous performance: Start location, ball count, reliability...">${notes.autoPerformance}</textarea>
+                <textarea class="notes-textarea" id="notes-auto" placeholder="Describe autonomous performance: Start location, hive tips, leave, park, reliability...">${notes.autoPerformance}</textarea>
             </div>
             
             <div class="notes-section">
                 <label class="notes-label" for="notes-teleop">Teleoperated Performance</label>
-                <textarea class="notes-textarea" id="notes-teleop" placeholder="Describe teleoperated performance: Shooting location, throughput, accuracy, strategy...">${notes.teleopPerformance}</textarea>
+                <textarea class="notes-textarea" id="notes-teleop" placeholder="Describe teleoperated performance: Hive tips, flowers, garden, parking, reliability...">${notes.teleopPerformance}</textarea>
             </div>
             
             <div class="notes-section">
@@ -3486,8 +3394,8 @@ function computeOprForEvent(teamNumber, schedule, matchScores) {
                 overall: teamMatches.map(() => null),
                 auto: teamMatches.map(() => null),
                 teleop: teamMatches.map(() => null),
-                autoArtifacts: teamMatches.map(() => null),
-                teleopArtifacts: teamMatches.map(() => null)
+                autoHiveTips: teamMatches.map(() => null),
+                teleopHiveTips: teamMatches.map(() => null)
             },
             teamOpr: null
         };
@@ -3525,30 +3433,30 @@ function computeOprForEvent(teamNumber, schedule, matchScores) {
         overall: (alliance) => (alliance.autoPoints || 0) + (alliance.teleopPoints || 0),
         auto: (alliance) => alliance.autoPoints || 0,
         teleop: (alliance) => alliance.teleopPoints || 0,
-        autoArtifacts: (alliance) => (alliance.autoClassifiedArtifacts || 0) + (alliance.autoOverflowArtifacts || 0),
-        teleopArtifacts: (alliance) => (alliance.teleopClassifiedArtifacts || 0) + (alliance.teleopOverflowArtifacts || 0)
+        autoHiveTips: (alliance) => (alliance.autoHiveTips || 0),
+        teleopHiveTips: (alliance) => (alliance.teleopHiveTips || 0)
     };
     const solutions = {
         overall: buildLeastSquaresSolution(teamList, buildEquations(metricSelectors.overall)),
         auto: buildLeastSquaresSolution(teamList, buildEquations(metricSelectors.auto)),
         teleop: buildLeastSquaresSolution(teamList, buildEquations(metricSelectors.teleop)),
-        autoArtifacts: buildLeastSquaresSolution(teamList, buildEquations(metricSelectors.autoArtifacts)),
-        teleopArtifacts: buildLeastSquaresSolution(teamList, buildEquations(metricSelectors.teleopArtifacts))
+        autoHiveTips: buildLeastSquaresSolution(teamList, buildEquations(metricSelectors.autoHiveTips)),
+        teleopHiveTips: buildLeastSquaresSolution(teamList, buildEquations(metricSelectors.teleopHiveTips))
     };
     const teamOpr = {
         overall: solutions.overall.get(teamNumber) || 0,
         auto: solutions.auto.get(teamNumber) || 0,
         teleop: solutions.teleop.get(teamNumber) || 0,
-        autoArtifacts: solutions.autoArtifacts.get(teamNumber) || 0,
-        teleopArtifacts: solutions.teleopArtifacts.get(teamNumber) || 0
+        autoHiveTips: solutions.autoHiveTips.get(teamNumber) || 0,
+        teleopHiveTips: solutions.teleopHiveTips.get(teamNumber) || 0
     };
     // OPR is only shown for qual matches, null for playoff matches
     const perMatchOpr = {
         overall: teamMatches.map(match => isQualMatch(match) ? teamOpr.overall : null),
         auto: teamMatches.map(match => isQualMatch(match) ? teamOpr.auto : null),
         teleop: teamMatches.map(match => isQualMatch(match) ? teamOpr.teleop : null),
-        autoArtifacts: teamMatches.map(match => isQualMatch(match) ? teamOpr.autoArtifacts : null),
-        teleopArtifacts: teamMatches.map(match => isQualMatch(match) ? teamOpr.teleopArtifacts : null)
+        autoHiveTips: teamMatches.map(match => isQualMatch(match) ? teamOpr.autoHiveTips : null),
+        teleopHiveTips: teamMatches.map(match => isQualMatch(match) ? teamOpr.teleopHiveTips : null)
     };
     return {
         eventComplete,
@@ -3689,32 +3597,33 @@ function generateStatsHTML(stats) {
         <div class="insight-card">
             <h3>Autonomous Performance</h3>
             <div class="stat-row"><span>Avg Auto Points:</span><strong>${stats.avgAutoPoints.toFixed(1)}</strong></div>
-            <div class="stat-row"><span>Avg Artifact Points:</span><strong>${stats.avgAutoArtifactPoints.toFixed(1)}</strong></div>
-            <div class="stat-row"><span>Avg Pattern Points:</span><strong>${stats.avgAutoPatternPoints.toFixed(1)}</strong></div>
+            <div class="stat-row"><span>Avg Hive Points:</span><strong>${stats.avgAutoHivePoints.toFixed(1)}</strong></div>
+            <div class="stat-row"><span>Avg Park Points:</span><strong>${stats.avgAutoParkPoints.toFixed(1)}</strong></div>
             <div class="stat-row"><span>Avg Leave Points:</span><strong>${stats.avgAutoLeave.toFixed(1)}</strong></div>
-            <div class="stat-row"><span>Avg Artifacts Scored:</span><strong>${stats.avgAutoArtifacts.toFixed(1)}</strong></div>
-            <div class="stat-row"><span>Median Artifacts Scored:</span><strong>${stats.medianAutoArtifacts.toFixed(1)}</strong></div>
-            <div class="stat-row"><span>Mode Artifacts Scored:</span><strong>${stats.modeAutoArtifacts !== null && stats.modeAutoArtifacts !== undefined ? stats.modeAutoArtifacts : 'n/a'}</strong></div>
-            <div class="stat-row"><span>Std Dev Artifacts:</span><strong>${stats.stdDevAutoArtifacts.toFixed(1)}</strong></div>
+            <div class="stat-row"><span>Avg Hive Tips:</span><strong>${stats.avgAutoHiveTips.toFixed(1)}</strong></div>
+            <div class="stat-row"><span>Median Hive Tips:</span><strong>${stats.medianAutoHiveTips.toFixed(1)}</strong></div>
+            <div class="stat-row"><span>Mode Hive Tips:</span><strong>${stats.modeAutoHiveTips !== null && stats.modeAutoHiveTips !== undefined ? stats.modeAutoHiveTips : "n/a"}</strong></div>
+            <div class="stat-row"><span>Std Dev Hive Tips:</span><strong>${stats.stdDevAutoHiveTips.toFixed(1)}</strong></div>
         </div>
 
         <div class="insight-card">
             <h3>Teleop Performance</h3>
             <div class="stat-row"><span>Avg Teleop Points:</span><strong>${stats.avgTeleopPoints.toFixed(1)}</strong></div>
-            <div class="stat-row"><span>Avg Artifact Points:</span><strong>${stats.avgTeleopArtifactPoints.toFixed(1)}</strong></div>
-            <div class="stat-row"><span>Avg Pattern Points:</span><strong>${stats.avgTeleopPatternPoints.toFixed(1)}</strong></div>
-            <div class="stat-row"><span>Avg Base Points:</span><strong>${stats.avgTeleopBasePoints.toFixed(1)}</strong></div>
-            <div class="stat-row"><span>Avg Artifacts Scored:</span><strong>${stats.avgTeleopArtifacts.toFixed(1)}</strong></div>
-            <div class="stat-row"><span>Median Artifacts Scored:</span><strong>${stats.medianTeleopArtifacts.toFixed(1)}</strong></div>
-            <div class="stat-row"><span>Mode Artifacts Scored:</span><strong>${stats.modeTeleopArtifacts !== null && stats.modeTeleopArtifacts !== undefined ? stats.modeTeleopArtifacts : 'n/a'}</strong></div>
-            <div class="stat-row"><span>Std Dev Artifacts:</span><strong>${stats.stdDevTeleopArtifacts.toFixed(1)}</strong></div>
+            <div class="stat-row"><span>Avg Hive Points:</span><strong>${stats.avgTeleopHivePoints.toFixed(1)}</strong></div>
+            <div class="stat-row"><span>Avg Flower Points:</span><strong>${stats.avgTeleopFlowerPoints.toFixed(1)}</strong></div>
+            <div class="stat-row"><span>Avg Garden Points:</span><strong>${stats.avgTeleopGardenPoints.toFixed(1)}</strong></div>
+            <div class="stat-row"><span>Avg Park Points:</span><strong>${stats.avgTeleopParkPoints.toFixed(1)}</strong></div>
+            <div class="stat-row"><span>Avg Hive Tips:</span><strong>${stats.avgTeleopHiveTips.toFixed(1)}</strong></div>
+            <div class="stat-row"><span>Median Hive Tips:</span><strong>${stats.medianTeleopHiveTips.toFixed(1)}</strong></div>
+            <div class="stat-row"><span>Mode Hive Tips:</span><strong>${stats.modeTeleopHiveTips !== null && stats.modeTeleopHiveTips !== undefined ? stats.modeTeleopHiveTips : "n/a"}</strong></div>
+            <div class="stat-row"><span>Std Dev Hive Tips:</span><strong>${stats.stdDevTeleopHiveTips.toFixed(1)}</strong></div>
         </div>
 
         <div class="insight-card">
-            <h3>Ranking Points</h3>
-            <div class="stat-row"><span>Movement RP:</span><strong>${stats.movementRPRate.toFixed(1)}% (${(stats.movementRPRate * stats.totalMatches / 100).toFixed(0)})</strong></div>
-            <div class="stat-row"><span>Goal RP:</span><strong>${stats.goalRPRate.toFixed(1)}% (${(stats.goalRPRate * stats.totalMatches / 100).toFixed(0)})</strong></div>
-            <div class="stat-row"><span>Pattern RP:</span><strong>${stats.patternRPRate.toFixed(1)}% (${(stats.patternRPRate * stats.totalMatches / 100).toFixed(0)})</strong></div>
+            <h3>Qualification Ranking Points</h3>
+            <div class="stat-row"><span>Swarm RP:</span><strong>${stats.swarmRPRate.toFixed(1)}% (${(stats.swarmRPRate * stats.qualificationMatches / 100).toFixed(0)})</strong></div>
+            <div class="stat-row"><span>Pollinator 1 RP:</span><strong>${stats.pollinator1RPRate.toFixed(1)}% (${(stats.pollinator1RPRate * stats.qualificationMatches / 100).toFixed(0)})</strong></div>
+            <div class="stat-row"><span>Pollinator 2 RP:</span><strong>${stats.pollinator2RPRate.toFixed(1)}% (${(stats.pollinator2RPRate * stats.qualificationMatches / 100).toFixed(0)})</strong></div>
         </div>
 
         <div class="insight-card">
@@ -3848,25 +3757,27 @@ function calculateTeamStatistics(teamNumber, scoreData) {
     const scoresNoPenalty = [];
     const autoPoints = [];
     const teleopPoints = [];
-    const autoArtifactsCounts = [];
-    const teleopArtifactsCounts = [];
+    const autoHiveTipsCounts = [];
+    const teleopHiveTipsCounts = [];
     const matchLabels = [];
     const overallOprSeries = [];
     const autoOprSeries = [];
     const teleopOprSeries = [];
-    const autoArtifactOprSeries = [];
-    const teleopArtifactOprSeries = [];
+    const autoHiveTipOprSeries = [];
+    const teleopHiveTipOprSeries = [];
     let totalEventsAnalyzed = 0;
     let eventsWithCompleteScores = 0;
     let autoLeaveTotal = 0;
-    let autoArtifactPointsTotal = 0;
-    let autoPatternPointsTotal = 0;
-    let teleopArtifactPointsTotal = 0;
-    let teleopPatternPointsTotal = 0;
-    let teleopBasePointsTotal = 0;
-    let movementRP = 0;
-    let goalRP = 0;
-    let patternRP = 0;
+    let autoHivePointsTotal = 0;
+    let autoParkPointsTotal = 0;
+    let teleopHivePointsTotal = 0;
+    let teleopFlowerPointsTotal = 0;
+    let teleopGardenPointsTotal = 0;
+    let teleopParkPointsTotal = 0;
+    let qualificationMatches = 0;
+    let swarmRP = 0;
+    let pollinator1RP = 0;
+    let pollinator2RP = 0;
     let penaltyPointsTotal = 0;
     let majorFouls = 0;
     let minorFouls = 0;
@@ -3892,28 +3803,32 @@ function calculateTeamStatistics(teamNumber, scoreData) {
             overallOprSeries.push(perMatchOpr.overall ? roundTo2(perMatchOpr.overall[idx]) : null);
             autoOprSeries.push(perMatchOpr.auto ? roundTo2(perMatchOpr.auto[idx]) : null);
             teleopOprSeries.push(perMatchOpr.teleop ? roundTo2(perMatchOpr.teleop[idx]) : null);
-            autoArtifactOprSeries.push(perMatchOpr.autoArtifacts ? roundTo2(perMatchOpr.autoArtifacts[idx]) : null);
-            teleopArtifactOprSeries.push(perMatchOpr.teleopArtifacts ? roundTo2(perMatchOpr.teleopArtifacts[idx]) : null);
+            autoHiveTipOprSeries.push(perMatchOpr.autoHiveTips ? roundTo2(perMatchOpr.autoHiveTips[idx]) : null);
+            teleopHiveTipOprSeries.push(perMatchOpr.teleopHiveTips ? roundTo2(perMatchOpr.teleopHiveTips[idx]) : null);
             const scoreWithoutPenalty = (alliance.autoPoints || 0) + (alliance.teleopPoints || 0);
             scoresNoPenalty.push(scoreWithoutPenalty);
             autoPoints.push(alliance.autoPoints || 0);
             teleopPoints.push(alliance.teleopPoints || 0);
             autoLeaveTotal += alliance.autoLeavePoints || 0;
-            autoArtifactPointsTotal += alliance.autoArtifactPoints || 0;
-            autoPatternPointsTotal += alliance.autoPatternPoints || 0;
-            const autoArtifacts = (alliance.autoClassifiedArtifacts || 0) + (alliance.autoOverflowArtifacts || 0);
-            autoArtifactsCounts.push(autoArtifacts);
-            teleopArtifactPointsTotal += alliance.teleopArtifactPoints || 0;
-            teleopPatternPointsTotal += alliance.teleopPatternPoints || 0;
-            teleopBasePointsTotal += alliance.teleopBasePoints || 0;
-            const teleopArtifacts = (alliance.teleopClassifiedArtifacts || 0) + (alliance.teleopOverflowArtifacts || 0);
-            teleopArtifactsCounts.push(teleopArtifacts);
-            if (alliance.movementRP)
-                movementRP++;
-            if (alliance.goalRP)
-                goalRP++;
-            if (alliance.patternRP)
-                patternRP++;
+            autoHivePointsTotal += alliance.autoHivePoints || 0;
+            autoParkPointsTotal += alliance.autoParkPoints || 0;
+            const autoHiveTips = (alliance.autoHiveTips || 0);
+            autoHiveTipsCounts.push(autoHiveTips);
+            teleopHivePointsTotal += alliance.teleopHivePoints || 0;
+            teleopFlowerPointsTotal += alliance.teleopFlowerPoints || 0;
+            teleopGardenPointsTotal += alliance.teleopGardenPoints || 0;
+            teleopParkPointsTotal += alliance.teleopParkPoints || 0;
+            const teleopHiveTips = (alliance.teleopHiveTips || 0);
+            teleopHiveTipsCounts.push(teleopHiveTips);
+            if (isQualMatch(match)) {
+                qualificationMatches++;
+                if (alliance.swarmRP)
+                    swarmRP++;
+                if (alliance.pollinator1RP)
+                    pollinator1RP++;
+                if (alliance.pollinator2RP)
+                    pollinator2RP++;
+            }
             penaltyPointsTotal += alliance.foulPointsCommitted || 0;
             majorFouls += alliance.majorFouls || 0;
             minorFouls += alliance.minorFouls || 0;
@@ -3930,14 +3845,14 @@ function calculateTeamStatistics(teamNumber, scoreData) {
     const scoreStdDev = calculateStdDev(scoresNoPenalty, avgScore);
     const avgAuto = autoPoints.length > 0 ? autoPoints.reduce((a, b) => a + b, 0) / autoPoints.length : 0;
     const avgTeleop = teleopPoints.length > 0 ? teleopPoints.reduce((a, b) => a + b, 0) / teleopPoints.length : 0;
-    const avgAutoArtifacts = autoArtifactsCounts.length > 0 ? autoArtifactsCounts.reduce((a, b) => a + b, 0) / autoArtifactsCounts.length : 0;
-    const medianAutoArtifacts = calculateMedian(autoArtifactsCounts);
-    const modeAutoArtifacts = calculateMode(autoArtifactsCounts);
-    const stdDevAutoArtifacts = calculateStdDev(autoArtifactsCounts, avgAutoArtifacts);
-    const avgTeleopArtifacts = teleopArtifactsCounts.length > 0 ? teleopArtifactsCounts.reduce((a, b) => a + b, 0) / teleopArtifactsCounts.length : 0;
-    const medianTeleopArtifacts = calculateMedian(teleopArtifactsCounts);
-    const modeTeleopArtifacts = calculateMode(teleopArtifactsCounts);
-    const stdDevTeleopArtifacts = calculateStdDev(teleopArtifactsCounts, avgTeleopArtifacts);
+    const avgAutoHiveTips = autoHiveTipsCounts.length > 0 ? autoHiveTipsCounts.reduce((a, b) => a + b, 0) / autoHiveTipsCounts.length : 0;
+    const medianAutoHiveTips = calculateMedian(autoHiveTipsCounts);
+    const modeAutoHiveTips = calculateMode(autoHiveTipsCounts);
+    const stdDevAutoHiveTips = calculateStdDev(autoHiveTipsCounts, avgAutoHiveTips);
+    const avgTeleopHiveTips = teleopHiveTipsCounts.length > 0 ? teleopHiveTipsCounts.reduce((a, b) => a + b, 0) / teleopHiveTipsCounts.length : 0;
+    const medianTeleopHiveTips = calculateMedian(teleopHiveTipsCounts);
+    const modeTeleopHiveTips = calculateMode(teleopHiveTipsCounts);
+    const stdDevTeleopHiveTips = calculateStdDev(teleopHiveTipsCounts, avgTeleopHiveTips);
     return {
         totalMatches,
         wins,
@@ -3949,23 +3864,25 @@ function calculateTeamStatistics(teamNumber, scoreData) {
         minScore: scoresNoPenalty.length > 0 ? Math.min(...scoresNoPenalty) : 0,
         avgAutoPoints: avgAuto,
         avgAutoLeave: totalMatches > 0 ? autoLeaveTotal / totalMatches : 0,
-        avgAutoArtifactPoints: totalMatches > 0 ? autoArtifactPointsTotal / totalMatches : 0,
-        avgAutoPatternPoints: totalMatches > 0 ? autoPatternPointsTotal / totalMatches : 0,
-        avgAutoArtifacts,
-        medianAutoArtifacts,
-        modeAutoArtifacts,
-        stdDevAutoArtifacts,
+        avgAutoHivePoints: totalMatches > 0 ? autoHivePointsTotal / totalMatches : 0,
+        avgAutoParkPoints: totalMatches > 0 ? autoParkPointsTotal / totalMatches : 0,
+        avgAutoHiveTips,
+        medianAutoHiveTips,
+        modeAutoHiveTips,
+        stdDevAutoHiveTips,
         avgTeleopPoints: avgTeleop,
-        avgTeleopArtifactPoints: totalMatches > 0 ? teleopArtifactPointsTotal / totalMatches : 0,
-        avgTeleopPatternPoints: totalMatches > 0 ? teleopPatternPointsTotal / totalMatches : 0,
-        avgTeleopBasePoints: totalMatches > 0 ? teleopBasePointsTotal / totalMatches : 0,
-        avgTeleopArtifacts,
-        medianTeleopArtifacts,
-        modeTeleopArtifacts,
-        stdDevTeleopArtifacts,
-        movementRPRate: totalMatches > 0 ? (movementRP / totalMatches) * 100 : 0,
-        goalRPRate: totalMatches > 0 ? (goalRP / totalMatches) * 100 : 0,
-        patternRPRate: totalMatches > 0 ? (patternRP / totalMatches) * 100 : 0,
+        avgTeleopHivePoints: totalMatches > 0 ? teleopHivePointsTotal / totalMatches : 0,
+        avgTeleopGardenPoints: totalMatches > 0 ? teleopGardenPointsTotal / totalMatches : 0,
+        avgTeleopFlowerPoints: totalMatches > 0 ? teleopFlowerPointsTotal / totalMatches : 0,
+        avgTeleopParkPoints: totalMatches > 0 ? teleopParkPointsTotal / totalMatches : 0,
+        avgTeleopHiveTips,
+        medianTeleopHiveTips,
+        modeTeleopHiveTips,
+        stdDevTeleopHiveTips,
+        qualificationMatches,
+        swarmRPRate: qualificationMatches > 0 ? (swarmRP / qualificationMatches) * 100 : 0,
+        pollinator1RPRate: qualificationMatches > 0 ? (pollinator1RP / qualificationMatches) * 100 : 0,
+        pollinator2RPRate: qualificationMatches > 0 ? (pollinator2RP / qualificationMatches) * 100 : 0,
         avgPenaltyPoints: totalMatches > 0 ? penaltyPointsTotal / totalMatches : 0,
         totalMajorFouls: majorFouls,
         totalMinorFouls: minorFouls,
@@ -3973,14 +3890,14 @@ function calculateTeamStatistics(teamNumber, scoreData) {
         scoresNoPenalty,
         autoPoints,
         teleopPoints,
-        autoArtifactsCounts,
-        teleopArtifactsCounts,
+        autoHiveTipsCounts,
+        teleopHiveTipsCounts,
         matchLabels,
         overallOprSeries,
         autoOprSeries,
         teleopOprSeries,
-        autoArtifactOprSeries,
-        teleopArtifactOprSeries,
+        autoHiveTipOprSeries,
+        teleopHiveTipOprSeries,
         eventsWithCompleteScores,
         totalEventsAnalyzed
     };
@@ -3994,10 +3911,10 @@ function generateChartsHTML(stats) {
     const teleopMax = stats.teleopPoints.length > 0 ? Math.max(...stats.teleopPoints) : 50;
     const autoTeleopMax = Math.max(autoMax, teleopMax, 50);
     const autoTeleopChart = generateComparisonChart(stats.autoPoints, stats.teleopPoints, matchLabels, autoTeleopMax, "Auto OPR", stats.autoOprSeries, "Teleop OPR", stats.teleopOprSeries);
-    const autoArtifacts = stats.autoArtifactsCounts || [];
-    const teleopArtifacts = stats.teleopArtifactsCounts || [];
-    const maxArtifacts = Math.max(autoArtifacts.length > 0 ? Math.max(...autoArtifacts) : 10, teleopArtifacts.length > 0 ? Math.max(...teleopArtifacts) : 10, 10);
-    const artifactsLineChart = generateLineChart(autoArtifacts, teleopArtifacts, matchLabels, maxArtifacts, "Auto Artifacts OPR", stats.autoArtifactOprSeries, "Teleop Artifacts OPR", stats.teleopArtifactOprSeries);
+    const autoHiveTips = stats.autoHiveTipsCounts || [];
+    const teleopHiveTips = stats.teleopHiveTipsCounts || [];
+    const maxHiveTips = Math.max(autoHiveTips.length > 0 ? Math.max(...autoHiveTips) : 10, teleopHiveTips.length > 0 ? Math.max(...teleopHiveTips) : 10, 10);
+    const hiveTipsLineChart = generateLineChart(autoHiveTips, teleopHiveTips, matchLabels, maxHiveTips, "Auto Hive Tips OPR", stats.autoHiveTipOprSeries, "Teleop Hive Tips OPR", stats.teleopHiveTipOprSeries);
     // const oprContext = stats.totalEventsAnalyzed > 0
     //     ? `<div style="margin: 8px 0 4px; color: #9aa0ac; font-size: 12px;">OPR overlays shown for ${stats.eventsWithCompleteScores}/${stats.totalEventsAnalyzed} meets that are fully scored.</div>`
     //     : "";
@@ -4017,12 +3934,12 @@ function generateChartsHTML(stats) {
             </div>
             <div class="insights-charts full-width">
                 <div class="chart-container wide">
-                    <h3>Artifacts Scored <span class="chart-info-icon" title="Includes both classified and overflow artifacts">(i)</span></h3>
+                    <h3>Hive Tips <span class="chart-info-icon" title="Alliance hive tips in autonomous and teleop">(i)</span></h3>
                     <div class="chart-legend">
                         <span class="legend-item"><span class="legend-color auto"></span> Auto</span>
                         <span class="legend-item"><span class="legend-color teleop"></span> Teleop</span>
                     </div>
-                    ${artifactsLineChart}
+                    ${hiveTipsLineChart}
                 </div>
             </div>
         </div>
@@ -4352,7 +4269,7 @@ function generateLineChart(data1, data2, labels, maxValue, overlay1Label, overla
         ];
         if (overlay1Data && overlay1Data.length === data1.length && overlay1Data.some(v => v !== null && v !== undefined)) {
             datasets.push({
-                label: overlay1Label || "Auto Artifacts OPR",
+                label: overlay1Label || "Auto Hive Tips OPR",
                 data: overlay1Data,
                 borderColor: "#115e59",
                 backgroundColor: "#115e59",
@@ -4366,7 +4283,7 @@ function generateLineChart(data1, data2, labels, maxValue, overlay1Label, overla
         }
         if (overlay2Data && overlay2Data.length === data2.length && overlay2Data.some(v => v !== null && v !== undefined)) {
             datasets.push({
-                label: overlay2Label || "Teleop Artifacts OPR",
+                label: overlay2Label || "Teleop Hive Tips OPR",
                 data: overlay2Data,
                 borderColor: "#7f1d1d",
                 backgroundColor: "#7f1d1d",
@@ -4424,7 +4341,7 @@ function generateLineChart(data1, data2, labels, maxValue, overlay1Label, overla
                                 const label = context.dataset.label || "";
                                 const value = context.parsed.y;
                                 const display = typeof value === "number" ? value.toFixed(2) : value;
-                                return `${label}: ${display} artifact${value !== 1 ? "s" : ""}`;
+                                return `${label}: ${display} tip${value !== 1 ? "s" : ""}`;
                             }
                         },
                         borderColor: function (context) {
@@ -4577,7 +4494,7 @@ function loadFieldImage() {
             resolve(img);
         };
         img.onerror = reject;
-        img.src = "/assets/field.png";
+        img.src = "/assets/biobuzz-field.png";
     });
 }
 function resizeStrategyCanvases() {
@@ -4610,7 +4527,7 @@ function renderFieldBackground() {
     ctx.clearRect(0, 0, fieldCanvas.width, fieldCanvas.height);
     ctx.fillStyle = STRATEGY_CONFIG.fieldBackground;
     ctx.fillRect(0, 0, fieldCanvas.width, fieldCanvas.height);
-    const imgAspect = strategyFieldImage.width / strategyFieldImage.height;
+    const imgAspect = 1;
     const canvasAspect = fieldCanvas.width / fieldCanvas.height;
     let drawW, drawH, offsetX, offsetY;
     if (canvasAspect > imgAspect) {
@@ -4625,13 +4542,14 @@ function renderFieldBackground() {
         offsetX = 0;
         offsetY = (fieldCanvas.height - drawH) / 2;
     }
-    ctx.drawImage(strategyFieldImage, offsetX, offsetY, drawW, drawH);
+    // Field perimeter in FIRST Competition Manual Figure 9-2.
+    ctx.drawImage(strategyFieldImage, 147, 22, 369, 369, offsetX, offsetY, drawW, drawH);
 }
 function getFieldBounds() {
     const fieldCanvas = document.getElementById("strategy-field-canvas");
     if (!fieldCanvas || !strategyFieldImage)
         return { x: 0, y: 0, w: 0, h: 0 };
-    const imgAspect = strategyFieldImage.width / strategyFieldImage.height;
+    const imgAspect = 1;
     const canvasAspect = fieldCanvas.width / fieldCanvas.height;
     if (canvasAspect > imgAspect) {
         const drawH = fieldCanvas.height;
@@ -5621,6 +5539,25 @@ window.addEventListener("popstate", async (event) => {
     }
 });
 document.addEventListener("DOMContentLoaded", async () => {
+    if (IS_CAPACITOR) {
+        const link = document.getElementById("login-register-link");
+        if (link) {
+            link.addEventListener("click", (e) => {
+                e.preventDefault();
+                window.open("https://ftcvanguard.org/register", "_blank");
+            });
+        }
+        // Desktop nav buttons (back/forward)
+        if (!IS_NATIVE_MOBILE) {
+            document.body.classList.add("capacitor-desktop");
+            const backBtn = document.getElementById("cap-back-btn");
+            const forwardBtn = document.getElementById("cap-forward-btn");
+            if (backBtn)
+                backBtn.addEventListener("click", () => history.back());
+            if (forwardBtn)
+                forwardBtn.addEventListener("click", () => history.forward());
+        }
+    }
     // Mobile menu initialization
     const mobileMenuBtn = document.getElementById("mobile-menu-btn");
     const sidebarOverlay = document.getElementById("sidebar-overlay");

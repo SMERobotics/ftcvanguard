@@ -757,16 +757,16 @@
                 <div class="score-card blue">
                     <div class="score-card-header">
                         <div>
-                            <div class="score-card-label">Blue Alliance</div>
-                            <div class="score-card-total">145</div>
+                            <div class="score-card-label">BIOBUZZ · Blue Alliance</div>
+                            <div class="score-card-total">161</div>
                         </div>
                         <div class="rp-line">
                             <span class="rp-chip match blue filled" title="Match RP">Match</span>
                             <span class="rp-chip match blue filled" title="Match RP">Match</span>
                             <span class="rp-chip match blue filled" title="Match RP">Match</span>
-                            <span class="rp-chip blue filled" title="Movement RP">Movement</span>
-                            <span class="rp-chip blue" title="Goal RP">Goal</span>
-                            <span class="rp-chip blue filled" title="Pattern RP">Pattern</span>
+                            <span class="rp-chip blue filled" title="Swarm RP">Swarm</span>
+                            <span class="rp-chip blue filled" title="Pollinator 1 RP">Pollinator 1</span>
+                            <span class="rp-chip blue" title="Pollinator 2 RP">Pollinator 2</span>
                         </div>
                     </div>
                     <div class="score-card-body">
@@ -774,30 +774,30 @@
                             <canvas id="hero-donut-chart" width="180" height="180"></canvas>
                             <div class="donut-legend">
                                 <span><span class="legend-dot" style="background:#d6e9ff"></span>Auto Leave</span>
-                                <span><span class="legend-dot" style="background:#a9d0ff"></span>Auto Artifact</span>
-                                <span><span class="legend-dot" style="background:#7fb6ff"></span>Auto Pattern</span>
-                                <span><span class="legend-dot" style="background:#559cff"></span>Teleop Artifact</span>
-                                <span><span class="legend-dot" style="background:#2f86ff"></span>Teleop Depot</span>
-                                <span><span class="legend-dot" style="background:#1f73e8"></span>Teleop Pattern</span>
-                                <span><span class="legend-dot" style="background:#155bc1"></span>Teleop Base</span>
+                                <span><span class="legend-dot" style="background:#a9d0ff"></span>Auto Hive</span>
+                                <span><span class="legend-dot" style="background:#7fb6ff"></span>Auto Park</span>
+                                <span><span class="legend-dot" style="background:#559cff"></span>Teleop Hive</span>
+                                <span><span class="legend-dot" style="background:#2f86ff"></span>Teleop Garden</span>
+                                <span><span class="legend-dot" style="background:#1f73e8"></span>Teleop Flower</span>
+                                <span><span class="legend-dot" style="background:#155bc1"></span>Teleop Park</span>
                                 <span><span class="legend-dot" style="background:#707070"></span>Penalties</span>
                             </div>
                         </div>
                         <div class="score-details-grid">
                             <div class="score-section">
                                 <div class="section-title">Autonomous</div>
-                                <div class="metric-row"><span>Classified Artifacts</span><span class="metric-value">4</span></div>
+                                <div class="metric-row"><span>Hive Tips</span><span class="metric-value">2</span></div>
                                 <div class="metric-row"><span>Leave Points</span><span class="metric-value">6</span></div>
-                                <div class="metric-row"><span>Pattern Points</span><span class="metric-value">20</span></div>
-                                <div class="metric-row"><span>Artifact Points</span><span class="metric-value">24</span></div>
+                                <div class="metric-row"><span>Park Points</span><span class="metric-value">10</span></div>
+                                <div class="metric-row"><span>Hive Points</span><span class="metric-value">40</span></div>
                             </div>
                             <div class="score-section">
                                 <div class="section-title">Teleop</div>
-                                <div class="metric-row"><span>Classified Artifacts</span><span class="metric-value">12</span></div>
-                                <div class="metric-row"><span>Depot Artifacts</span><span class="metric-value">8</span></div>
-                                <div class="metric-row"><span>Pattern Points</span><span class="metric-value">40</span></div>
-                                <div class="metric-row"><span>Artifact Points</span><span class="metric-value">36</span></div>
-                                <div class="metric-row"><span>Base Points</span><span class="metric-value">12</span></div>
+                                <div class="metric-row"><span>Hive Tips</span><span class="metric-value">3</span></div>
+                                <div class="metric-row"><span>Hive Points</span><span class="metric-value">68</span></div>
+                                <div class="metric-row"><span>Garden Points</span><span class="metric-value">8</span></div>
+                                <div class="metric-row"><span>Flower Points</span><span class="metric-value">14</span></div>
+                                <div class="metric-row"><span>Park Points</span><span class="metric-value">5</span></div>
                             </div>
                             <div class="score-section">
                                 <div class="section-title">Robots</div>
@@ -809,13 +809,13 @@
                                 </div>
                                 <div class="metric-row">Teleop Park
                                     <span class="metric-value robot-badges">
-                                        <span class="robot-pill blue pill-on">R1 Full</span>
-                                        <span class="robot-pill blue pill-off">R2 None</span>
+                                        <span class="robot-pill blue pill-on">R1 Parked</span>
+                                        <span class="robot-pill blue pill-off">R2 Not parked</span>
                                     </span>
                                 </div>
                             </div>
                              <div class="score-section">
-                                <div class="metric-row"><span>Penalties Awarded</span><span class="metric-value" style="color: #ffd166;">5</span></div>
+                                <div class="metric-row"><span>Penalties Awarded</span><span class="metric-value" style="color: #ffd166;">10</span></div>
                             </div>
                         </div>
                     </div>
@@ -982,16 +982,16 @@
                     data: {
                         labels: [
                             "Auto Leave",
-                            "Auto Artifact",
-                            "Auto Pattern",
-                            "Teleop Artifact",
-                            "Teleop Depot",
-                            "Teleop Pattern",
-                            "Teleop Base",
+                            "Auto Hive",
+                            "Auto Park",
+                            "Teleop Hive",
+                            "Teleop Garden",
+                            "Teleop Flower",
+                            "Teleop Park",
                             "Penalties Awarded"
                         ],
                         datasets: [{
-                            data: [6, 24, 20, 36, 12, 40, 12, 5],
+                            data: [6, 40, 10, 68, 8, 14, 5, 10],
                             backgroundColor: ["#d6e9ff", "#a9d0ff", "#7fb6ff", "#559cff", "#2f86ff", "#1f73e8", "#155bc1", "#707070"],
                             borderWidth: 0
                         }]

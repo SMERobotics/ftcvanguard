@@ -14,6 +14,8 @@ import threading
 import time
 import tomllib
 
+from season import FTC_SEASON, migrate_season
+
 FTC_API_URL = "https://ftc-api.firstinspires.org/v2.0"
 BLOCK_REGISTRATION = False
 RSA_PUBLIC_KEY = ""
@@ -112,8 +114,8 @@ def set_team_schedule_offset(
 
 
 def get_active_event(team_id: int) -> str | None:
-    now = datetime.now() - timedelta(weeks=34)
-    year = now.year
+    now = datetime.now()
+    year = FTC_SEASON
 
     r = s.get(f"{FTC_API_URL}/{year}/events?teamNumber={team_id}")
     if r.status_code != 200:
@@ -223,8 +225,8 @@ def send_notification(
 
 
 def notification_callback():
-    now = datetime.now() - timedelta(weeks=34)
-    year = now.year
+    now = datetime.now()
+    year = FTC_SEASON
 
     for team_id in NTFY_TEAMS:
         event = get_active_event(team_id)
@@ -320,6 +322,7 @@ with open(os.path.join(ssh_dir, "id_rsa.pem"), "r") as f:
     RSA_PRIVATE_KEY = f.read()
 
 db = get_db()
+migrate_season(db)
 cursor = db.cursor()
 cursor.execute("PRAGMA journal_mode=WAL;")
 cursor.execute(
@@ -753,8 +756,7 @@ def _api_v1_events():
 
     # fetch events from FTC API
 
-    now = datetime.now() - timedelta(weeks=34)
-    year = now.year
+    year = FTC_SEASON
 
     r = s.get(f"{FTC_API_URL}/{year}/events?teamNumber={team_id}")
     return r.json(), r.status_code
@@ -781,8 +783,7 @@ def _api_v1_event():
     except:
         return {"status": "fuck", "error": "bad request"}, 400
 
-    now = datetime.now() - timedelta(weeks=34)
-    year = now.year
+    year = FTC_SEASON
 
     r = s.get(f"{FTC_API_URL}/{year}/events?eventCode={event}")
     return r.json(), r.status_code
@@ -809,8 +810,7 @@ def _api_v1_schedule():
     except:
         return {"status": "fuck", "error": "bad request"}, 400
 
-    now = datetime.now() - timedelta(weeks=34)
-    year = now.year
+    year = FTC_SEASON
 
     # Fetch both qual and playoff schedules and merge them
     qual_url = f"{FTC_API_URL}/{year}/schedule/{event}?tournamentLevel=qual"
@@ -929,8 +929,7 @@ def _api_v1_matches():
         return {"status": "fuck", "error": "missing event"}, 400
 
     level = request.args.get("level")
-    now = datetime.now() - timedelta(weeks=34)
-    year = now.year
+    year = FTC_SEASON
 
     url = f"{FTC_API_URL}/{year}/matches/{event}"
     params = []
@@ -957,8 +956,7 @@ def _api_v1_scores(event, level):
     except jwt.InvalidTokenError:
         return {"status": "fuck", "error": "invalid token"}, 401
 
-    now = datetime.now() - timedelta(weeks=34)
-    year = now.year
+    year = FTC_SEASON
 
     r = s.get(f"{FTC_API_URL}/{year}/scores/{event}/{level}")
     return r.json(), r.status_code
@@ -978,8 +976,7 @@ def _api_v1_team_events(team_number):
     except jwt.InvalidTokenError:
         return {"status": "fuck", "error": "invalid token"}, 401
 
-    now = datetime.now() - timedelta(weeks=34)
-    year = now.year
+    year = FTC_SEASON
 
     r = s.get(f"{FTC_API_URL}/{year}/events?teamNumber={team_number}")
     return r.json(), r.status_code
@@ -1009,8 +1006,7 @@ def _api_v1_rankings():
     if not event:
         return {"status": "fuck", "error": "missing event"}, 400
 
-    now = datetime.now() - timedelta(weeks=34)
-    year = now.year
+    year = FTC_SEASON
 
     r = s.get(f"{FTC_API_URL}/{year}/rankings/{event}")
     return r.json(), r.status_code
@@ -1035,8 +1031,7 @@ def _api_v1_teams():
     except:
         return {"status": "fuck", "error": "bad request"}, 400
 
-    now = datetime.now() - timedelta(weeks=34)
-    year = now.year
+    year = FTC_SEASON
 
     r = s.get(f"{FTC_API_URL}/{year}/teams?eventCode={event}")
     return r.json(), r.status_code
@@ -1056,8 +1051,7 @@ def _api_v1_team_info(team_number):
     except jwt.InvalidTokenError:
         return {"status": "fuck", "error": "invalid token"}, 401
 
-    now = datetime.now() - timedelta(weeks=34)
-    year = now.year
+    year = FTC_SEASON
 
     r = s.get(f"{FTC_API_URL}/{year}/teams?teamNumber={team_number}")
     return r.json(), r.status_code
