@@ -1,3 +1,3 @@
 # ftcvanguard
 
-Palantir for kids game
+Palantir for tech challenge (minus evil death and destruction)
