@@ -18,6 +18,7 @@ dependencies = [
 ]
 
 [project.scripts]
+start = "vanguard:start"
 dev = "vanguard:dev"
 
 [build-system]

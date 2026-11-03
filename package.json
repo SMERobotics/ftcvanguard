@@ -4,8 +4,10 @@
   "private": true,
   "packageManager": "bun@1.3.14",
   "scripts": {
-    "server": "uv run --directory server dev",
+    "server": "uv run --directory server start",
+    "server:dev": "uv run --directory server dev",
     "ios": "bun run --cwd ios start",
+    "ios:ios": "bun run --cwd ios ios",
     "ios:typecheck": "bun run --cwd ios typecheck"
   }
 }
