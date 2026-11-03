@@ -1,6 +1,6 @@
 import httpx
 
-from app.config import get_settings
+from vanguard.config import get_settings
 
 
 class FTCClient(httpx.AsyncClient):

@@ -1,14 +1,19 @@
+### iOS
+
 node_modules/
 .expo/
 dist/
-/ios/
-/android/
 .DS_Store
 .env*.local
 *.tsbuildinfo
 .metro-health-check*
+# define explicitly so we don't accidentally target the code itself
+/ios/ios/
+/ios/android/
 
-# Python-generated files
+### server
+
+.venv
 __pycache__/
 *.py[oc]
 build/
@@ -16,12 +21,11 @@ dist/
 wheels/
 *.egg-info
 
-# Virtual environments
-.venv
+### config
 
-# Config
 .env
 config.toml
 
-# Development files
+### misc/dev
+
 prompts/

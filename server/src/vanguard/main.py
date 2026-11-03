@@ -3,9 +3,9 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from redis.asyncio import Redis
 
-from app.config import get_settings
-from app.ftc import FTCClient
-from app.services.schedule import Schedule, get_schedule
+from vanguard.config import get_settings
+from vanguard.ftc import FTCClient
+from vanguard.services.schedule import Schedule, get_schedule
 
 
 @asynccontextmanager

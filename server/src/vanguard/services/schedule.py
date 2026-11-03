@@ -5,7 +5,7 @@ from zoneinfo import ZoneInfo
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.ftc import FTCClient
+from vanguard.ftc import FTCClient
 
 LEVELS = ("PRACTICE", "QUALIFICATION", "PLAYOFF")
 

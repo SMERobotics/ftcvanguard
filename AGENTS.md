@@ -2,8 +2,9 @@
 
 ## Stack
 
-backend: FastAPI, httpx, Redis, SQLModel
-iOS: React Native + Expo
+`server/`: FastAPI, httpx, Redis, SQLModel
+`ios/`: React Native + Expo
+`web/`: Svelte + SvelteKit, Tailwind
 
 ## Practices
 
