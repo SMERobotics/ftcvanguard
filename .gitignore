@@ -22,3 +22,6 @@ wheels/
 # Config
 .env
 config.toml
+
+# Development files
+prompts/

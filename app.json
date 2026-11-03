@@ -13,6 +13,7 @@
       "supportsTablet": true
     },
     "plugins": [
+      "expo-router",
       "expo-font"
     ]
   }

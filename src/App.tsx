@@ -1,14 +1,30 @@
-import { JetBrainsMono_400Regular, useFonts } from '@expo-google-fonts/jetbrains-mono';
-import { Text, View } from 'react-native';
+import { JetBrainsMono_400Regular, JetBrainsMono_700Bold, useFonts } from '@expo-google-fonts/jetbrains-mono';
+import { selectionAsync } from 'expo-haptics';
+import { NativeTabs } from 'expo-router/native-tabs';
 
 export default function App() {
-  const [loaded, error] = useFonts({ JetBrainsMono_400Regular });
+  const [loaded, error] = useFonts({ JetBrainsMono_400Regular, JetBrainsMono_700Bold });
 
   if (error) throw error;
+  if (!loaded) return null;
 
   return (
-    <View style={{ flex: 1, backgroundColor: 'black', alignItems: 'center', justifyContent: 'center' }}>
-      {loaded && <Text style={{ color: 'white', fontFamily: 'JetBrainsMono_400Regular' }}>Vanguard</Text>}
-    </View>
+    <NativeTabs
+      labelStyle={{ fontFamily: 'JetBrainsMono_400Regular' }}
+      screenListeners={({ navigation }) => ({
+        tabPress: ({ data }) => {
+          if (data.isPrevented || navigation.isFocused()) return;
+          void selectionAsync().catch(() => {});
+        },
+      })}>
+      <NativeTabs.Trigger name="schedule">
+        <NativeTabs.Trigger.Label>Schedule</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Icon src={require('./assets/lucide/clipboard-clock.png')} renderingMode="template" />
+      </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="rankings">
+        <NativeTabs.Trigger.Label>Rankings</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Icon src={require('./assets/lucide/podium.png')} renderingMode="template" />
+      </NativeTabs.Trigger>
+    </NativeTabs>
   );
 }
