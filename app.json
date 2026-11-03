@@ -10,7 +10,13 @@
     "userInterfaceStyle": "dark",
     "backgroundColor": "#000000",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSAppTransportSecurity": {
+          "NSAllowsLocalNetworking": true
+        },
+        "NSLocalNetworkUsageDescription": "Vanguard connects to a local development server to fetch data."
+      }
     },
     "plugins": [
       "expo-router",
