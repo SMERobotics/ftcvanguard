@@ -1,10 +1,11 @@
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from redis.asyncio import Redis
 
 from app.config import get_settings
 from app.ftc import FTCClient
+from app.services.schedule import Schedule, get_schedule
 
 
 @asynccontextmanager
@@ -25,6 +26,11 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
+
+
+@app.get("/api/v2/schedule", response_model=Schedule)
+async def schedule(event: str, request: Request) -> Schedule:
+    return await get_schedule(event, request.app.state.ftc)
 
 
 @app.get("/")
