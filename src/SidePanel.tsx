@@ -1,6 +1,6 @@
 import { CircleQuestionMark, Info, Settings } from 'lucide-react-native';
 import { createContext, useState, type ReactNode } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { Image, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { Drawer } from 'react-native-drawer-layout';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -36,7 +36,7 @@ export default function SidePanel({ children }: { children: ReactNode }) {
             style={[styles.panel, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
             <View style={styles.rail}>
               <Pressable onPress={() => setOpen(false)} accessibilityLabel="Close side panel" accessibilityRole="button" style={styles.icon}>
-                <Text style={styles.monogram}>V</Text>
+                <Image source={require('./assets/team.png')} resizeMode="contain" accessible={false} style={styles.icon} />
               </Pressable>
               <View style={styles.utilities}>
                 {utilities.map(({ label, icon: Icon }) => (
@@ -63,14 +63,13 @@ export default function SidePanel({ children }: { children: ReactNode }) {
 const styles = StyleSheet.create({
   panel: { flex: 1, flexDirection: 'row', backgroundColor: '#333333' },
   rail: { width: 72, alignItems: 'center', paddingTop: 20, paddingBottom: 12, borderRightWidth: 1, borderColor: '#414143'  },
-  icon: { width: 48, height: 48, borderRadius: 24, backgroundColor: '#3478C5', alignItems: 'center', justifyContent: 'center' },
-  monogram: { color: 'white', fontFamily: 'JetBrainsMono_400Regular', fontSize: 22 },
+  icon: { width: 48, height: 48 },
   utilities: { marginTop: 'auto', gap: 8, paddingTop: 24 },
   utility: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center' },
   content: { flex: 1 },
   contentInset: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 24 },
   title: { color: 'white', fontFamily: 'JetBrainsMono_700Bold', fontSize: 24, marginTop: -3 },
   subtitle: { color: '#bdbdbd', fontFamily: 'JetBrainsMono_400Regular', fontSize: 12, marginTop: -2 },
-  heading: { color: '#9a9a9a', fontFamily: 'JetBrainsMono_400Regular', fontSize: 16, marginTop: 32, marginBottom: 20 },
+  heading: { color: '#9a9a9a', fontFamily: 'JetBrainsMono_400Regular', fontSize: 16, marginTop: 40, marginBottom: 20 },
   event: { color: '#e1e1e1', fontFamily: 'JetBrainsMono_400Regular', fontSize: 16, paddingBottom: 20 },
 });
