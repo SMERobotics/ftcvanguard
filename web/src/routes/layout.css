@@ -1,0 +1,16 @@
+@import '@ftcvanguard/design/styles.css';
+@import 'tailwindcss';
+@import '@ftcvanguard/design/theme.css';
+@plugin '@tailwindcss/forms';
+@plugin '@tailwindcss/typography';
+
+@theme inline {
+    --color-chrome: var(--vd-bg-chrome);
+    --color-border: var(--vd-border);
+}
+
+@layer base {
+    *, ::before, ::after, ::backdrop {
+        border-color: var(--vd-border);
+    }
+}
