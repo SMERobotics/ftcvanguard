@@ -16,7 +16,8 @@
           "NSAllowsLocalNetworking": true
         },
         "NSLocalNetworkUsageDescription": "Vanguard connects to a local development server to fetch data."
-      }
+      },
+      "bundleIdentifier": "com.milesmuehlbach.vanguard"
     },
     "plugins": [
       "expo-router",

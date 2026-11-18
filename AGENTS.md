@@ -16,6 +16,8 @@ Prefer clean, visually simple code and linear execution.
 The humans working here aren't stupid - If advanced Python notation and functions can functionally reimplement a whole chunk of code into a line or two, do it.
 Humans have limited attention spans - Structure should not be inflated if the same task can be done in a more readable and beautifully simple way.
 
+Please limit the scope of the actions you make. Commanded actions should execute verbatim with exactly the scope defined in the prompt provided by the user. Do not make large changes to code structure or organization.
+
 When writing code:
 - Names are for quick identification, not cramming every detail into dozens of references.
   - Do not use long, verbose names: Choose clearer, more semantically specific names that can be shorter.
