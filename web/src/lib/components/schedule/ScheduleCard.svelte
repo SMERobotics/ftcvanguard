@@ -4,7 +4,7 @@
     let {stripe}: {stripe: any} = $props();
 </script>
 
-<Card {stripe}>
+<Card {stripe} class="hover:scale-[101%] transition-all duration-100">
     <div class="flex flex-col justify-between gap-2">
         <div class="flex flex-row justify-between align-middle">
             <p class="font-bold text-xl">Qualification 1</p>
