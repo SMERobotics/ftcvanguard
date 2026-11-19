@@ -29,7 +29,7 @@
         <ScheduleCard stripe="none"/>
     </div>
     <div class="w-[1px] shrink-0 touch-none cursor-col-resize bg-border" role="separator" aria-label="Resize panels" aria-orientation="vertical" onpointerdown={startResize} onpointermove={resize}></div>
-    <div class="flex min-w-0 flex-1 overflow-auto bg-chrome">
+    <div class="flex min-w-0 flex-1 overflow-auto bg-chrome justify-center items-center">
         u won the match yayyy
     </div>
 </div>
